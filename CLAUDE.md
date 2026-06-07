@@ -15,8 +15,9 @@ maintainer (`skrabe`). Never direct-push or assume write access to a leaf: the c
 **prepares verified PRs**. (Full model: CONTEXT.md → "Control plane".)
 
 ## Build / test / run
-Greenfield — **no stack chosen yet** (TypeScript vs plain Node `.mjs`). The exact build / test /
-lint / run incantations land here once `/software-design` picks the stack and slice 1 is scaffolded.
+Stack: **TypeScript + vitest** (chosen via `/software-design`; ADR pending). The exact build /
+test / lint / run incantations land here once slice 1 scaffolds `package.json`. Design:
+`docs/design/release-adoption-substrate.md`.
 
 ## Agent skills
 
