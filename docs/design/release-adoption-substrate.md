@@ -77,9 +77,8 @@ Dependency order: #13 → #3 → {#4, #5} → #7; #6 independent (parallel).
 
 ## Open Questions
 
-- [ ] **Stack = TypeScript + vitest** is a hard-to-reverse choice with a real alternative
-      (plain `.mjs`, matching `~/repos/bench`). Decided in this session; **ADR-worthy** —
-      capture via `/grill-with-docs` so the rationale (leaf vitest parity, typed value
-      objects + SDK-style port interfaces vs. frictionless bench `.mjs` reuse) is durable.
+- [x] **Stack = TypeScript + vitest + pnpm + ESM, run via `tsx` (no build step).** Captured in
+      [ADR 0004](../adr/0004-typescript-vitest-run-via-tsx-no-build.md). No bundler: maint is a
+      cockpit, not a distributable package; fork publishing happens at the leaf.
 - [ ] Adoption-record on-disk format/location (input to slice-6 reporting) — defer to when
       reporting is designed; #3 only requires it be structured/machine-readable.
