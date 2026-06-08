@@ -4,6 +4,7 @@ dist/
 .DS_Store
 /tmp/
 results/local/
+__pycache__/
 
 # Secrets — never commit the claude -p license / OAuth token (ADR 0003).
 # The Real gate reads credentials from the environment at run time.
