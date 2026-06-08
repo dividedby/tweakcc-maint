@@ -11,40 +11,61 @@ const cleanSignals: CapturedSignals = {
   validator: 'Orphan-variable check: 0 orphans across 42 overrides.',
 };
 
-describe('IntegrationGate.runGate — clean single version', () => {
-  it('emits an Adoption record with a passing Four-zeros result and the CC version', () => {
-    const env = new FakeAdoptionEnvironment({ '1.2.3': cleanSignals });
-    const record = runGate(['1.2.3'], env);
+/** Find the per-version result for a given version in a record (or fail). */
+function versionResult(record: AdoptionRecord, ccVersion: string) {
+  const result = record.versions.find((v) => v.ccVersion === ccVersion);
+  expect(result, `expected a per-version result for ${ccVersion}`).toBeDefined();
+  return result!;
+}
 
-    expect(record.ccVersion).toBe('1.2.3');
-    expect(record.fourZeros.pass).toBe(true);
-    expect(record.fourZeros.failedPatches).toEqual([]);
-    expect(record.fourZeros.missingSystemPrompts).toEqual([]);
-    expect(record.fourZeros.orphanVariables).toEqual([]);
-    expect(record.fourZeros.bootVerifyPassed).toBe(true);
+describe('IntegrationGate.runGate — clean matrix of N versions', () => {
+  it('all-clean matrix → run passes with a passing Four-zeros result per version', () => {
+    const env = new FakeAdoptionEnvironment({
+      '1.2.3': cleanSignals,
+      '1.2.4': cleanSignals,
+      '1.3.0': cleanSignals,
+    });
+    const record = runGate(['1.2.3', '1.2.4', '1.3.0'], env);
+
+    expect(record.pass).toBe(true);
+    expect(record.versions.map((v) => v.ccVersion)).toEqual(['1.2.3', '1.2.4', '1.3.0']);
+    for (const v of record.versions) {
+      expect(v.fourZeros.pass).toBe(true);
+      expect(v.fourZeros.failedPatches).toEqual([]);
+      expect(v.fourZeros.missingSystemPrompts).toEqual([]);
+      expect(v.fourZeros.orphanVariables).toEqual([]);
+      expect(v.fourZeros.bootVerifyPassed).toBe(true);
+    }
   });
 
-  it('record maps to exit code 0', () => {
+  it('all-clean matrix → exit code 0', () => {
+    const env = new FakeAdoptionEnvironment({ '1.2.3': cleanSignals, '1.2.4': cleanSignals });
+    const record = runGate(['1.2.3', '1.2.4'], env);
+    expect(recordToExitCode(record)).toBe(0);
+  });
+
+  it('a single-version matrix still works (the #3 skeleton case)', () => {
     const env = new FakeAdoptionEnvironment({ '1.2.3': cleanSignals });
     const record = runGate(['1.2.3'], env);
+
+    expect(record.pass).toBe(true);
+    expect(record.versions).toHaveLength(1);
+    expect(record.versions[0]!.ccVersion).toBe('1.2.3');
     expect(recordToExitCode(record)).toBe(0);
   });
 });
 
 describe('IntegrationGate — Adoption record is structured/machine-readable', () => {
-  it('carries CC version, per-check Four-zeros result, and an ISO date', () => {
-    const env = new FakeAdoptionEnvironment({ '1.2.3': cleanSignals });
-    const record = runGate(['1.2.3'], env);
+  it('carries per-version CC version + Four-zeros result, run-level pass, and an ISO date', () => {
+    const env = new FakeAdoptionEnvironment({ '1.2.3': cleanSignals, '1.2.4': cleanSignals });
+    const record = runGate(['1.2.3', '1.2.4'], env);
 
     expect(record).toMatchObject({
-      ccVersion: '1.2.3',
-      fourZeros: {
-        pass: true,
-        failedPatches: [],
-        missingSystemPrompts: [],
-        orphanVariables: [],
-        bootVerifyPassed: true,
-      },
+      pass: true,
+      versions: [
+        { ccVersion: '1.2.3', fourZeros: { pass: true } },
+        { ccVersion: '1.2.4', fourZeros: { pass: true } },
+      ],
     });
     // Date is present and a valid ISO-8601 timestamp.
     expect(typeof record.date).toBe('string');
@@ -59,75 +80,101 @@ describe('IntegrationGate — Adoption record is structured/machine-readable', (
   });
 });
 
-describe('IntegrationGate.runGate — any Four-zeros breach → non-zero + recorded', () => {
-  it('failed patch → non-zero exit and recorded', () => {
-    const env = FakeAdoptionEnvironment.breach('1.2.3', 'failedPatch');
-    const record = runGate(['1.2.3'], env);
+describe('IntegrationGate.runGate — any version breaching fails the WHOLE run', () => {
+  it('exactly one version breaches → run fails, exit non-zero, record names which version failed', () => {
+    const env = new FakeAdoptionEnvironment({
+      '1.2.3': cleanSignals,
+      '1.2.4': FakeAdoptionEnvironment.breachSignals('bootCrash'),
+      '1.3.0': cleanSignals,
+    });
+    const record = runGate(['1.2.3', '1.2.4', '1.3.0'], env);
 
-    expect(record.fourZeros.pass).toBe(false);
-    expect(record.fourZeros.failedPatches.length).toBeGreaterThan(0);
+    expect(record.pass).toBe(false);
     expect(recordToExitCode(record)).not.toBe(0);
+
+    // The record shows WHICH version failed (and that the others passed).
+    expect(versionResult(record, '1.2.3').fourZeros.pass).toBe(true);
+    expect(versionResult(record, '1.2.4').fourZeros.pass).toBe(false);
+    expect(versionResult(record, '1.3.0').fourZeros.pass).toBe(true);
+
+    const failed = record.versions.filter((v) => !v.fourZeros.pass).map((v) => v.ccVersion);
+    expect(failed).toEqual(['1.2.4']);
   });
 
-  it('missing system prompt → non-zero exit and recorded', () => {
-    const env = FakeAdoptionEnvironment.breach('1.2.3', 'missingPrompt');
-    const record = runGate(['1.2.3'], env);
+  it('FIRST version fails → whole run fails', () => {
+    const env = new FakeAdoptionEnvironment({
+      '1.2.3': FakeAdoptionEnvironment.breachSignals('failedPatch'),
+      '1.2.4': cleanSignals,
+    });
+    const record = runGate(['1.2.3', '1.2.4'], env);
 
-    expect(record.fourZeros.pass).toBe(false);
-    expect(record.fourZeros.missingSystemPrompts.length).toBeGreaterThan(0);
+    expect(record.pass).toBe(false);
     expect(recordToExitCode(record)).not.toBe(0);
+    expect(versionResult(record, '1.2.3').fourZeros.pass).toBe(false);
+    expect(versionResult(record, '1.2.4').fourZeros.pass).toBe(true);
   });
 
-  it('orphan variable → non-zero exit and recorded', () => {
-    const env = FakeAdoptionEnvironment.breach('1.2.3', 'orphanVar');
-    const record = runGate(['1.2.3'], env);
+  it('LAST version fails → whole run fails', () => {
+    const env = new FakeAdoptionEnvironment({
+      '1.2.3': cleanSignals,
+      '1.2.4': FakeAdoptionEnvironment.breachSignals('orphanVar'),
+    });
+    const record = runGate(['1.2.3', '1.2.4'], env);
 
-    expect(record.fourZeros.pass).toBe(false);
-    expect(record.fourZeros.orphanVariables.length).toBeGreaterThan(0);
+    expect(record.pass).toBe(false);
     expect(recordToExitCode(record)).not.toBe(0);
+    expect(versionResult(record, '1.2.3').fourZeros.pass).toBe(true);
+    expect(versionResult(record, '1.2.4').fourZeros.pass).toBe(false);
   });
 
-  it('boot crash → non-zero exit and recorded', () => {
-    const env = FakeAdoptionEnvironment.breach('1.2.3', 'bootCrash');
-    const record = runGate(['1.2.3'], env);
+  it('multiple versions breach → run fails and every breach is recorded', () => {
+    const env = new FakeAdoptionEnvironment({
+      '1.2.3': FakeAdoptionEnvironment.breachSignals('missingPrompt'),
+      '1.2.4': cleanSignals,
+      '1.3.0': FakeAdoptionEnvironment.breachSignals('bootCrash'),
+    });
+    const record = runGate(['1.2.3', '1.2.4', '1.3.0'], env);
 
-    expect(record.fourZeros.pass).toBe(false);
-    expect(record.fourZeros.bootVerifyPassed).toBe(false);
-    expect(recordToExitCode(record)).not.toBe(0);
+    expect(record.pass).toBe(false);
+    const failed = record.versions.filter((v) => !v.fourZeros.pass).map((v) => v.ccVersion);
+    expect(failed).toEqual(['1.2.3', '1.3.0']);
   });
 });
 
-describe('IntegrationGate.runGate — matrix-of-one contract', () => {
-  it('throws if the matrix is empty', () => {
+describe('IntegrationGate.runGate — empty matrix is an error, not a vacuous pass', () => {
+  it('throws on an empty matrix', () => {
     const env = new FakeAdoptionEnvironment({ '1.2.3': cleanSignals });
     expect(() => runGate([], env)).toThrow();
-  });
-
-  it('throws if the matrix carries more than one version (skeleton is single-version)', () => {
-    const env = new FakeAdoptionEnvironment({
-      '1.2.3': cleanSignals,
-      '1.2.4': cleanSignals,
-    });
-    expect(() => runGate(['1.2.3', '1.2.4'], env)).toThrow();
   });
 });
 
 describe('IntegrationGate.recordToExitCode', () => {
   it('passing record → 0, breaching record → non-zero', () => {
     const pass: AdoptionRecord = {
-      ccVersion: '1.2.3',
-      fourZeros: {
-        pass: true,
-        failedPatches: [],
-        missingSystemPrompts: [],
-        orphanVariables: [],
-        bootVerifyPassed: true,
-      },
+      pass: true,
+      versions: [
+        {
+          ccVersion: '1.2.3',
+          fourZeros: {
+            pass: true,
+            failedPatches: [],
+            missingSystemPrompts: [],
+            orphanVariables: [],
+            bootVerifyPassed: true,
+          },
+        },
+      ],
       date: new Date().toISOString(),
     };
     const fail: AdoptionRecord = {
       ...pass,
-      fourZeros: { ...pass.fourZeros, pass: false, bootVerifyPassed: false },
+      pass: false,
+      versions: [
+        {
+          ...pass.versions[0]!,
+          fourZeros: { ...pass.versions[0]!.fourZeros, pass: false, bootVerifyPassed: false },
+        },
+      ],
     };
     expect(recordToExitCode(pass)).toBe(0);
     expect(recordToExitCode(fail)).not.toBe(0);

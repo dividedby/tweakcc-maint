@@ -46,6 +46,15 @@ export class FakeAdoptionEnvironment implements AdoptionEnvironment {
     return new FakeAdoptionEnvironment({ [ccVersion]: withBreach(kind) });
   }
 
+  /**
+   * Canned {@link CapturedSignals} carrying exactly one breach kind — for composing
+   * per-version outcomes in a multi-version matrix, e.g.
+   * `{ '1.2.3': cleanSignals, '1.2.4': FakeAdoptionEnvironment.breachSignals('bootCrash') }`.
+   */
+  static breachSignals(kind: BreachKind): CapturedSignals {
+    return withBreach(kind);
+  }
+
   adopt(ccVersion: string): CapturedSignals {
     const signals = this.signals[ccVersion];
     if (signals === undefined) {
