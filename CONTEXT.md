@@ -49,9 +49,9 @@ _Avoid_: test suite, CI, validation.
 **Integration gate**:
 The cross-repo slice of the **Verification gate** that `tweakcc-maint` owns
 because it spans both leaf repos plus a real CC binary: real `--apply` against a
-real Claude Code install → **Boot-verify** → **Orphan-variable** validation
-(lobotomized overrides cross-referenced against tweakcc-fixed's pristine
-`identifierMap`). This is the layer that catches what unit tests structurally
+real Claude Code install → **Boot-verify** → **Orphan variable** detection (the
+patcher's **Orphan report** statically, **Boot-verify** at runtime). This is the
+layer that catches what unit tests structurally
 cannot — runtime-only breakage. Its pass-bar is the **Four-zeros bar**, asserted across the
 **Support matrix** and bracketed by a **Restore drill**; each run emits an
 **Adoption record**.
@@ -127,11 +127,23 @@ _Avoid_: sanity check, baseline.
 **Orphan variable**:
 A `${VAR}` interpolation that survives into the *applied* prompt but no longer
 exists in the patched binary's runtime scope (Anthropic renamed or inlined it).
-Crashes CC with `ReferenceError: VAR is not defined` at runtime. Authoritatively
-detected at runtime by **Boot-verify**, and — where the patcher reports the
-surviving placeholders its own apply-time resolution emits — consumed by the
-**Integration gate**; a thin static **authoring-drift pre-check** flags the
-narrower case of a declared backing variable upstream renamed or inlined, but
-cannot see runtime-scope orphans (that is Boot-verify's altitude, not a static
-check's).
+Crashes CC with `ReferenceError: VAR is not defined` at runtime. Detected at
+runtime by **Boot-verify** and statically by the patcher's **Orphan report**
+(both consumed by the **Integration gate**'s **Four-zeros bar**); a thin static
+**authoring-drift pre-check** flags only the narrower authoring-time case — a
+declared backing variable upstream renamed or inlined — and cannot see runtime
+scope.
 _Avoid_: dangling var, bad placeholder, missing token.
+
+**Orphan report**:
+The authoritative *static* enumeration of **Orphan variables**: the surviving,
+evaluated-position placeholders the patcher emits from its *own* apply-time
+resolution — which alone knows both the `identifierMap` slots it left unfilled
+*and* the splice context that makes them crash-class. Complete across *all*
+prompts (including lazy paths a single **Boot-verify** never runs), but blind to
+the *filled-but-stale* class — a slot resolved to a real identifier no longer in
+runtime scope — that only **Boot-verify** catches. The two are complementary
+altitudes, neither a superset; the **Four-zeros bar** needs both. Consumed by the
+**Integration gate**, replacing the thin static **authoring-drift pre-check**
+([ADR 0005](./docs/adr/0005-orphan-detection-belongs-to-the-patcher.md)).
+_Avoid_: orphan list, placeholder dump.
