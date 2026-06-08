@@ -45,14 +45,20 @@ const DEFAULT_MODEL = 'haiku';
 const SEMVER = /(\d+\.\d+\.\d+)/;
 
 export class RealAdoptionEnvironment implements AdoptionEnvironment {
-  private readonly cfg: Required<RealAdoptionEnvironmentConfig>;
+  private readonly cfg: RealAdoptionEnvironmentConfig & {
+    bootVerifyPrompt: string;
+    bootVerifyModel: string;
+  };
+  private cachedVersion?: string;
+  private cachedPromptDirs?: string[];
 
   constructor(config: RealAdoptionEnvironmentConfig) {
+    // Default with `??` per field — a trailing `...config` spread would let an explicitly
+    // passed `undefined` clobber a default (e.g. `--model undefined`).
     this.cfg = {
-      bootVerifyPrompt: DEFAULT_PROMPT,
-      bootVerifyModel: DEFAULT_MODEL,
-      promptDirs: config.promptDirs ?? discoverPromptDirs(config.lobotomizedDir),
       ...config,
+      bootVerifyPrompt: config.bootVerifyPrompt ?? DEFAULT_PROMPT,
+      bootVerifyModel: config.bootVerifyModel ?? DEFAULT_MODEL,
     };
   }
 
@@ -61,22 +67,33 @@ export class RealAdoptionEnvironment implements AdoptionEnvironment {
     return join(this.cfg.tweakccFixedDir, 'dist', 'index.mjs');
   }
 
-  /**
-   * The Support matrix the environment knows about. Per #22 this is INSTALLED-version-only:
-   * `tweakcc-fixed --apply` patches the one installed Claude Code, so the real matrix is the
-   * single installed version (read from `claude --version`). The caller builds the matrix
-   * from this and hands it to runGate.
-   */
-  listMatrix(): string[] {
+  /** Override dirs scanned for orphans — explicit config, else discovered lazily (one scan). */
+  private get promptDirs(): string[] {
+    if (this.cfg.promptDirs !== undefined) return this.cfg.promptDirs;
+    return (this.cachedPromptDirs ??= discoverPromptDirs(this.cfg.lobotomizedDir));
+  }
+
+  /** The installed Claude Code version (from `claude --version`), read once and memoized. */
+  private installedVersion(): string {
+    if (this.cachedVersion !== undefined) return this.cachedVersion;
     const r = runSync('claude', ['--version']);
     const m = SEMVER.exec(r.stdout);
     if (m === null) {
       throw new Error(
-        `RealAdoptionEnvironment.listMatrix: could not read installed Claude Code version from ` +
+        `RealAdoptionEnvironment: could not read installed Claude Code version from ` +
           `\`claude --version\` (got: ${JSON.stringify(r.stdout.trim())}). Is Claude Code installed?`,
       );
     }
-    return [m[1]!];
+    return (this.cachedVersion = m[1]!);
+  }
+
+  /**
+   * The Support matrix the environment knows about. Per #22 this is INSTALLED-version-only:
+   * `tweakcc-fixed --apply` patches the one installed Claude Code, so the real matrix is the
+   * single installed version. The caller builds the matrix from this and hands it to runGate.
+   */
+  listMatrix(): string[] {
+    return [this.installedVersion()];
   }
 
   /**
@@ -87,7 +104,7 @@ export class RealAdoptionEnvironment implements AdoptionEnvironment {
    *  - validator ← the real Orphan-variable check over the override dirs
    */
   adopt(ccVersion: string): CapturedSignals {
-    const installed = this.listMatrix()[0];
+    const installed = this.installedVersion();
     if (ccVersion !== installed) {
       throw new Error(
         `RealAdoptionEnvironment.adopt: asked to adopt ${ccVersion} but the installed Claude Code ` +
@@ -101,14 +118,17 @@ export class RealAdoptionEnvironment implements AdoptionEnvironment {
       );
     }
 
+    // Resolve the read-only inputs (override dirs, identifierMap strings file) BEFORE the
+    // mutating `--apply`, so a missing prompts file / override dir fails fast rather than
+    // leaving the install patched with no record (the stubbed restore would not undo it).
+    const overrideDirs = this.promptDirs;
+    const stringsFile = resolveStringsFilePath(this.cfg.tweakccFixedDir, ccVersion);
+
     const apply = combinedOutput(runSync('node', [this.tweakccCli, '--apply']));
     const bootVerify = normalizeBootVerify(
       runSync('claude', ['-p', this.cfg.bootVerifyPrompt, '--model', this.cfg.bootVerifyModel]),
     );
-    const validator = runOrphanValidator(
-      this.cfg.promptDirs,
-      resolveStringsFilePath(this.cfg.tweakccFixedDir, ccVersion),
-    );
+    const validator = runOrphanValidator(overrideDirs, stringsFile);
 
     return { apply, bootVerify, validator };
   }
@@ -136,10 +156,10 @@ export class RealAdoptionEnvironment implements AdoptionEnvironment {
   }
 }
 
-/** Override dirs to scan for orphans: every `system-prompts-*` dir under the lobotomized repo. */
+/** Override dirs to scan for orphans: every `system-prompts-<model>` dir under the leaf. */
 function discoverPromptDirs(lobotomizedDir: string): string[] {
   return readdirSync(lobotomizedDir, { withFileTypes: true })
-    .filter((e) => e.isDirectory() && e.name.startsWith('system-prompts'))
+    .filter((e) => e.isDirectory() && e.name.startsWith('system-prompts-'))
     .map((e) => join(lobotomizedDir, e.name));
 }
 
