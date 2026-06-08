@@ -4,10 +4,10 @@ HITL verification of `RealAdoptionEnvironment`'s adopt path (PRD #20 → #22). T
 tests prove the gate's orchestration; this runbook is the one layer the fakes can't
 exercise — a human running the real gate against a real Claude Code install.
 
-> ⚠️ **The Restore drill is NOT real in this slice (#23 owns it).** The gate runs a real
-> `tweakcc-fixed --apply` against your installed Claude Code and does **not** automatically
-> restore it. Have a backup, and restore manually when done (step 5). The record's
-> `restoreDrill` fields are placeholders until #23.
+> ℹ️ **The Restore drill is real (#23).** The gate confirms a backup before apply, runs a real
+> `tweakcc-fixed --restore` after, and verifies clean stock — so each version's flow is
+> backup → apply → Four-zeros → restore → verify-clean. If the record reports a failed or
+> dirty restore, restore manually (step 4). Ensure a backup exists before running.
 
 ## Prerequisites
 
@@ -61,15 +61,20 @@ The point of the real env: it *discovers* breakage the Fake only *simulates*. Pi
 
 Re-run step 1: expect `pass: false` and a non-zero exit, with the record naming the breach.
 
-## 4. Restore manually (because the drill is stubbed this slice)
+## 4. Restore manually — only if the record reports a failed/dirty restore
+
+The gate restores automatically (#23). Restore by hand only if `restoreDrill.status` is
+`restore-failed` or `dirty-restore`:
 
 ```bash
 node ~/repos/tweakcc-fixed/dist/index.mjs --restore
 ```
 
-## Known limitations (this slice)
+## Known limitations
 
-- **Restore drill is stubbed** (#23). See the warning above.
+- **Clean-stock check uses tweakcc's `config.json` flag** (`changesApplied: false`), not yet a
+  byte-for-byte hash of the install against the backup. Confirm a real dirty-restore is caught
+  during HITL; a hash compare is the stronger form to add if the flag proves insufficient.
 - **Orphan validator covers the `identifierMap` variable class.** It cross-references each
   override's declared `variables:` against the target version's `prompts-<version>.json`
   `identifierMap`. Synthetic positional names (`…_VAR_<n>`) are excluded. It does **not**

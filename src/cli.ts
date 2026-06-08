@@ -10,9 +10,9 @@
  * LOBOTOMIZED_DIR. Credentials are read from the environment (CLAUDE_CODE_OAUTH_TOKEN or
  * ANTHROPIC_API_KEY) — nothing is committed.
  *
- * SAFETY (this slice): the Restore drill is not real yet (#23). The gate runs a real
- * `--apply` and does NOT automatically restore — restore manually with `tweakcc-fixed
- * --restore` afterward. The record's restoreDrill fields are placeholders until #23.
+ * SAFETY: the gate runs a real `--apply` and a real `--restore` (the Restore drill, #23) —
+ * confirm-backup before, restore + verify-clean after. If the run ends dirty (e.g. a failed
+ * or dirty restore, reported in the record), restore manually with `tweakcc-fixed --restore`.
  */
 
 import { runGate, recordToExitCode } from './integration-gate.js';
@@ -32,10 +32,9 @@ function main(): void {
   }
 
   console.error(
-    '⚠️  Restore drill is NOT real in this slice (#22). The gate will run a real ' +
-      '`tweakcc-fixed --apply`\n    against your installed Claude Code and will NOT ' +
-      'automatically restore it. Make sure you have a\n    backup, and restore manually ' +
-      'with `tweakcc-fixed --restore` when done. (#23 makes restore real.)\n',
+    '⚠️  The gate runs a real `tweakcc-fixed --apply` AND a real `--restore` against your ' +
+      'installed\n    Claude Code (the Restore drill). Ensure a backup exists. If the record ' +
+      'reports a failed or\n    dirty restore, restore manually with `tweakcc-fixed --restore`.\n',
   );
 
   const env = new RealAdoptionEnvironment(defaultLeafConfig());
