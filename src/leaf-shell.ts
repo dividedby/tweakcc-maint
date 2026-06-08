@@ -14,6 +14,7 @@
  */
 
 import { spawnSync } from 'node:child_process';
+import { appendFileSync } from 'node:fs';
 
 /** The captured result of one synchronous shell-out. */
 export interface ShellResult {
@@ -23,18 +24,78 @@ export interface ShellResult {
   stderr: string;
 }
 
-/** Run a command synchronously, capturing stdout/stderr as UTF-8 text. */
+/**
+ * Run a command synchronously, capturing stdout/stderr as UTF-8 text. `input`, when given,
+ * is written to the child's stdin (used to pass the boot-verify prompt headlessly, since
+ * `claude`'s `--allowedTools` is variadic and would swallow a trailing positional prompt).
+ */
 export function runSync(
   command: string,
   args: string[],
   env: NodeJS.ProcessEnv = process.env,
+  input?: string,
 ): ShellResult {
-  const r = spawnSync(command, args, { encoding: 'utf8', env });
+  const r = spawnSync(command, args, { encoding: 'utf8', env, input });
   return {
     status: r.status,
     stdout: r.stdout ?? '',
     stderr: r.stderr ?? '',
   };
+}
+
+/**
+ * Pull the assistant's final reply text out of `claude -p --output-format stream-json`
+ * output: the last `type:"result"` event carries `.result` (and `total_cost_usd`). Lines
+ * that don't parse as JSON are skipped. An errored result (`is_error`) yields '' so the
+ * boot-verify marker treats it as a failure. Pure — unit-tested.
+ */
+export function extractResultText(streamJson: string): string {
+  let reply = '';
+  for (const line of streamJson.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    try {
+      const ev = JSON.parse(trimmed);
+      if (ev && ev.type === 'result') {
+        reply = ev.is_error ? '' : String(ev.result ?? '');
+      }
+    } catch {
+      // not a JSON event line — ignore
+    }
+  }
+  return reply;
+}
+
+/**
+ * Boot-verify via headless `claude -p` in stream-json mode, so the final `type:"result"`
+ * event (carrying `total_cost_usd` / `num_turns`) lands in the captured output for the
+ * cross-repo cost ledger. The raw stream is appended to `GATE_AGENT_LOG` when that env var
+ * is set (the CI workflow surfaces `total_cost_usd` from it) — kept off the gate's stdout,
+ * which is reserved for the Adoption record. The returned `ShellResult.stdout` is the
+ * extracted reply so {@link normalizeBootVerify} keeps working unchanged; if the stream
+ * carried no result event but the run still succeeded, the raw stdout is the fallback.
+ */
+export function runBootVerify(
+  prompt: string,
+  model: string,
+  env: NodeJS.ProcessEnv = process.env,
+): ShellResult {
+  const r = runSync(
+    'claude',
+    ['-p', '--output-format', 'stream-json', '--verbose', '--model', model],
+    env,
+    prompt,
+  );
+  const log = env.GATE_AGENT_LOG;
+  if (log && r.stdout) {
+    try {
+      appendFileSync(log, r.stdout.endsWith('\n') ? r.stdout : `${r.stdout}\n`);
+    } catch {
+      // a missing/unwritable sidecar path must never fail the gate — cost tracking is best-effort
+    }
+  }
+  const reply = extractResultText(r.stdout) || r.stdout.trim();
+  return { status: r.status, stdout: reply, stderr: r.stderr };
 }
 
 /** Combined stdout+stderr — what feeds `signals.apply` (failures often land on stderr). */
