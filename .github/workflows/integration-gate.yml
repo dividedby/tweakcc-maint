@@ -1,0 +1,103 @@
+# Integration gate on GitHub-hosted CI (ADR 0006).
+#
+# Runs the same environment-agnostic gate as locally — `pnpm tsx src/cli.ts` —
+# on the maintainer's fork (never skrabe's leaf repos; contributor cockpit).
+# The matrix is installed-version-only, so `cc_version` IS the Support matrix:
+# install that Claude Code version, the gate discovers it via `claude --version`.
+name: integration-gate
+
+on:
+  workflow_dispatch:
+    inputs:
+      cc_version:
+        description: "Claude Code version to adopt-test (e.g. 2.1.168)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    env:
+      # The gate reads credentials from the environment (ADR 0003). ANTHROPIC_API_KEY
+      # authenticates `claude -p` headlessly (ADR 0006). DISABLE_AUTOUPDATER pins the
+      # installed CC version so the cache key stays honest.
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      DISABLE_AUTOUPDATER: "1"
+      TWEAKCC_FIXED_DIR: ${{ github.workspace }}/leaves/tweakcc-fixed
+      LOBOTOMIZED_DIR: ${{ github.workspace }}/leaves/lobotomized-claude-code
+    steps:
+      - name: Guard — require the license secret
+        run: |
+          if [ -z "${ANTHROPIC_API_KEY}" ]; then
+            echo "::error::ANTHROPIC_API_KEY secret is not set on this fork; Boot-verify cannot run." >&2
+            exit 1
+          fi
+
+      - name: Checkout tweakcc-maint
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11  # matches devEngines.packageManager (pnpm ^11.5.2)
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      # --- Leaf clones (read-only; the control plane never pushes to skrabe) ---
+      - name: Clone leaf repos
+        run: |
+          git clone --depth 1 https://github.com/skrabe/tweakcc-fixed "${TWEAKCC_FIXED_DIR}"
+          git clone --depth 1 https://github.com/skrabe/lobotomized-claude-code "${LOBOTOMIZED_DIR}"
+
+      - name: Cache tweakcc-fixed build
+        id: leaf-cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.TWEAKCC_FIXED_DIR }}/dist
+          # Keyed on the leaf's HEAD so a leaf change rebuilds; falls back to most-recent.
+          key: tweakcc-fixed-dist-${{ hashFiles(format('{0}/.git/HEAD', env.TWEAKCC_FIXED_DIR)) }}
+          restore-keys: tweakcc-fixed-dist-
+
+      - name: Build tweakcc-fixed (the gate runs its dist/index.mjs)
+        if: steps.leaf-cache.outputs.cache-hit != 'true'
+        working-directory: ${{ env.TWEAKCC_FIXED_DIR }}
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm build
+
+      # --- Pinned Claude Code binary (CI owns install + cache; ADR 0006) ---
+      - name: Cache Claude Code ${{ inputs.cc_version }}
+        id: cc-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.local/bin/claude
+            ~/.local/share/claude
+          key: claude-code-${{ inputs.cc_version }}
+
+      - name: Install Claude Code ${{ inputs.cc_version }}
+        if: steps.cc-cache.outputs.cache-hit != 'true'
+        run: curl -fsSL https://claude.ai/install.sh | bash -s "${{ inputs.cc_version }}"
+
+      - name: Put Claude Code on PATH and verify the pin
+        run: |
+          echo "${HOME}/.local/bin" >> "${GITHUB_PATH}"
+          "${HOME}/.local/bin/claude" --version
+
+      # --- The gate: real apply -> Boot-verify -> Orphan check, bracketed by Restore drill ---
+      - name: Run the Integration gate
+        run: pnpm tsx src/cli.ts | tee adoption-record.json
+
+      - name: Upload Adoption record (PR evidence)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: adoption-record-${{ inputs.cc_version }}
+          path: adoption-record.json

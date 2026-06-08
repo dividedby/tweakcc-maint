@@ -26,6 +26,20 @@ Stack: **TypeScript + vitest + pnpm + ESM, run via `tsx` (no build step)** — s
 No `dist`/bundler: sources run directly via `tsx`, identically locally and in CI.
 `pnpm-workspace.yaml` allowlists esbuild's build script (vitest/tsx dependency).
 
+## Harness (project-scope guards)
+`.claude/settings.json` wires two PreToolUse Bash hooks that run under unattended
+`claude -p` (where the maintainer's global guards are absent) — see `docs/adr/0006`:
+- `.claude/hooks/git-guard.py` — blocks destructive git (force-push, `reset --hard`,
+  `clean -f`, discard checkout/restore; branch-delete when unattended).
+- `.claude/hooks/secret-guard.py` — blocks the `claude -p` license reaching the tree.
+
+Each ships a framework-free self-test — run it directly after editing the guard:
+`.claude/hooks/git-guard.test.py` · `.claude/hooks/secret-guard.test.py`.
+
+## CI
+`.github/workflows/integration-gate.yml` runs the gate on the fork via
+`workflow_dispatch(cc_version)` — that input *is* the Support matrix. See `docs/adr/0006`.
+
 ## Agent skills
 
 ### Issue tracker
