@@ -72,9 +72,12 @@ node ~/repos/tweakcc-fixed/dist/index.mjs --restore
 
 ## Known limitations
 
-- **Clean-stock check uses tweakcc's `config.json` flag** (`changesApplied: false`), not yet a
-  byte-for-byte hash of the install against the backup. Confirm a real dirty-restore is caught
-  during HITL; a hash compare is the stronger form to add if the flag proves insufficient.
+- **Clean-stock check is a byte-for-byte sha256** of the installed `claude` file (the launcher
+  resolved through symlinks to its real target) against tweakcc-fixed's stock backup under
+  `~/.tweakcc`. This replaced the `config.json` `changesApplied` flag, which `--restore` resets
+  to clean on every successful exit and so could not distinguish a faithful restore from a dirty
+  one (#23 HITL finding). A dirty restore — restore exits 0 but the bytes differ — is now caught
+  as `dirty-restore`; a missing/unreadable install or backup also fails closed (not clean).
 - **Orphan validator covers the `identifierMap` variable class.** It cross-references each
   override's declared `variables:` against the target version's `prompts-<version>.json`
   `identifierMap`. Synthetic positional names (`…_VAR_<n>`) are excluded. It does **not**

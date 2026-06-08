@@ -18,8 +18,9 @@
  */
 
 import { homedir } from 'node:os';
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { createHash } from 'node:crypto';
+import { existsSync, readdirSync, readFileSync, realpathSync } from 'node:fs';
+import { delimiter, join } from 'node:path';
 
 import type { AdoptionEnvironment, RestoreOutcome } from './adoption-environment.js';
 import type { CapturedSignals } from './four-zeros-verdict.js';
@@ -51,13 +52,18 @@ const SEMVER = /(\d+\.\d+\.\d+)/;
 const BACKUP_FILES = ['cli.js.backup', 'native-binary.backup'];
 
 /**
- * Whether tweakcc-fixed's `config.json` reports the install as clean stock — its own source
- * of truth, set to `changesApplied: false` after a successful `--restore`. Pure over the file
- * content so it is unit-testable. (A byte-for-byte hash of the install against the backup is a
- * stronger check worth adding during #23's HITL verification; the flag is the primary signal.)
+ * Whether the install is byte-identical to the stock backup — the real clean-stock signal,
+ * pure over the two sha256 digests so it is unit-testable. An `undefined` digest means a file
+ * could not be located/read (cannot prove clean → not clean). This is the stronger check #23's
+ * HITL run called for: tweakcc-fixed flips `config.json` `changesApplied` to `false` on EVERY
+ * successful `--restore` exit, so that flag cannot tell a faithful restore from a dirty one
+ * (restore exits 0 but the bytes differ — partial copy, wrong target); a digest compare can.
  */
-export function isCleanFromConfig(configJson: string): boolean {
-  return (JSON.parse(configJson) as { changesApplied?: boolean }).changesApplied === false;
+export function isCleanFromHashes(
+  installDigest: string | undefined,
+  backupDigest: string | undefined,
+): boolean {
+  return installDigest !== undefined && installDigest === backupDigest;
 }
 
 export class RealAdoptionEnvironment implements AdoptionEnvironment {
@@ -177,18 +183,49 @@ export class RealAdoptionEnvironment implements AdoptionEnvironment {
   }
 
   /**
-   * Whether the install is back to clean stock after a successful restore, per tweakcc-fixed's
-   * `config.json` (`changesApplied: false`). A dirty restore fails the run even when Four-zeros
-   * passed. Returns false if the config is missing/unreadable (cannot prove clean).
+   * Whether the install is back to clean stock after a successful restore: the installed file
+   * (the `claude` launcher on PATH, resolved through symlinks to its real target) is byte-
+   * identical to tweakcc-fixed's stock backup under its config dir. A dirty restore — restore
+   * exits 0 but the bytes differ — fails the run even when Four-zeros passed. Returns false if
+   * either file can't be located/read (cannot prove clean). Replaces the earlier `config.json`
+   * `changesApplied` flag, which `--restore` resets to clean on every success (#23 HITL finding).
    */
   isCleanStock(_ccVersion: string): boolean {
-    const configPath = join(this.tweakccConfigDir, 'config.json');
-    if (!existsSync(configPath)) return false;
-    try {
-      return isCleanFromConfig(readFileSync(configPath, 'utf8'));
-    } catch {
-      return false;
+    const installFile = resolveInstallFile();
+    const backupName = BACKUP_FILES.find((f) => existsSync(join(this.tweakccConfigDir, f)));
+    const installDigest = installFile === undefined ? undefined : fileDigest(installFile);
+    const backupDigest =
+      backupName === undefined ? undefined : fileDigest(join(this.tweakccConfigDir, backupName));
+    return isCleanFromHashes(installDigest, backupDigest);
+  }
+}
+
+/**
+ * The installed Claude Code file to hash: the `claude` launcher found on PATH, resolved through
+ * any symlinks to its real target (native versioned binary or npm `cli.js`). Undefined if
+ * `claude` is not on PATH or can't be resolved.
+ */
+function resolveInstallFile(): string | undefined {
+  for (const dir of (process.env.PATH ?? '').split(delimiter)) {
+    if (dir === '') continue;
+    const candidate = join(dir, 'claude');
+    if (existsSync(candidate)) {
+      try {
+        return realpathSync(candidate);
+      } catch {
+        return undefined;
+      }
     }
+  }
+  return undefined;
+}
+
+/** sha256 hex digest of a file, or undefined if it can't be read. */
+function fileDigest(path: string): string | undefined {
+  try {
+    return createHash('sha256').update(readFileSync(path)).digest('hex');
+  } catch {
+    return undefined;
   }
 }
 
