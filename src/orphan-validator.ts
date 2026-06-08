@@ -1,28 +1,38 @@
 /**
- * OrphanValidator — the real Orphan-variable check for RealAdoptionEnvironment
- * (PRD #20, story 5; issue #22). It produces the `validator` string of a
- * {@link CapturedSignals}, which FourZerosVerdict then interprets — emitting one
- * `ReferenceError: <VAR> is not defined` line per Orphan variable, the exact signature
- * the verdict keys on.
+ * OrphanValidator — the **authoring-drift pre-check** for RealAdoptionEnvironment
+ * (PRD #20, story 5; issues #22, #27, #30; design in
+ * docs/adr/0005-orphan-detection-belongs-to-the-patcher.md).
  *
- * Definition (the PRD's): an Orphan variable is a variable a lobotomized override
- * DECLARES (its frontmatter `variables:` list — the backing it was authored against) that
- * is ABSENT from the target CC version's pristine `identifierMap` — i.e. renamed or
- * inlined upstream, so the override's `${VAR}` would resolve to nothing and crash the
- * patched binary. The check is therefore a cross-reference of each override's declared
- * variables against tweakcc-fixed's `prompts-<version>.json` (the `identifierMap` source
- * of truth), matched per prompt by id.
+ * This is NOT the authoritative Orphan-variable detector. Per ADR 0005 and the
+ * CONTEXT.md `Orphan variable` term, runtime-orphan authority belongs to:
+ *   - **Boot-verify** — the authoritative runtime detector; it sees the patched
+ *     binary's actual runtime scope and FAILs on the runtime-only class (e.g.
+ *     `IS_TRUTHY_FN`) that no static check can see, and
+ *   - the **patcher's apply-time report** (future `--report-orphans` in
+ *     tweakcc-fixed, consumed by the Integration gate) — the authoritative static
+ *     report, because the fork owns the apply-time resolution that emits the
+ *     surviving `${...}` set.
+ *
+ * What THIS check does, and only this: a cheap **authoring-drift** cross-reference.
+ * It flags the narrow case of a variable a lobotomized override DECLARES (its
+ * frontmatter `variables:` list — the backing it was authored against) that is ABSENT
+ * from the target CC version's pristine `identifierMap` — i.e. a backing name upstream
+ * renamed or inlined since the override was authored. It is matched per prompt by id
+ * against tweakcc-fixed's `prompts-<version>.json` (the `identifierMap` source of truth).
+ * It structurally CANNOT see runtime-scope orphans — that is Boot-verify's altitude.
  *
  * An earlier draft scanned override BODIES for `${VAR}` and over-reported wildly (every
  * `${…}` in prose/quoted code counted) — the declared-vars-vs-identifierMap cross-
- * reference is the correct, low-noise check.
+ * reference is the correct, low-noise authoring-drift check.
  *
- * Known approximation, documented for the HITL reviewer: synthetic POSITIONAL placeholder
- * names (`…_VAR_<n>`) are matched by index, not by name, so they never appear in
+ * Bounds, documented for the HITL reviewer: synthetic POSITIONAL placeholder names
+ * (`…_VAR_<n>`) are matched by index, not by name, so they never appear in
  * `identifierMap`'s (named) values — they are excluded rather than flagged. An override
- * matched to no prompt in the target version is skipped (cannot be validated here). The
- * fully-authoritative check is tweakcc-fixed's own apply-time resolution; this is the
- * static cross-reference the gate runs ahead of it.
+ * matched to no prompt in the target version is skipped (cannot be validated here).
+ *
+ * It still produces the `validator` string of a {@link CapturedSignals} — one
+ * `ReferenceError: <VAR> is not defined` line per finding, the exact signature
+ * FourZerosVerdict keys on — so the verdict layer is unchanged.
  *
  * Pure core (`findOrphans` / `formatValidatorOutput` / `buildLegalMap`) is unit-tested with
  * fixtures; the fs/JSON wrappers are exercised by the HITL run.
@@ -40,11 +50,15 @@ export interface OverrideFile {
   content: string;
 }
 
-/** One Orphan variable: a declared variable absent from the target version's identifierMap. */
+/**
+ * One authoring-drift finding: a declared backing variable absent from the target
+ * version's identifierMap (renamed/inlined upstream). Not the authoritative orphan set —
+ * see the module header (Boot-verify + the patcher report own that).
+ */
 export interface OrphanFinding {
-  /** The override file the orphan was declared in. */
+  /** The override file the drift was found in. */
   file: string;
-  /** The unbacked variable name. */
+  /** The declared-but-unbacked variable name. */
   variable: string;
 }
 
@@ -154,20 +168,47 @@ export function readOverrideFiles(dirs: string[]): OverrideFile[] {
 }
 
 /**
- * Locate the pristine `prompts-<version>.json` for a CC version: tweakcc-fixed's bundled
- * `data/prompts/` first (authoritative, same-day), then the user cache populated by a prior
- * `--apply` (`~/.tweakcc/prompt-data-cache/`). Throws with guidance if neither exists.
+ * Resolve the fork's tweakcc config directory, mirroring tweakcc-fixed's `getConfigDir`
+ * (src/config.ts) so the validator reads from the same cache the fork writes to. Order:
+ * `$TWEAKCC_CONFIG_DIR` → existing `~/.tweakcc` → `$XDG_CONFIG_HOME/tweakcc` → `~/.claude/tweakcc`
+ * → `~/.tweakcc` (default). We mirror it (not import it) deliberately: deep-importing the
+ * leaf's `export const` is the brittle coupling ADR 0005 rejects.
+ */
+function forkConfigDir(): string {
+  const override = process.env.TWEAKCC_CONFIG_DIR?.trim();
+  if (override !== undefined && override !== '') {
+    return override.startsWith('~') ? join(homedir(), override.slice(1)) : override;
+  }
+  const defaultDir = join(homedir(), '.tweakcc');
+  if (existsSync(defaultDir)) return defaultDir;
+  const xdg = process.env.XDG_CONFIG_HOME?.trim();
+  if (xdg !== undefined && xdg !== '') return join(xdg, 'tweakcc');
+  const claudeDir = join(homedir(), '.claude', 'tweakcc');
+  if (existsSync(claudeDir)) return claudeDir;
+  return defaultDir;
+}
+
+/**
+ * Locate the `prompts-<version>.json` the FORK would read, deferring to the patcher's
+ * documented resolution order rather than the validator's own (ADR 0005): repo-local
+ * `data/prompts/` wins (a fork's locally-extracted, same-day JSON is the authoritative
+ * one), then the fork's config-dir cache populated by a prior `--apply`. The fork's third
+ * tier — the network fetch — is the fork's alone; this offline pre-check does not fetch.
+ * Reading from the same on-disk candidates the fork resolves keeps the pre-check from
+ * disagreeing with the file the fork would actually apply. Throws with guidance if no
+ * local file exists (the fork would fetch; the pre-check defers that to apply-time).
  */
 export function resolveStringsFilePath(tweakccFixedDir: string, version: string): string {
   const candidates = [
     join(tweakccFixedDir, 'data', 'prompts', `prompts-${version}.json`),
-    join(homedir(), '.tweakcc', 'prompt-data-cache', `prompts-${version}.json`),
+    join(forkConfigDir(), 'prompt-data-cache', `prompts-${version}.json`),
   ];
   const found = candidates.find((p) => existsSync(p));
   if (found === undefined) {
     throw new Error(
-      `OrphanValidator: no prompts-${version}.json found (looked in ${candidates.join(', ')}). ` +
-        `Run \`tweakcc-fixed --apply\` once to populate the prompt-data cache for this version.`,
+      `OrphanValidator: no local prompts-${version}.json found (looked in ${candidates.join(', ')}). ` +
+        `Run \`tweakcc-fixed --apply\` once to populate the prompt-data cache for this version ` +
+        `(the fork would fetch it from the network at apply-time; this pre-check does not).`,
     );
   }
   return found;
@@ -178,7 +219,7 @@ export function loadLegalMap(stringsFilePath: string): Map<string, Set<string>> 
   return buildLegalMap(JSON.parse(readFileSync(stringsFilePath, 'utf8')) as StringsFile);
 }
 
-/** Run the Orphan-variable check over the override dirs and return the `validator` string. */
+/** Run the authoring-drift pre-check over the override dirs and return the `validator` string. */
 export function runOrphanValidator(dirs: string[], stringsFilePath: string): string {
   return formatValidatorOutput(readOverrideFiles(dirs), loadLegalMap(stringsFilePath));
 }

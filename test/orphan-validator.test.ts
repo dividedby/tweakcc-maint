@@ -64,11 +64,21 @@ describe('promptIdOf / buildLegalMap', () => {
   });
 });
 
-describe('findOrphans — declared variables vs. the target identifierMap', () => {
+// The authoring-drift pre-check (ADR 0005): flags only a declared backing variable
+// upstream renamed/inlined. It is NOT the authoritative orphan detector — runtime-scope
+// orphans are Boot-verify's altitude — so these assert the narrow drift promise only.
+describe('findOrphans — authoring-drift: declared variables vs. the target identifierMap', () => {
   it('flags a declared variable absent from the matched prompt identifierMap', () => {
     const files = [override('agent.md', ['BACKED', 'RENAMED_AWAY'])];
     const orphans = findOrphans(files, legal({ agent: ['BACKED'] }));
     expect(orphans).toEqual([{ file: 'agent.md', variable: 'RENAMED_AWAY' }]);
+  });
+
+  it('does NOT catch a runtime-scope orphan that the override never declared (Boot-verify owns that)', () => {
+    // IS_TRUTHY_FN class: a name that only goes missing in the patched binary's runtime
+    // scope, never declared in `variables:`. A static check structurally cannot see it.
+    const files = [override('agent.md', ['BACKED'])];
+    expect(findOrphans(files, legal({ agent: ['BACKED'] }))).toEqual([]);
   });
 
   it('an override whose declared variables are all backed has no orphans', () => {
