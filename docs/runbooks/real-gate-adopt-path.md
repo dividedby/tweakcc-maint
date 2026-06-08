@@ -1,0 +1,78 @@
+# Runbook — running the real gate (adopt path, #22)
+
+HITL verification of `RealAdoptionEnvironment`'s adopt path (PRD #20 → #22). The unit
+tests prove the gate's orchestration; this runbook is the one layer the fakes can't
+exercise — a human running the real gate against a real Claude Code install.
+
+> ⚠️ **The Restore drill is NOT real in this slice (#23 owns it).** The gate runs a real
+> `tweakcc-fixed --apply` against your installed Claude Code and does **not** automatically
+> restore it. Have a backup, and restore manually when done (step 5). The record's
+> `restoreDrill` fields are placeholders until #23.
+
+## Prerequisites
+
+1. **Leaf clones** (siblings under `~/repos`, or set `TWEAKCC_FIXED_DIR` / `LOBOTOMIZED_DIR`):
+   ```bash
+   git clone https://github.com/skrabe/tweakcc-fixed ~/repos/tweakcc-fixed
+   git clone https://github.com/skrabe/lobotomized-claude-code ~/repos/lobotomized-claude-code
+   ```
+2. **Build tweakcc-fixed** (it has a build step; the gate runs `dist/index.mjs`):
+   ```bash
+   cd ~/repos/tweakcc-fixed && pnpm install && pnpm build
+   ```
+3. **Seed the prompt-data cache** — one `--apply` populates `~/.tweakcc/prompt-data-cache/`
+   with `prompts-<version>.json` (the orphan validator's `identifierMap` source; the
+   bundled `tweakcc-fixed/data/prompts/` is used first when present):
+   ```bash
+   node ~/repos/tweakcc-fixed/dist/index.mjs --apply
+   ```
+4. **A real Claude Code install + a backup** of it.
+5. **Credentials in the environment** (read at run time; nothing committed — ADR 0003):
+   ```bash
+   export CLAUDE_CODE_OAUTH_TOKEN=...     # or ANTHROPIC_API_KEY=...
+   ```
+
+## 1. Run the gate on the installed (known-good) version
+
+```bash
+cd ~/repos/tweakcc-maint
+pnpm tsx src/cli.ts
+```
+
+The matrix is **installed-version-only** (#22): `listMatrix()` reads `claude --version`.
+Expect a `pass: true` Adoption record on stdout and exit 0. Diagnostics (the matrix, the
+safety warning) go to stderr; the JSON record is the only thing on stdout.
+
+## 2. Inspect the record
+
+- `versions[0].fourZeros.pass === true`, with empty `failedPatches` / `missingSystemPrompts`
+  / `orphanVariables` and `bootVerifyPassed: true`.
+- `versions[0].restoreDrill` is a placeholder this slice — ignore it until #23.
+
+## 3. Break a bump on purpose → expect a real non-zero verdict
+
+The point of the real env: it *discovers* breakage the Fake only *simulates*. Pick one:
+
+- **Failed patch / missing prompt** — perturb a patch anchor or a system-prompt override so
+  `--apply` misfires; expect `failedPatches` / `missingSystemPrompts` populated.
+- **Orphan variable** — add a bogus `${NOT_A_REAL_VAR}` to an override's `variables:` list;
+  expect it in `orphanVariables`.
+- **Boot crash** — break a patched template literal; expect `bootVerifyPassed: false`.
+
+Re-run step 1: expect `pass: false` and a non-zero exit, with the record naming the breach.
+
+## 4. Restore manually (because the drill is stubbed this slice)
+
+```bash
+node ~/repos/tweakcc-fixed/dist/index.mjs --restore
+```
+
+## Known limitations (this slice)
+
+- **Restore drill is stubbed** (#23). See the warning above.
+- **Orphan validator covers the `identifierMap` variable class.** It cross-references each
+  override's declared `variables:` against the target version's `prompts-<version>.json`
+  `identifierMap`. Synthetic positional names (`…_VAR_<n>`) are excluded. It does **not**
+  yet model the fork's other backing classes (e.g. `_FN` functions, `_OBJECT`s), so it can
+  over-report those — adjudicate flagged orphans against `tweakcc-fixed`'s own apply output.
+  `apply` and `boot-verify` are the load-bearing real signals.
