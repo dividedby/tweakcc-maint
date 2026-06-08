@@ -16,8 +16,15 @@ maintainer (`skrabe`). Never direct-push or assume write access to a leaf: the c
 
 ## Build / test / run
 Stack: **TypeScript + vitest + pnpm + ESM, run via `tsx` (no build step)** — see
-`docs/adr/0004`. The exact build / test / lint / run incantations land here once slice 1
-scaffolds `package.json`. Design: `docs/design/release-adoption-substrate.md`.
+`docs/adr/0004`. Design: `docs/design/release-adoption-substrate.md`.
+
+- Install: `pnpm install`
+- Test: `pnpm test` (vitest run; `pnpm test:watch` for watch mode)
+- Typecheck: `pnpm typecheck` (`tsc --noEmit` — there is no emit/build step)
+- Run a source file directly: `pnpm tsx <file.ts>`
+
+No `dist`/bundler: sources run directly via `tsx`, identically locally and in CI.
+`pnpm-workspace.yaml` allowlists esbuild's build script (vitest/tsx dependency).
 
 ## Agent skills
 
