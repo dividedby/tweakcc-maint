@@ -30,11 +30,11 @@ describe('IntegrationGate.runGate — clean matrix of N versions', () => {
     expect(record.pass).toBe(true);
     expect(record.versions.map((v) => v.ccVersion)).toEqual(['1.2.3', '1.2.4', '1.3.0']);
     for (const v of record.versions) {
-      expect(v.fourZeros.pass).toBe(true);
-      expect(v.fourZeros.failedPatches).toEqual([]);
-      expect(v.fourZeros.missingSystemPrompts).toEqual([]);
-      expect(v.fourZeros.orphanVariables).toEqual([]);
-      expect(v.fourZeros.bootVerifyPassed).toBe(true);
+      expect(v.fourZeros!.pass).toBe(true);
+      expect(v.fourZeros!.failedPatches).toEqual([]);
+      expect(v.fourZeros!.missingSystemPrompts).toEqual([]);
+      expect(v.fourZeros!.orphanVariables).toEqual([]);
+      expect(v.fourZeros!.bootVerifyPassed).toBe(true);
     }
   });
 
@@ -93,11 +93,11 @@ describe('IntegrationGate.runGate — any version breaching fails the WHOLE run'
     expect(recordToExitCode(record)).not.toBe(0);
 
     // The record shows WHICH version failed (and that the others passed).
-    expect(versionResult(record, '1.2.3').fourZeros.pass).toBe(true);
-    expect(versionResult(record, '1.2.4').fourZeros.pass).toBe(false);
-    expect(versionResult(record, '1.3.0').fourZeros.pass).toBe(true);
+    expect(versionResult(record, '1.2.3').fourZeros!.pass).toBe(true);
+    expect(versionResult(record, '1.2.4').fourZeros!.pass).toBe(false);
+    expect(versionResult(record, '1.3.0').fourZeros!.pass).toBe(true);
 
-    const failed = record.versions.filter((v) => !v.fourZeros.pass).map((v) => v.ccVersion);
+    const failed = record.versions.filter((v) => !v.fourZeros!.pass).map((v) => v.ccVersion);
     expect(failed).toEqual(['1.2.4']);
   });
 
@@ -110,8 +110,8 @@ describe('IntegrationGate.runGate — any version breaching fails the WHOLE run'
 
     expect(record.pass).toBe(false);
     expect(recordToExitCode(record)).not.toBe(0);
-    expect(versionResult(record, '1.2.3').fourZeros.pass).toBe(false);
-    expect(versionResult(record, '1.2.4').fourZeros.pass).toBe(true);
+    expect(versionResult(record, '1.2.3').fourZeros!.pass).toBe(false);
+    expect(versionResult(record, '1.2.4').fourZeros!.pass).toBe(true);
   });
 
   it('LAST version fails → whole run fails', () => {
@@ -123,8 +123,8 @@ describe('IntegrationGate.runGate — any version breaching fails the WHOLE run'
 
     expect(record.pass).toBe(false);
     expect(recordToExitCode(record)).not.toBe(0);
-    expect(versionResult(record, '1.2.3').fourZeros.pass).toBe(true);
-    expect(versionResult(record, '1.2.4').fourZeros.pass).toBe(false);
+    expect(versionResult(record, '1.2.3').fourZeros!.pass).toBe(true);
+    expect(versionResult(record, '1.2.4').fourZeros!.pass).toBe(false);
   });
 
   it('multiple versions breach → run fails and every breach is recorded', () => {
@@ -136,7 +136,7 @@ describe('IntegrationGate.runGate — any version breaching fails the WHOLE run'
     const record = runGate(['1.2.3', '1.2.4', '1.3.0'], env);
 
     expect(record.pass).toBe(false);
-    const failed = record.versions.filter((v) => !v.fourZeros.pass).map((v) => v.ccVersion);
+    const failed = record.versions.filter((v) => !v.fourZeros!.pass).map((v) => v.ccVersion);
     expect(failed).toEqual(['1.2.3', '1.3.0']);
   });
 });
@@ -145,6 +145,119 @@ describe('IntegrationGate.runGate — empty matrix is an error, not a vacuous pa
   it('throws on an empty matrix', () => {
     const env = new FakeAdoptionEnvironment({ '1.2.3': cleanSignals });
     expect(() => runGate([], env)).toThrow();
+  });
+});
+
+describe('IntegrationGate.runGate — Restore drill brackets the per-version flow', () => {
+  it('version WITH a confirmed backup → flow is backup-exists → apply → Four-zeros → restore → verify-clean, and records a passing Restore-drill result', () => {
+    const env = new FakeAdoptionEnvironment({ '1.2.3': cleanSignals });
+    const record = runGate(['1.2.3'], env);
+
+    expect(record.pass).toBe(true);
+    const v = versionResult(record, '1.2.3');
+    expect(v.fourZeros!.pass).toBe(true);
+    expect(v.restoreDrill.pass).toBe(true);
+    expect(v.restoreDrill.status).toBe('pass');
+    expect(v.restoreDrill.backupExists).toBe(true);
+    expect(v.restoreDrill.restored).toBe(true);
+    expect(v.restoreDrill.cleanStock).toBe(true);
+    expect(recordToExitCode(record)).toBe(0);
+  });
+
+  it('the seam is exercised in order: backupExists, then adopt, then restore, then isCleanStock', () => {
+    const calls: string[] = [];
+    const env = new FakeAdoptionEnvironment({ '1.2.3': cleanSignals }, {
+      onCall: (name) => calls.push(name),
+    });
+    runGate(['1.2.3'], env);
+    expect(calls).toEqual(['backupExists', 'adopt', 'restore', 'isCleanStock']);
+  });
+
+  it('restore leaves the install NON-clean → run FAILS even though Four-zeros passed, and the dirty restore is recorded', () => {
+    const env = new FakeAdoptionEnvironment({ '1.2.3': cleanSignals }, {
+      perVersion: { '1.2.3': { cleanStock: false } },
+    });
+    const record = runGate(['1.2.3'], env);
+
+    expect(record.pass).toBe(false);
+    expect(recordToExitCode(record)).not.toBe(0);
+
+    const v = versionResult(record, '1.2.3');
+    // Four-zeros itself passed; the failure is the dirty restore.
+    expect(v.fourZeros!.pass).toBe(true);
+    expect(v.restoreDrill.pass).toBe(false);
+    expect(v.restoreDrill.status).toBe('dirty-restore');
+    expect(v.restoreDrill.backupExists).toBe(true);
+    expect(v.restoreDrill.restored).toBe(true);
+    expect(v.restoreDrill.cleanStock).toBe(false);
+  });
+
+  it('NO backup exists → gate FAILS BEFORE apply and records the missing backup', () => {
+    const env = new FakeAdoptionEnvironment({ '1.2.3': cleanSignals }, {
+      perVersion: { '1.2.3': { backupExists: false } },
+    });
+    const record = runGate(['1.2.3'], env);
+
+    expect(record.pass).toBe(false);
+    expect(recordToExitCode(record)).not.toBe(0);
+
+    const v = versionResult(record, '1.2.3');
+    expect(v.restoreDrill.pass).toBe(false);
+    expect(v.restoreDrill.status).toBe('missing-backup');
+    expect(v.restoreDrill.backupExists).toBe(false);
+    // No apply / Four-zeros was attempted: the flow bailed before apply.
+    expect(v.fourZeros).toBeUndefined();
+  });
+
+  it('missing backup → adopt / restore / isCleanStock are never called (bail before apply)', () => {
+    const calls: string[] = [];
+    const env = new FakeAdoptionEnvironment({ '1.2.3': cleanSignals }, {
+      perVersion: { '1.2.3': { backupExists: false } },
+      onCall: (name) => calls.push(name),
+    });
+    runGate(['1.2.3'], env);
+    expect(calls).toEqual(['backupExists']);
+  });
+
+  it('restore-FAILURE is distinguished from verify-clean-FAILURE (records which)', () => {
+    const env = new FakeAdoptionEnvironment({ '1.2.3': cleanSignals }, {
+      perVersion: { '1.2.3': { restoreOutcome: 'failed' } },
+    });
+    const record = runGate(['1.2.3'], env);
+
+    expect(record.pass).toBe(false);
+    const v = versionResult(record, '1.2.3');
+    expect(v.fourZeros!.pass).toBe(true);
+    expect(v.restoreDrill.pass).toBe(false);
+    expect(v.restoreDrill.status).toBe('restore-failed');
+    expect(v.restoreDrill.restored).toBe(false);
+    // When restore itself failed, clean-stock was never verified.
+    expect(v.restoreDrill.cleanStock).toBe(false);
+  });
+
+  it('Four-zeros breach AND restore drill both run; a Four-zeros breach fails the run on its own', () => {
+    const env = new FakeAdoptionEnvironment({
+      '1.2.3': FakeAdoptionEnvironment.breachSignals('bootCrash'),
+    });
+    const record = runGate(['1.2.3'], env);
+
+    expect(record.pass).toBe(false);
+    const v = versionResult(record, '1.2.3');
+    expect(v.fourZeros!.pass).toBe(false);
+    // Restore drill still ran and passed; the run fails because of Four-zeros.
+    expect(v.restoreDrill.pass).toBe(true);
+  });
+
+  it('in a multi-version matrix, one version dirty-restoring fails the whole run', () => {
+    const env = new FakeAdoptionEnvironment(
+      { '1.2.3': cleanSignals, '1.2.4': cleanSignals },
+      { perVersion: { '1.2.4': { cleanStock: false } } },
+    );
+    const record = runGate(['1.2.3', '1.2.4'], env);
+
+    expect(record.pass).toBe(false);
+    expect(versionResult(record, '1.2.3').restoreDrill.pass).toBe(true);
+    expect(versionResult(record, '1.2.4').restoreDrill.status).toBe('dirty-restore');
   });
 });
 
@@ -162,6 +275,13 @@ describe('IntegrationGate.recordToExitCode', () => {
             orphanVariables: [],
             bootVerifyPassed: true,
           },
+          restoreDrill: {
+            pass: true,
+            status: 'pass',
+            backupExists: true,
+            restored: true,
+            cleanStock: true,
+          },
         },
       ],
       date: new Date().toISOString(),
@@ -172,7 +292,13 @@ describe('IntegrationGate.recordToExitCode', () => {
       versions: [
         {
           ...pass.versions[0]!,
-          fourZeros: { ...pass.versions[0]!.fourZeros, pass: false, bootVerifyPassed: false },
+          fourZeros: {
+            pass: false,
+            failedPatches: [],
+            missingSystemPrompts: [],
+            orphanVariables: [],
+            bootVerifyPassed: false,
+          },
         },
       ],
     };
