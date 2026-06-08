@@ -30,6 +30,12 @@ export interface RestoreDrillOverride {
 
 /** Optional knobs for the fake beyond the canned signals. */
 export interface FakeAdoptionEnvironmentOptions {
+  /**
+   * The Support matrix this environment reports from {@link FakeAdoptionEnvironment.listMatrix}.
+   * Defaults to the configured signals' versions (`Object.keys(signals)`), so the common case
+   * needs no extra config; set it explicitly to drive an empty or order-specific matrix.
+   */
+  matrix?: string[];
   /** Per-version Restore-drill outcome overrides, keyed by CC version. */
   perVersion?: Record<string, RestoreDrillOverride>;
   /** Spy hook invoked with each seam method name as it is called, in order. */
@@ -61,6 +67,7 @@ function withBreach(kind: BreachKind): CapturedSignals {
 
 export class FakeAdoptionEnvironment implements AdoptionEnvironment {
   private readonly signals: Readonly<Record<string, CapturedSignals>>;
+  private readonly matrix: readonly string[];
   private readonly perVersion: Readonly<Record<string, RestoreDrillOverride>>;
   private readonly onCall: FakeAdoptionEnvironmentOptions['onCall'];
 
@@ -69,8 +76,14 @@ export class FakeAdoptionEnvironment implements AdoptionEnvironment {
     options: FakeAdoptionEnvironmentOptions = {},
   ) {
     this.signals = signals;
+    this.matrix = options.matrix ?? Object.keys(signals);
     this.perVersion = options.perVersion ?? {};
     this.onCall = options.onCall;
+  }
+
+  /** The configured Support matrix (no real discovery — that is RealAdoptionEnvironment, #22). */
+  listMatrix(): string[] {
+    return [...this.matrix];
   }
 
   private override(ccVersion: string): RestoreDrillOverride {

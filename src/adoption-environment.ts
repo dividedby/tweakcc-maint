@@ -30,6 +30,14 @@ export type RestoreOutcome = 'ok' | 'failed';
 
 export interface AdoptionEnvironment {
   /**
+   * The Support matrix the environment knows about — the CC versions the gate should
+   * check. The *caller* reads this to build the matrix it hands to `runGate(matrix, env)`;
+   * it is NOT called inside `runGate`, which stays environment-agnostic (it receives the
+   * matrix as data). An empty list flows into `runGate`'s existing empty-matrix error.
+   */
+  listMatrix(): string[];
+
+  /**
    * Whether a confirmed backup exists for this version's install — the escape hatch
    * the Restore drill proves. The gate checks this BEFORE apply: with no backup, a
    * bad adoption could brick the install with no way back, so the run fails pre-apply.
