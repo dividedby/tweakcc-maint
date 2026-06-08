@@ -21,18 +21,20 @@ jobs:
   gate:
     runs-on: ubuntu-latest
     env:
-      # The gate reads credentials from the environment (ADR 0003). ANTHROPIC_API_KEY
-      # authenticates `claude -p` headlessly (ADR 0006). DISABLE_AUTOUPDATER pins the
-      # installed CC version so the cache key stays honest.
+      # The gate reads credentials from the environment (ADR 0003); either authenticates
+      # `claude -p` headlessly (ADR 0006), checked CLAUDE_CODE_OAUTH_TOKEN-first to match
+      # src/cli.ts. Set whichever you generated as a repo secret on the fork.
+      # DISABLE_AUTOUPDATER pins the installed CC version so the cache key stays honest.
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       DISABLE_AUTOUPDATER: "1"
       TWEAKCC_FIXED_DIR: ${{ github.workspace }}/leaves/tweakcc-fixed
       LOBOTOMIZED_DIR: ${{ github.workspace }}/leaves/lobotomized-claude-code
     steps:
-      - name: Guard — require the license secret
+      - name: Guard — require a license secret
         run: |
-          if [ -z "${ANTHROPIC_API_KEY}" ]; then
-            echo "::error::ANTHROPIC_API_KEY secret is not set on this fork; Boot-verify cannot run." >&2
+          if [ -z "${CLAUDE_CODE_OAUTH_TOKEN}" ] && [ -z "${ANTHROPIC_API_KEY}" ]; then
+            echo "::error::Neither CLAUDE_CODE_OAUTH_TOKEN nor ANTHROPIC_API_KEY is set on this fork; Boot-verify cannot run." >&2
             exit 1
           fi
 

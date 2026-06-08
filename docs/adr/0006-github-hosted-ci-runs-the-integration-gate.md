@@ -77,8 +77,10 @@ must run under unattended `claude -p`, where the global guards are absent.
   are a later refinement.
 - The job clones both leaves and builds `tweakcc-fixed` (`pnpm install && pnpm build`)
   before invoking the gate — the gate runs the leaf's `dist/index.mjs`.
-- `ANTHROPIC_API_KEY` is a repository secret on the fork; the secret-guard + existing
-  `.gitignore` keep it out of the tree.
+- The license is a repository secret on the fork — `CLAUDE_CODE_OAUTH_TOKEN` (from
+  `claude setup-token`) or `ANTHROPIC_API_KEY`; the workflow forwards both and the gate
+  prefers the OAuth token (`src/cli.ts`). The secret-guard + existing `.gitignore` keep
+  it out of the tree.
 - The Adoption record is uploaded as a build artifact — the machine-readable evidence
   the same record feeds into the slice-6 adoption-history surface (#12).
 - Acceptance (#10) is satisfied only once the workflow's first real run is green; the
