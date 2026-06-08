@@ -43,7 +43,7 @@ no other guidance is needed. Follow it top to bottom:
 ### Open
 | # | Issue | Wave | Status | Owner | Skill(s) | Deps | Notes |
 | - | ----- | ---- | ------ | ----- | -------- | ---- | ----- |
-| 45 | Swap tweakcc-fixed#4 detector to the identifierMap-union check | W1 | **Next** | agent | `/tdd` | — | skrabe pre-approved; leaf-PR commit, merge stays his |
+| 45 | Swap tweakcc-fixed#4 detector to the identifierMap-union check | W1 | Blocked | agent | `/tdd` | — | verified commit `bc60baa` pushed to PR #4; agent work done — awaiting HITL boot-verify vs stock 2.1.168 + skrabe merge (both his) |
 | 46 | Authoring-drift pre-check validates vs the leaf's OWN identifierMap | W1 | **Next** | agent | `/tdd` | — | capture lineage rule in CONTEXT.md via `/grill-with-docs` |
 | 31 | Gate consumes the patcher orphan report (consumer half) | W1 | Blocked | agent | `/tdd` | #43 | buildable behind a faked `--report-orphans` seam; real shell-out needs #43 |
 | 43 | Patcher `--report-orphans` (producer, leaf PR to skrabe) | W1 | Backlog | human | `/release-adoption` | — | skrabe-facing PR + merge timing not ours |
