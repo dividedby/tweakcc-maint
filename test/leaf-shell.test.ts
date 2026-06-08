@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { normalizeBootVerify, combinedOutput, type ShellResult } from '../src/leaf-shell.js';
+import { normalizeBootVerify, combinedOutput, extractResultText, type ShellResult } from '../src/leaf-shell.js';
 import { evaluate } from '../src/four-zeros-verdict.js';
 import { formatValidatorOutput } from '../src/orphan-validator.js';
 
@@ -29,6 +29,29 @@ describe('normalizeBootVerify — translate a claude -p result into the verdict 
   it('does not echo failure stdout into the message (no marker smuggling)', () => {
     const out = normalizeBootVerify(result({ status: 1, stdout: 'Boot-verify OK (fluke reply)' }));
     expect(out).not.toContain('Boot-verify OK');
+  });
+});
+
+describe('extractResultText — reply from claude -p stream-json output', () => {
+  const assistant = '{"type":"assistant","message":{"content":[{"type":"text","text":"ok"}]}}';
+  const ok = '{"type":"result","subtype":"success","is_error":false,"result":"ok","total_cost_usd":0.0012,"num_turns":1}';
+
+  it('returns the result event reply text', () => {
+    expect(extractResultText(`${assistant}\n${ok}`)).toBe('ok');
+  });
+
+  it('errored result yields empty (boot-verify treats it as a failure)', () => {
+    const err = '{"type":"result","is_error":true,"result":"boom"}';
+    expect(extractResultText(err)).toBe('');
+  });
+
+  it('skips non-JSON lines and tolerates no result event', () => {
+    expect(extractResultText('warming up...\n' + assistant)).toBe('');
+  });
+
+  it('takes the last result event when several are present', () => {
+    const first = '{"type":"result","is_error":false,"result":"first"}';
+    expect(extractResultText(`${first}\n${ok}`)).toBe('ok');
   });
 });
 

@@ -28,6 +28,9 @@ jobs:
       CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       DISABLE_AUTOUPDATER: "1"
+      # Boot-verify (headless claude -p) appends its raw stream-json here; the post-gate
+      # step surfaces total_cost_usd from it for the cross-repo cost ledger (agent-research).
+      GATE_AGENT_LOG: ${{ github.workspace }}/agent.jsonl
       TWEAKCC_FIXED_DIR: ${{ github.workspace }}/leaves/tweakcc-fixed
       LOBOTOMIZED_DIR: ${{ github.workspace }}/leaves/lobotomized-claude-code
     steps:
@@ -58,17 +61,11 @@ jobs:
           git clone --depth 1 https://github.com/skrabe/tweakcc-fixed "${TWEAKCC_FIXED_DIR}"
           git clone --depth 1 https://github.com/skrabe/lobotomized-claude-code "${LOBOTOMIZED_DIR}"
 
-      - name: Cache tweakcc-fixed build
-        id: leaf-cache
-        uses: actions/cache@v4
-        with:
-          path: ${{ env.TWEAKCC_FIXED_DIR }}/dist
-          # Keyed on the leaf's HEAD so a leaf change rebuilds; falls back to most-recent.
-          key: tweakcc-fixed-dist-${{ hashFiles(format('{0}/.git/HEAD', env.TWEAKCC_FIXED_DIR)) }}
-          restore-keys: tweakcc-fixed-dist-
-
-      - name: Build tweakcc-fixed (the gate runs its dist/index.mjs)
-        if: steps.leaf-cache.outputs.cache-hit != 'true'
+      # Always install + build: the gate runs the leaf's dist/index.mjs, which needs its
+      # runtime node_modules (ink, etc.) present. Caching only dist while gating the
+      # install behind that cache left a dist with no node_modules. pnpm's symlinked
+      # node_modules is fragile to cache, so we rebuild fresh each run (on-demand workflow).
+      - name: Install + build tweakcc-fixed (the gate runs its dist/index.mjs)
         working-directory: ${{ env.TWEAKCC_FIXED_DIR }}
         run: |
           pnpm install --frozen-lockfile
@@ -110,9 +107,29 @@ jobs:
           set -o pipefail
           pnpm tsx src/cli.ts | tee adoption-record.json
 
-      - name: Upload Adoption record (PR evidence)
+      # Surface the Agent-SDK cost onto stdout so it lands in the Actions log, where the
+      # agent-research cost ledger scrapes `total_cost_usd`. Boot-verify's stdout is the
+      # gate's reserved JSON record, so the cost comes from the GATE_AGENT_LOG sidecar.
+      - name: Surface Agent-SDK cost to the run log
+        if: always()
+        run: |
+          if [ -s "${GATE_AGENT_LOG}" ]; then
+            total=$(jq -rs '[.[] | select(.type=="result") | .total_cost_usd // empty] | add // 0' "${GATE_AGENT_LOG}")
+            turns=$(jq -rs '[.[] | select(.type=="result") | .num_turns // empty] | add // 0' "${GATE_AGENT_LOG}")
+            echo "total_cost_usd=${total}"
+            echo "num_turns=${turns}"
+          else
+            echo "total_cost_usd=0"
+            echo "num_turns=0"
+            echo "::notice::No agent stream captured (no successful Boot-verify model call this run)."
+          fi
+
+      - name: Upload Adoption record + agent stream (PR evidence)
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: adoption-record-${{ inputs.cc_version }}
-          path: adoption-record.json
+          path: |
+            adoption-record.json
+            agent.jsonl
+          if-no-files-found: warn

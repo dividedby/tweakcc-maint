@@ -24,7 +24,7 @@ import { delimiter, join } from 'node:path';
 
 import type { AdoptionEnvironment, RestoreOutcome } from './adoption-environment.js';
 import type { CapturedSignals } from './four-zeros-verdict.js';
-import { runSync, combinedOutput, normalizeBootVerify } from './leaf-shell.js';
+import { runSync, runBootVerify, combinedOutput, normalizeBootVerify } from './leaf-shell.js';
 import { runOrphanValidator, resolveStringsFilePath } from './orphan-validator.js';
 
 /** Configuration for the real adapter — paths to the leaves and boot-verify knobs. */
@@ -153,7 +153,7 @@ export class RealAdoptionEnvironment implements AdoptionEnvironment {
 
     const apply = combinedOutput(runSync('node', [this.tweakccCli, '--apply']));
     const bootVerify = normalizeBootVerify(
-      runSync('claude', ['-p', this.cfg.bootVerifyPrompt, '--model', this.cfg.bootVerifyModel]),
+      runBootVerify(this.cfg.bootVerifyPrompt, this.cfg.bootVerifyModel),
     );
     const validator = runOrphanValidator(overrideDirs, stringsFile);
 
