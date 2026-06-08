@@ -125,9 +125,13 @@ from "more direct but wrong."
 _Avoid_: sanity check, baseline.
 
 **Orphan variable**:
-An `${VAR}` interpolation in a prompt override that no longer exists in the
-current binary's runtime scope (Anthropic renamed or inlined it). Crashes CC
-with `ReferenceError: VAR is not defined` at runtime. The orphan-variable
-validator (lobotomized side) is the deterministic detector, run by the
-**Integration gate**.
+A `${VAR}` interpolation that survives into the *applied* prompt but no longer
+exists in the patched binary's runtime scope (Anthropic renamed or inlined it).
+Crashes CC with `ReferenceError: VAR is not defined` at runtime. Authoritatively
+detected at runtime by **Boot-verify**, and — where the patcher reports the
+surviving placeholders its own apply-time resolution emits — consumed by the
+**Integration gate**; a thin static **authoring-drift pre-check** flags the
+narrower case of a declared backing variable upstream renamed or inlined, but
+cannot see runtime-scope orphans (that is Boot-verify's altitude, not a static
+check's).
 _Avoid_: dangling var, bad placeholder, missing token.
