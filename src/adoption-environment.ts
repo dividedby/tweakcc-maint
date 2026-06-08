@@ -11,18 +11,49 @@
  * RealAdoptionEnvironment (#7, HITL). The same `runGate` runs identically against
  * either (ADR 0003).
  *
- * Backup/restore (Restore drill) is part of this seam in the design, but the
- * walking skeleton (#3) only exercises apply → boot-verify → orphan-detect.
- * Restore-drill bracketing lands in #5.
+ * Backup/restore (Restore drill) is part of this seam: #5 adds the capabilities the
+ * drill needs — backupExists / restore / isCleanStock — so `runGate` can bracket the
+ * apply with confirm-backup before and restore → verify-clean after. How they are
+ * actually performed (filesystem mechanics) is the RealAdoptionEnvironment's job (#7),
+ * not this seam's contract.
  */
 
 import type { CapturedSignals } from './four-zeros-verdict.js';
 
+/**
+ * Outcome of running `--restore` for one version: whether the restore COMMAND itself
+ * succeeded. Distinct from whether the install is clean stock afterwards (that is
+ * {@link AdoptionEnvironment.isCleanStock}) — a restore can succeed yet leave the
+ * install dirty, or fail outright.
+ */
+export type RestoreOutcome = 'ok' | 'failed';
+
 export interface AdoptionEnvironment {
+  /**
+   * Whether a confirmed backup exists for this version's install — the escape hatch
+   * the Restore drill proves. The gate checks this BEFORE apply: with no backup, a
+   * bad adoption could brick the install with no way back, so the run fails pre-apply.
+   */
+  backupExists(ccVersion: string): boolean;
+
   /**
    * Apply the overrides to the given CC version, boot-verify the patched binary,
    * and run the Orphan-variable validator — returning the raw captured output of
    * each as a {@link CapturedSignals} for FourZerosVerdict to interpret.
    */
   adopt(ccVersion: string): CapturedSignals;
+
+  /**
+   * Run `--restore` to undo the adoption for this version, returning whether the
+   * restore COMMAND succeeded. A failed restore is distinct from a restore that
+   * succeeds but leaves the install non-clean (see {@link isCleanStock}).
+   */
+  restore(ccVersion: string): RestoreOutcome;
+
+  /**
+   * Whether the install for this version is back to clean stock — verified AFTER a
+   * successful restore. A non-clean install (dirty restore) fails the run even when
+   * Four-zeros passed.
+   */
+  isCleanStock(ccVersion: string): boolean;
 }

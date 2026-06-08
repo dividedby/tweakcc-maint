@@ -1,15 +1,40 @@
 /**
  * FakeAdoptionEnvironment — the test double for the AdoptionEnvironment seam
  * (design doc → Seams; fake contract: must drive failed-patch, missing-prompt,
- * orphan-var, and boot-crash per version).
+ * orphan-var, boot-crash, dirty-restore, and missing-backup per version).
  *
  * It holds canned {@link CapturedSignals} per CC version and returns them from
  * `adopt`. The raw strings are still interpreted by the REAL FourZerosVerdict, so
  * the fake drives a breach by emitting output that matches that tool's signatures.
+ *
+ * The Restore-drill capabilities (backupExists / restore / isCleanStock) are
+ * controllable per version via the constructor's `perVersion` overrides; by default
+ * every configured version has a backup, restores OK, and is clean stock — so the
+ * drill is invisible to tests that don't care about it. It does NOT model HOW backup
+ * or restore is performed (filesystem mechanics are #7); it only sets the seam's
+ * observable outcomes.
  */
 
-import type { AdoptionEnvironment } from './adoption-environment.js';
+import type { AdoptionEnvironment, RestoreOutcome } from './adoption-environment.js';
 import type { CapturedSignals } from './four-zeros-verdict.js';
+
+/** Per-version overrides for the Restore-drill seam outcomes. */
+export interface RestoreDrillOverride {
+  /** Whether a backup exists (default true). */
+  backupExists?: boolean;
+  /** Outcome of `--restore` (default 'ok'). */
+  restoreOutcome?: RestoreOutcome;
+  /** Whether the install verifies clean stock after restore (default true). */
+  cleanStock?: boolean;
+}
+
+/** Optional knobs for the fake beyond the canned signals. */
+export interface FakeAdoptionEnvironmentOptions {
+  /** Per-version Restore-drill outcome overrides, keyed by CC version. */
+  perVersion?: Record<string, RestoreDrillOverride>;
+  /** Spy hook invoked with each seam method name as it is called, in order. */
+  onCall?: (method: 'backupExists' | 'adopt' | 'restore' | 'isCleanStock') => void;
+}
 
 /** The four Four-zeros breach kinds the fake contract must be able to drive. */
 export type BreachKind = 'failedPatch' | 'missingPrompt' | 'orphanVar' | 'bootCrash';
@@ -36,9 +61,35 @@ function withBreach(kind: BreachKind): CapturedSignals {
 
 export class FakeAdoptionEnvironment implements AdoptionEnvironment {
   private readonly signals: Readonly<Record<string, CapturedSignals>>;
+  private readonly perVersion: Readonly<Record<string, RestoreDrillOverride>>;
+  private readonly onCall: FakeAdoptionEnvironmentOptions['onCall'];
 
-  constructor(signals: Record<string, CapturedSignals>) {
+  constructor(
+    signals: Record<string, CapturedSignals>,
+    options: FakeAdoptionEnvironmentOptions = {},
+  ) {
     this.signals = signals;
+    this.perVersion = options.perVersion ?? {};
+    this.onCall = options.onCall;
+  }
+
+  private override(ccVersion: string): RestoreDrillOverride {
+    return this.perVersion[ccVersion] ?? {};
+  }
+
+  backupExists(ccVersion: string): boolean {
+    this.onCall?.('backupExists');
+    return this.override(ccVersion).backupExists ?? true;
+  }
+
+  restore(ccVersion: string): RestoreOutcome {
+    this.onCall?.('restore');
+    return this.override(ccVersion).restoreOutcome ?? 'ok';
+  }
+
+  isCleanStock(ccVersion: string): boolean {
+    this.onCall?.('isCleanStock');
+    return this.override(ccVersion).cleanStock ?? true;
   }
 
   /** Convenience: an env whose single version yields exactly one breach kind. */
@@ -56,6 +107,7 @@ export class FakeAdoptionEnvironment implements AdoptionEnvironment {
   }
 
   adopt(ccVersion: string): CapturedSignals {
+    this.onCall?.('adopt');
     const signals = this.signals[ccVersion];
     if (signals === undefined) {
       throw new Error(`FakeAdoptionEnvironment: no signals configured for version '${ccVersion}'`);
