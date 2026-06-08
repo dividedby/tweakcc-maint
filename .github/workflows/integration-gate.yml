@@ -93,9 +93,22 @@ jobs:
           echo "${HOME}/.local/bin" >> "${GITHUB_PATH}"
           "${HOME}/.local/bin/claude" --version
 
+      # The Restore drill (#23) fails closed unless a stock backup exists before apply.
+      # On an ephemeral runner the fresh install has none, so seed it the way the runbook
+      # prerequisites do: one --apply creates tweakcc-fixed's stock backup under ~/.tweakcc
+      # (and the prompt-data cache), then --restore returns CC to clean stock for the gate.
+      - name: Seed the stock backup (runbook prereq)
+        run: |
+          node "${TWEAKCC_FIXED_DIR}/dist/index.mjs" --apply
+          node "${TWEAKCC_FIXED_DIR}/dist/index.mjs" --restore
+
       # --- The gate: real apply -> Boot-verify -> Orphan check, bracketed by Restore drill ---
       - name: Run the Integration gate
-        run: pnpm tsx src/cli.ts | tee adoption-record.json
+        run: |
+          # pipefail so the gate's non-zero exit (pass:false) fails the job — `tee`
+          # alone would mask it and turn a red gate into a green run.
+          set -o pipefail
+          pnpm tsx src/cli.ts | tee adoption-record.json
 
       - name: Upload Adoption record (PR evidence)
         if: always()
