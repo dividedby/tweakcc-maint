@@ -7,8 +7,9 @@
  *   pnpm tsx src/cli.ts
  *
  * Leaf paths default to sibling clones under ~/repos; override with TWEAKCC_FIXED_DIR /
- * LOBOTOMIZED_DIR. Credentials are read from the environment (CLAUDE_CODE_OAUTH_TOKEN or
- * ANTHROPIC_API_KEY) — nothing is committed.
+ * LOBOTOMIZED_DIR. Credentials come from the environment (CLAUDE_CODE_OAUTH_TOKEN or
+ * ANTHROPIC_API_KEY) OR Claude Code's own stored OAuth (keychain/config) that `claude -p`
+ * authenticates with — see credentials-preflight (#42). Nothing is committed.
  *
  * SAFETY: the gate runs a real `--apply` and a real `--restore` (the Restore drill, #23) —
  * confirm-backup before, restore + verify-clean after. If the run ends dirty (e.g. a failed
@@ -17,19 +18,11 @@
 
 import { runGate, recordToExitCode } from './integration-gate.js';
 import { RealAdoptionEnvironment, defaultLeafConfig } from './real-adoption-environment.js';
-
-function hasCredentials(): boolean {
-  return Boolean(process.env.CLAUDE_CODE_OAUTH_TOKEN ?? process.env.ANTHROPIC_API_KEY);
-}
+import { detectCredentials, credentialMessage } from './credentials-preflight.js';
 
 function main(): void {
-  if (!hasCredentials()) {
-    console.error(
-      'No credentials in the environment — boot-verify (`claude -p`) will fail.\n' +
-        'Set CLAUDE_CODE_OAUTH_TOKEN (or ANTHROPIC_API_KEY) and re-run.',
-    );
-    process.exit(2);
-  }
+  const message = credentialMessage(detectCredentials());
+  if (message) console.error(message);
 
   console.error(
     '⚠️  The gate runs a real `tweakcc-fixed --apply` AND a real `--restore` against your ' +
