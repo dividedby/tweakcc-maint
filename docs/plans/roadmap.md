@@ -2,8 +2,9 @@
 
 > **Status:** active · **Owner:** maintainer + agents
 >
-> The authoritative execution roadmap. Every open issue appears in the master
-> census below, and this is the single place to go to pick the next thing to
+> The authoritative execution roadmap. Every issue appears in the master
+> census below (closed issues are kept as `Done` rows — the census is the full
+> record), and this is the single place to go to pick the next thing to
 > work on. **This document self-updates:** every PR that opens, advances, or
 > closes an issue updates that issue's row in the same branch — a PreToolUse hook
 > (`.claude/hooks/roadmap-guard.py`) enforces it. Out-of-band drift (issues
@@ -37,7 +38,9 @@ no other guidance is needed. Follow it top to bottom:
 | **W2** | Verdict-signal trust (triage decisions) | #41 #47 | none — triage anytime |
 | **—**  | Cross-cutting / later | #26 #11 #8 | n/a |
 
-## Master census (all open issues)
+## Master census (all issues)
+
+### Open
 | # | Issue | Wave | Status | Owner | Skill(s) | Deps | Notes |
 | - | ----- | ---- | ------ | ----- | -------- | ---- | ----- |
 | 45 | Swap tweakcc-fixed#4 detector to the identifierMap-union check | W1 | **Next** | agent | `/tdd` | — | skrabe pre-approved; leaf-PR commit, merge stays his |
@@ -50,6 +53,26 @@ no other guidance is needed. Follow it top to bottom:
 | 26 | Leaf finding: lobotomized breaks CC 2.1.168 (evidence) | — | Parked | human | — | — | correct root-cause framing + re-baseline gate vs stock tweakcc-fixed |
 | 11 | Roadmap: behavioral A/B benchmark (stock vs lobotomized) | — | Parked | human | — | — | roadmap item |
 | 8 | Roadmap: leaf test broadening (tweakcc-fixed + lobotomized) | — | Parked | human | — | — | roadmap item |
+
+### Done (closed — kept as full record, newest first)
+| # | Issue | Wave | Status | Owner | Skill(s) | Deps | Notes |
+| - | ----- | ---- | ------ | ----- | -------- | ---- | ----- |
+| 30 | Re-scope orphan check to authoring-drift pre-check; defer prompts-source to patcher | — | Done | agent | — | — | foundation refined by #45/#46 |
+| 27 | Orphan validator: align identifierMap source with applied overrides | — | Done | agent | — | — | — |
+| 23 | RealAdoptionEnvironment Restore drill (HITL) | — | Done | human | — | — | — |
+| 22 | RealAdoptionEnvironment adopt path — real --apply / boot-verify (HITL) | — | Done | human | — | — | — |
+| 21 | listMatrix() seam — environment supplies the Support matrix | — | Done | agent | — | — | — |
+| 20 | PRD: RealAdoptionEnvironment — shell-out adapter behind gate seam (HITL) | — | Done | human | — | — | — |
+| 13 | Parse apply/boot/validator output into a Four-zeros verdict | — | Done | agent | — | — | — |
+| 12 | Adoption-history reporting over Adoption records | — | Done | agent | — | — | — |
+| 10 | GitHub-hosted CI running the gate on the fork PR branch | — | Done | human | — | — | harness guards landed here (ADR 0006) |
+| 9 | Rebuild the release-adoption skill (ex-/showtime) | — | Done | agent | — | — | — |
+| 7 | TB4: real adoption-environment adapter (HITL) | — | Done | agent | — | — | — |
+| 6 | TB5: propose-only release-detector run-book | — | Done | agent | — | — | — |
+| 5 | TB3: Restore-drill bracketing the gate | — | Done | agent | — | — | — |
+| 4 | TB2: Support-matrix iteration — every version must pass | — | Done | agent | — | — | — |
+| 3 | TB1: walking-skeleton integration gate → Four-zeros verdict | — | Done | agent | — | — | — |
+| 2 | PRD: release-adoption control plane | — | Done | mixed | — | — | — |
 
 ## Legend
 - **Status** — `Next` (do now) · `Backlog` (ready, unstarted) · `Blocked`
