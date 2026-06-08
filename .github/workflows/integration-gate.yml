@@ -31,6 +31,10 @@ jobs:
       # Boot-verify (headless claude -p) appends its raw stream-json here; the post-gate
       # step surfaces total_cost_usd from it for the cross-repo cost ledger (agent-research).
       GATE_AGENT_LOG: ${{ github.workspace }}/agent.jsonl
+      # Pin the leaf's config/backup dir explicitly so tweakcc-fixed (getConfigDir checks this
+      # first) and the gate's restore-drill agree — otherwise the leaf's fallback resolution
+      # (~/.claude/tweakcc once claude creates ~/.claude) diverges from the gate → missing-backup.
+      TWEAKCC_CONFIG_DIR: ${{ github.workspace }}/.tweakcc
       TWEAKCC_FIXED_DIR: ${{ github.workspace }}/leaves/tweakcc-fixed
       LOBOTOMIZED_DIR: ${{ github.workspace }}/leaves/lobotomized-claude-code
     steps:

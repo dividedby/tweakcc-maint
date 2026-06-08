@@ -242,5 +242,10 @@ export function defaultLeafConfig(): RealAdoptionEnvironmentConfig {
     tweakccFixedDir: process.env.TWEAKCC_FIXED_DIR ?? join(homedir(), 'repos', 'tweakcc-fixed'),
     lobotomizedDir:
       process.env.LOBOTOMIZED_DIR ?? join(homedir(), 'repos', 'lobotomized-claude-code'),
+    // Honor TWEAKCC_CONFIG_DIR so the gate's restore-drill reads backups from the same dir
+    // tweakcc-fixed writes them to (its getConfigDir checks TWEAKCC_CONFIG_DIR first). Without
+    // this, the leaf's multi-step dir resolution (e.g. ~/.claude/tweakcc on a runner where
+    // claude created ~/.claude) diverges from the gate's hardcoded ~/.tweakcc → missing-backup.
+    tweakccConfigDir: process.env.TWEAKCC_CONFIG_DIR?.trim() || undefined,
   };
 }
