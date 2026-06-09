@@ -26,9 +26,12 @@
  * reference is the correct, low-noise authoring-drift check.
  *
  * Bounds, documented for the HITL reviewer: synthetic POSITIONAL placeholder names
- * (`…_VAR_<n>`) are matched by index, not by name, so they never appear in
- * `identifierMap`'s (named) values — they are excluded rather than flagged. An override
- * matched to no prompt in the target version is skipped (cannot be validated here).
+ * (`…_VAR_<n>`, e.g. `PROMPT_VAR_0`) ARE cross-referenced by name like any other declared
+ * variable — they appear as `identifierMap` values when correctly backed, so a declared
+ * positional absent from the target identifierMap is the renamed/restructured boot-crash
+ * class (`ReferenceError: PROMPT_VAR_0 is not defined`) and is flagged, not excluded (#62;
+ * an earlier blanket exclusion read false-clean on exactly this case). An override matched
+ * to no prompt in the target version is skipped (cannot be validated here).
  *
  * It still produces the `validator` string of a {@link CapturedSignals} — one
  * `ReferenceError: <VAR> is not defined` line per finding, the exact signature
@@ -71,8 +74,6 @@ export interface StringsFile {
 const FRONTMATTER = /^\s*<!--([\s\S]*?)-->/;
 const VARIABLES_KEY = /^variables:\s*$/;
 const LIST_ITEM = /^\s*-\s*(\S+)/;
-// Synthetic positional placeholder, e.g. `PROMPT_VAR_0` — matched by index, not by name.
-const SYNTHETIC_POSITIONAL = /_VAR_\d+$/;
 
 /** Extract the declared backing-variable whitelist from an override's frontmatter. */
 export function parseAllowedVariables(content: string): string[] {
@@ -112,10 +113,10 @@ export function buildLegalMap(strings: StringsFile): Map<string, Set<string>> {
 
 /**
  * Orphan variables across a set of overrides: each declared variable whose name is absent
- * from its prompt's identifierMap in the target version. Synthetic positional names
- * (`…_VAR_<n>`) are excluded; overrides matching no prompt in the target version are
- * skipped (cannot be validated). Each (file, variable) is reported once, in declaration
- * order.
+ * from its prompt's identifierMap in the target version — synthetic positional names
+ * (`…_VAR_<n>`) included, since they too are backed by name (#62). Overrides matching no
+ * prompt in the target version are skipped (cannot be validated). Each (file, variable) is
+ * reported once, in declaration order.
  */
 export function findOrphans(
   files: OverrideFile[],
@@ -126,7 +127,7 @@ export function findOrphans(
     const legal = legalByPromptId.get(promptIdOf(file.path));
     if (legal === undefined) continue; // no matching prompt in this version — skip
     for (const variable of parseAllowedVariables(file.content)) {
-      if (legal.has(variable) || SYNTHETIC_POSITIONAL.test(variable)) continue;
+      if (legal.has(variable)) continue;
       orphans.push({ file: file.path, variable });
     }
   }
