@@ -35,7 +35,7 @@ no other guidance is needed. Follow it top to bottom:
 | Wave | Theme | Issues | Gate to enter |
 | ---- | ----- | ------ | ------------- |
 | **W1** | 2.1.168 orphan/boot adoption correctness | #45 #31 #43 | none — active now |
-| **W2** | Verdict-signal trust (triage decisions) | #41 | none — triage anytime |
+| **W2** | Verdict-signal trust (triage decisions) | — (cleared) | none — triage anytime |
 | **—**  | Cross-cutting / later | #26 #11 #8 #51 #52 #53 | n/a |
 
 ## Master census (all issues)
@@ -46,7 +46,6 @@ no other guidance is needed. Follow it top to bottom:
 | 45 | Swap tweakcc-fixed#4 detector to the identifierMap-union check | W1 | Blocked | agent | `/tdd` | — | verified commit `bc60baa` pushed to PR #4; agent work done — awaiting HITL boot-verify vs stock 2.1.168 + skrabe merge (both his) |
 | 31 | Gate consumes the patcher orphan report (consumer half) | W1 | Blocked | agent | `/tdd` | #43 | buildable behind a faked `--report-orphans` seam; real shell-out needs #43 |
 | 43 | Patcher `--report-orphans` (producer, leaf PR to skrabe) | W1 | Backlog | human | `/release-adoption` | — | skrabe-facing PR + merge timing not ours |
-| 41 | orphanVariables double-sourced / not trustworthy as authority | W2 | Parked | mixed | `/triage` | — | needs-triage decision on the verdict path |
 | 26 | Leaf finding: lobotomized breaks CC 2.1.168 (evidence) | — | Parked | human | — | — | correct root-cause framing + re-baseline gate vs stock tweakcc-fixed |
 | 11 | Roadmap: behavioral A/B benchmark (stock vs lobotomized) | — | Parked | human | — | — | roadmap item |
 | 8 | Roadmap: leaf test broadening (tweakcc-fixed + lobotomized) | — | Parked | human | — | — | roadmap item |
@@ -58,6 +57,7 @@ no other guidance is needed. Follow it top to bottom:
 | # | Issue | Wave | Status | Owner | Skill(s) | Deps | Notes |
 | - | ----- | ---- | ------ | ----- | -------- | ---- | ----- |
 | 46 | Authoring-drift pre-check validates vs the leaf's OWN identifierMap | W1 | Done | mixed | `/triage` | — | closed as **overtaken** — skrabe solved mis-binds at the patcher altitude (`38daf92` extractor adopts upstream's authoritative identifierMap → mis-bind structurally impossible for shared prompts; `4e1b245` audit gate; `322ba20` capture/read-consistency test), so the wrong-lineage fixture can no longer reproduce and a control-plane pre-check is redundant. The leaf-own-JSON validation rule survives (self-correcting; in CONTEXT notes); Boot-verify stays the Four-zeros authority (ADR 0005) |
+| 41 | orphanVariables double-sourced / not trustworthy as authority | W2 | Done | mixed | `/triage` | — | triaged → **closed as superseded-by-#31**: headline double-sourcing premise overtaken (verdict single-sources the static validator, `four-zeros-verdict.ts:55`); two real residuals (static list is a hard input vs ADR 0005's advisory; no dedup + static/runtime `ReferenceError` signature collision) folded into #31's acceptance — same `validator`/`FourZerosVerdict` seam #31 rewires |
 | 47 | Partial-identifierMap wrong-capture binding boots clean | W2 | Done | mixed | `/triage` | — | resolved by skrabe at the patcher altitude, verified vs tweakcc-fixed main `322ba20`: croncreate 7-slot fill (`50e1ff0` — `CANCEL_TIMEFRAME_DAYS` now at correct slot) + mis-bind audit gate (`4e1b245`) + extractor adopts upstream's authoritative identifierMap (`38daf92`); override realigned (lobotomized `54e0d34`). Boot-verify remains the Four-zeros authority (ADR 0005) |
 | 42 | cli.ts hasCredentials() false-negative on stored OAuth | W1 | Done | agent | `/tdd` | — | stored-OAuth probe seam; warn-and-proceed, Boot-verify is authority — unblocks real local gate runs |
 | 30 | Re-scope orphan check to authoring-drift pre-check; defer prompts-source to patcher | — | Done | agent | — | — | foundation refined by #45/#46 |
