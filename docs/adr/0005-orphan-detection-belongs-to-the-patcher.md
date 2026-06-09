@@ -88,3 +88,28 @@ Assign orphan detection by **altitude and ownership**, consistent with
 - The CONTEXT.md **Orphan variable** term is updated to name Boot-verify and the
   patcher's apply-time report as the authoritative detectors, with the static
   check as a bounded pre-check.
+
+## Addendum (2026-06-09, #80): the published driver is the canonical verification seam
+
+skrabe published `skills/showtime/driver.mjs` in `tweakcc-fixed` (c5fabdf) — his
+owner-canonical four-zeros harness (`check` = idempotent re-apply + apply-log
+hygiene + smoke + mis-bind audit; `report` = the version-bump report incl. the
+`UNKNOWN_N` placeholder count). This extends the decision's principle ("the fork
+already owns the resolution") from orphan detection to the whole verification
+path:
+
+- **The driver is the canonical signal source.** When present in the configured
+  checkout, the Integration gate sources its apply / orphan / mis-bind signals
+  from `driver.mjs check` + `report` + `tools/auditMisbinds.mjs`
+  (`src/driver-verification.ts`), keying on the driver's exit codes — never on a
+  private re-parse of his output prose (the #58 drift class). When absent (older
+  checkout) the gate falls back to the hand-rolled path, the same shape as the
+  #31 consumer fallback.
+- **`auditMisbinds=0` is the fourth zero.** The leaf's mis-bind audit (wrong-but-
+  valid slot binding — invisible to the other three zeros and to smoke) is a
+  first-class verdict input, sourced from the leaf's own tool, not reimplemented.
+- **Unchanged authority split.** Boot-verify stays the control plane's own
+  runtime check (the driver's smoke step is deliberately inconclusive-tolerant,
+  and the gate's boot-verify carries the cost-ledger wiring), and the static
+  validator stays the advisory authoring-drift pre-check — this addendum narrows
+  nothing decided above.
