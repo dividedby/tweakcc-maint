@@ -34,19 +34,20 @@ no other guidance is needed. Follow it top to bottom:
 ## Priority waves
 | Wave | Theme | Issues | Gate to enter |
 | ---- | ----- | ------ | ------------- |
-| **W1** | 2.1.169 adoption + 2.1.168 orphan/boot correctness | #58 #45 #43 | none — active now |
-| **W2** | Verdict-signal trust (triage decisions) | — (cleared) | none — triage anytime |
-| **—**  | Cross-cutting / later | #26 #11 #8 #51 #52 #53 | n/a |
+| **W1** | 2.1.169 adoption + 2.1.168 orphan/boot correctness | #58 #45 #43 #26 | none — active now |
+| **W2** | Verdict-signal trust (triage decisions) | #62 | none — triage anytime |
+| **—**  | Cross-cutting / later | #11 #8 #51 #52 #53 | n/a |
 
 ## Master census (all issues)
 
 ### Open
 | # | Issue | Wave | Status | Owner | Skill(s) | Deps | Notes |
 | - | ----- | ---- | ------ | ----- | -------- | ---- | ----- |
-| 58 | Adopt CC 2.1.169 | W1 | Next | human | `/release-adoption` | — | new version shipped; nothing extracted yet (matrix tops at 2.1.168). Step 1–2 (extract `prompts-2.1.169.json` + diff vs 2.1.168) is **agent-doable now** and decides whether lobotomized needs a PR; step 7 gate run + leaf PRs are HITL/skrabe. Use upstream's 2.1.169 JSON for `TWEAKCC_UPSTREAM_JSON` (`38daf92` convergence) |
+| 58 | Adopt CC 2.1.169 | W1 | Blocked | human | `/release-adoption` | #26 | **Patcher half DONE + shipped** → skrabe/tweakcc-fixed#5 (prompts `prompts-2.1.169.json` + extractor). Verified by the HITL gate: isolated Four-zeros `pass:true`/`bootVerifyPassed:true` + `versionBumpReport --strict` 0 blocking. The handoff's "no override work / 0 orphans" was **disproven** — the full-override gate boot-crashes on **pre-existing #26** breakage, so the lobotomized half is blocked on #26. Extraction seeded from the leaf's own prior JSON (no `TWEAKCC_UPSTREAM_JSON`) |
 | 45 | Swap tweakcc-fixed#4 detector to the identifierMap-union check | W1 | Blocked | human | `/tdd` | — | agent work **done** (commit `bc60baa` on leaf PR #4); owner now human — remaining is HITL boot-verify vs stock 2.1.168 + skrabe merge (both his), relabeled `ready-for-human`. Not agent-pickable |
 | 43 | Patcher `--report-orphans` (producer, leaf PR to skrabe) | W1 | Backlog | human | `/release-adoption` | — | skrabe-facing PR + merge timing not ours. On landing, also wire `RealAdoptionEnvironment.adopt` to call the flag and populate `orphanReport` — the consumer is ready (#31), the env just omits the call until the flag exists |
-| 26 | Leaf finding: lobotomized breaks CC 2.1.168 (evidence) | — | Parked | human | — | — | correct root-cause framing + re-baseline gate vs stock tweakcc-fixed |
+| 26 | Leaf finding: lobotomized breaks CC 2.1.168 (evidence) | W1 | Backlog | human | — | — | **Un-parked** — now the live blocker for #58's lobotomized half. 2.1.169 gate confirmed it is **pre-existing & version-independent**: overrides pinned at old ccVersions ref slot names matching neither .168 nor .169 (`askuserquestion` `${PROMPT_VAR_0}`; `croncreate` `${CRON_DURABLE_FLAG}` vs `CRON_DURABILITY_SECTION`) → boot `ReferenceError`. Fix = realign the conflict-flagged overrides (partly curation, `ready-for-human`) |
+| 62 | Orphan-validator false-clean: `SYNTHETIC_POSITIONAL` hides boot-crashing `_VAR_<n>` | W2 | Backlog | human | `/triage` | — | filed from the #58 gate run. Validator excludes `_VAR_<n>` (`orphan-validator.ts:75`) assuming the patcher binds them positionally, but the patcher leaked `${PROMPT_VAR_0}` → boot `ReferenceError` (absent from `advisoryOrphans`). Layer-ownership call (patcher vs validator), tangled with #45. `needs-triage` |
 | 11 | Roadmap: behavioral A/B benchmark (stock vs lobotomized) | — | Parked | human | — | — | roadmap item |
 | 8 | Roadmap: leaf test broadening (tweakcc-fixed + lobotomized) | — | Parked | human | — | — | roadmap item |
 | 51 | Onboard as an apply-agent-research Consumer loop | — | Backlog | human | `/apply-agent-research` | — | tier-2 slotting: cross-cutting workflow onboarding; operator stands up the loop |
