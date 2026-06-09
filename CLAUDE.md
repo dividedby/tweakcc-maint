@@ -14,6 +14,13 @@ The leaf repos — `tweakcc-fixed`, `lobotomized-claude-code` — are owned by a
 maintainer (`skrabe`). Never direct-push or assume write access to a leaf: the control plane
 **prepares verified PRs**. (Full model: CONTEXT.md → "Control plane".)
 
+Open every leaf PR **as a draft with an intent ping** — say what it does and any
+cost it puts on the leaf owner (e.g. a version-pinned snapshot he'd have to
+regenerate on each bump) — and let him pull it ready. *Prepare*, don't *impose*:
+unsolicited "please merge" PRs into someone else's repo are out of bounds even
+when the diff is green. Map the contribution onto his stated bar
+(four-zeros + `auditMisbinds=0`) and conventions before proposing.
+
 ## Build / test / run
 Stack: **TypeScript + vitest + pnpm + ESM, run via `tsx` (no build step)** — see
 `docs/adr/0004`. Design: `docs/design/release-adoption-substrate.md`.
