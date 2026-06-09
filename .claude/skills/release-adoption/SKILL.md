@@ -44,11 +44,26 @@ work (prepared on fork branches); step 7 is this repo's gate; step 8 is optional
    added / removed / changed prompts. Value-regression (prompt-count vs previous, our
    extractor vs Piebald) is a *leaf golden-snapshot check* in `tweakcc-fixed`, not this
    skill's job — run the leaf's `pnpm test`.
-3. **Realign overrides** — update `lobotomized-claude-code`'s prompt overrides to match the
-   synced prompts. Watch for **Orphan variables**: a `${VAR}` that no longer exists in the
-   patched binary's runtime scope. The patcher owns authoritative orphan detection
-   ([ADR 0005](../../../docs/adr/0005-orphan-detection-belongs-to-the-patcher.md)); the
-   gate's Boot-verify catches runtime-scope orphans.
+3. **Realign overrides** — realignment is not one edit; it's a **per-override classification**
+   into one of skrabe's four fates (use his exact terms — see leaf commit `411f5e6`,
+   the 2.1.169 realignment):
+   - **RETRIM** — a curated (trimmed) override sits on a pristine Anthropic *rewrote*. Re-do the
+     trim onto the new pristine and fold in terminology renames, **new/renamed variable slots**,
+     and new rules. (e.g. `agent-prompt-worker-fork` gained `${AGENT_TOOL_NAME}`; `..._VAR_0` →
+     `SHOULD_PERSIST_APPROVAL_CONTEXT_FN`.) Validate `${VAR}`s against the leaf's OWN bundled
+     `prompts-X.Y.Z.json` identifierMap, not Piebald's.
+   - **RESYNC** — a near-verbatim passthrough that upstream wholesale-rewrote. Drop the stale
+     copy, adopt the new pristine.
+   - **KEEP_SUPPRESSED** — an empty-body suppression that still holds. Leave it.
+   - **NET-NEW** — upstream shipped new prompts. Add pristine off-the-shelf stubs — **even for
+     off-by-default gated features** (the pristine is still captured).
+
+   Two directions of slot drift, both live here: *additive* (new/renamed slots to fold in) and
+   *vanished* — an **Orphan variable**, a `${VAR}` that no longer exists in the patched binary's
+   runtime scope. The patcher owns authoritative orphan detection
+   ([ADR 0005](../../../docs/adr/0005-orphan-detection-belongs-to-the-patcher.md)); the gate's
+   Boot-verify catches runtime-scope orphans. Skip this whole step if the prompt diff (step 2)
+   moved nothing under the overrides.
 4. **Patch** — realign `tweakcc-fixed`'s code patches (match-methods) to the new CC shape.
    Never delete an old match-method while its CC shape is still in the **Support matrix**.
    To add a *new* patch, see [the add-a-patch sub-flow](references/add-a-patch.md).
