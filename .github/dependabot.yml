@@ -1,0 +1,11 @@
+# Library-bump complement to the staleness-review loop (#75): the cron audits
+# toolchain *pins* (Node, pnpm) and defers package.json devDependencies here.
+version: 2
+updates:
+  - package-ecosystem: npm # covers pnpm-lock.yaml
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      dev-dependencies:
+        dependency-type: development
