@@ -111,12 +111,15 @@ function unknownCount(report: ShellResult): number {
  * the configured checkout (its repo discovery would otherwise walk up from cwd); `report`
  * is given no previous-version argument so the driver's own default (the repo's
  * second-latest prompts JSON) stays authoritative. The audit runs once per override dir
- * with explicit paths (its positional CLI contract) — SKIPPED output (no upstream
- * reference dump on this box) is the leaf's own non-failure and the verdict honors it.
+ * with explicit paths (its positional CLI contract), against the caller's already-resolved
+ * `prompts-<version>.json` (the fork's repo-local-wins order, ADR 0005) — SKIPPED output
+ * (no upstream reference dump on this box) is the leaf's own non-failure and the verdict
+ * honors it.
  */
 export function runDriverVerification(
   tweakccFixedDir: string,
   ccVersion: string,
+  promptsJson: string,
   overrideDirs: string[],
 ): Pick<CapturedSignals, 'apply' | 'orphanReport' | 'auditMisbinds'> {
   const driver = driverPath(tweakccFixedDir);
@@ -124,10 +127,11 @@ export function runDriverVerification(
   const check = runSync('node', [driver, 'check'], env);
   const report = runSync('node', [driver, 'report'], env);
   const audit = join(tweakccFixedDir, 'tools', 'auditMisbinds.mjs');
-  const ourJson = join(tweakccFixedDir, 'data', 'prompts', `prompts-${ccVersion}.json`);
+  // The upstream reference dump path follows the driver's own convention (`/tmp/pieb-<v>.json`,
+  // SKILL.md); when no dump exists on this box the audit SKIPs itself, by the leaf's design.
   const upstreamJson = join('/tmp', `pieb-${ccVersion}.json`);
   const audits = overrideDirs.map((dir) =>
-    runSync('node', [audit, ourJson, upstreamJson, dir], env),
+    runSync('node', [audit, promptsJson, upstreamJson, dir], env),
   );
   return driverSignals(check, report, audits);
 }

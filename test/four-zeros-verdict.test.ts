@@ -206,6 +206,32 @@ describe('FourZerosVerdict.evaluate — auditMisbinds is the fourth zero (#80)',
     expect(result.misbinds).toEqual([]);
   });
 
+  it('a mis-bind in ANY audited override dir fails, even when another dir audited clean', () => {
+    // The real adapter audits once per override dir and joins the outputs; a clean
+    // `mis-bind audit: 0` from one dir must not mask a MIS-BINDS from another.
+    const result = evaluate({
+      ...clean,
+      auditMisbinds:
+        'mis-bind audit: 0 (every used placeholder sits at the upstream slot)\n' +
+        'MIS-BINDS: 1 (override placeholder at wrong slot)\n' +
+        '  compact: ${CWD} ours=slotA upstream=slotB',
+    });
+    expect(result.pass).toBe(false);
+    expect(result.auditMisbindsPassed).toBe(false);
+    expect(result.misbinds).toEqual(['compact: ${CWD} ours=slotA upstream=slotB']);
+  });
+
+  it('a clean audit alongside a SKIPPED one is still a hard, passing input', () => {
+    const result = evaluate({
+      ...clean,
+      auditMisbinds:
+        "mis-bind audit: SKIPPED — upstream reference missing/empty\n" +
+        'mis-bind audit: 0 (every used placeholder sits at the upstream slot)',
+    });
+    expect(result.pass).toBe(true);
+    expect(result.auditMisbindsPassed).toBe(true);
+  });
+
   it('unrecognized audit output must NOT false-pass', () => {
     const result = evaluate({ ...clean, auditMisbinds: 'some unexpected blob' });
     expect(result.pass).toBe(false);

@@ -168,7 +168,7 @@ export class RealAdoptionEnvironment implements AdoptionEnvironment {
     // not landed, so FourZerosVerdict sees the absent report and falls back to Boot-verify as
     // the orphan authority (#31 AC 4), with the static `validator` advisory only.
     const sourced = driverPresent(this.cfg.tweakccFixedDir)
-      ? runDriverVerification(this.cfg.tweakccFixedDir, ccVersion, overrideDirs)
+      ? runDriverVerification(this.cfg.tweakccFixedDir, ccVersion, stringsFile, overrideDirs)
       : { apply: combinedOutput(runSync('node', [this.tweakccCli, '--apply'])) };
     const bootVerify = normalizeBootVerify(
       runBootVerify(this.cfg.bootVerifyPrompt, this.cfg.bootVerifyModel),

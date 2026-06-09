@@ -94,6 +94,7 @@ const BOOT_VERIFY_OK = /Boot-verify OK\b/;
 // (MIS-BINDS or garbage) must not false-pass.
 const AUDIT_CLEAN = /mis-bind audit:\s*0\b/;
 const AUDIT_SKIPPED = /mis-bind audit:\s*SKIPPED\b/;
+const MISBINDS_FOUND = /MIS-BINDS:\s*\d+/;
 // `  <id>: ${NAME} ours=slotX upstream=slotY` — the audit's per-finding lines.
 const MISBIND_LINE = /^\s+(\S+:\s*\$\{[A-Z][A-Z0-9_]*\}.*)$/gm;
 
@@ -151,8 +152,15 @@ export function evaluate(signals: CapturedSignals): FourZerosResult {
   };
 }
 
-/** `undefined` = not a hard input (signal absent or audit SKIPPED); else clean? */
+/**
+ * `undefined` = not a hard input (signal absent, or every audit SKIPPED itself); else
+ * clean? The signal may join several per-override-dir audit runs, so failure wins over
+ * a clean assertion from another dir, which wins over SKIPPED.
+ */
 function parseAuditMisbinds(raw: string | undefined): boolean | undefined {
-  if (raw === undefined || AUDIT_SKIPPED.test(raw)) return undefined;
-  return AUDIT_CLEAN.test(raw);
+  if (raw === undefined) return undefined;
+  if (MISBINDS_FOUND.test(raw)) return false;
+  if (AUDIT_CLEAN.test(raw)) return true;
+  if (AUDIT_SKIPPED.test(raw)) return undefined;
+  return false;
 }
