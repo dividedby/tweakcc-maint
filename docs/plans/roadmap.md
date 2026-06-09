@@ -35,7 +35,7 @@ no other guidance is needed. Follow it top to bottom:
 | Wave | Theme | Issues | Gate to enter |
 | ---- | ----- | ------ | ------------- |
 | **W1** | 2.1.168 orphan/boot adoption correctness | #45 #46 #31 #43 | none — active now |
-| **W2** | Verdict-signal trust (triage decisions) | #41 #47 | none — triage anytime |
+| **W2** | Verdict-signal trust (triage decisions) | #41 | none — triage anytime |
 | **—**  | Cross-cutting / later | #26 #11 #8 #51 #52 #53 | n/a |
 
 ## Master census (all issues)
@@ -48,7 +48,6 @@ no other guidance is needed. Follow it top to bottom:
 | 31 | Gate consumes the patcher orphan report (consumer half) | W1 | Blocked | agent | `/tdd` | #43 | buildable behind a faked `--report-orphans` seam; real shell-out needs #43 |
 | 43 | Patcher `--report-orphans` (producer, leaf PR to skrabe) | W1 | Backlog | human | `/release-adoption` | — | skrabe-facing PR + merge timing not ours |
 | 41 | orphanVariables double-sourced / not trustworthy as authority | W2 | Parked | mixed | `/triage` | — | needs-triage decision on the verdict path |
-| 47 | Partial-identifierMap wrong-capture binding boots clean | W2 | Parked | mixed | `/triage` | — | data-fill **done by skrabe** (`54e0d34`/`6514464`: croncreate realigned to the corrected 7-slot vocabulary) — tier-3 flag: human confirm + close as resolved; relates #41/#43 |
 | 26 | Leaf finding: lobotomized breaks CC 2.1.168 (evidence) | — | Parked | human | — | — | correct root-cause framing + re-baseline gate vs stock tweakcc-fixed |
 | 11 | Roadmap: behavioral A/B benchmark (stock vs lobotomized) | — | Parked | human | — | — | roadmap item |
 | 8 | Roadmap: leaf test broadening (tweakcc-fixed + lobotomized) | — | Parked | human | — | — | roadmap item |
@@ -59,6 +58,7 @@ no other guidance is needed. Follow it top to bottom:
 ### Done (closed — kept as full record, newest first)
 | # | Issue | Wave | Status | Owner | Skill(s) | Deps | Notes |
 | - | ----- | ---- | ------ | ----- | -------- | ---- | ----- |
+| 47 | Partial-identifierMap wrong-capture binding boots clean | W2 | Done | mixed | `/triage` | — | resolved by skrabe at the patcher altitude, verified vs tweakcc-fixed main `322ba20`: croncreate 7-slot fill (`50e1ff0` — `CANCEL_TIMEFRAME_DAYS` now at correct slot) + mis-bind audit gate (`4e1b245`) + extractor adopts upstream's authoritative identifierMap (`38daf92`); override realigned (lobotomized `54e0d34`). Boot-verify remains the Four-zeros authority (ADR 0005) |
 | 42 | cli.ts hasCredentials() false-negative on stored OAuth | W1 | Done | agent | `/tdd` | — | stored-OAuth probe seam; warn-and-proceed, Boot-verify is authority — unblocks real local gate runs |
 | 30 | Re-scope orphan check to authoring-drift pre-check; defer prompts-source to patcher | — | Done | agent | — | — | foundation refined by #45/#46 |
 | 27 | Orphan validator: align identifierMap source with applied overrides | — | Done | agent | — | — | — |
