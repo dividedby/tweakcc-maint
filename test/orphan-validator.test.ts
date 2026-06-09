@@ -86,11 +86,22 @@ describe('findOrphans — authoring-drift: declared variables vs. the target ide
     expect(findOrphans(files, legal({ agent: ['X', 'Y', 'Z'] }))).toEqual([]);
   });
 
-  it('excludes synthetic positional placeholders (…_VAR_<n>) — matched by index, not name', () => {
-    const files = [override('p.md', ['PROMPT_VAR_0', 'PROMPT_VAR_3', 'REAL_ORPHAN'])];
+  it('flags a declared synthetic positional (…_VAR_<n>) absent from the identifierMap', () => {
+    // The boot-crash class (#62): the override declares PROMPT_VAR_0 against a prompt
+    // whose identifierMap no longer carries that slot — boots `ReferenceError:
+    // PROMPT_VAR_0 is not defined`. The advisory must surface it, not read clean.
+    const files = [override('p.md', ['PROMPT_VAR_0'])];
     expect(findOrphans(files, legal({ p: [] }))).toEqual([
-      { file: 'p.md', variable: 'REAL_ORPHAN' },
+      { file: 'p.md', variable: 'PROMPT_VAR_0' },
     ]);
+  });
+
+  it('does NOT flag a synthetic positional that IS backed (its name is an identifierMap value)', () => {
+    // Positional names DO appear as identifierMap values when correctly bound
+    // (e.g. PROMPT_VAR_0, SKILL_STUCK_DAEMON_SECTION_VAR_2). The name cross-reference
+    // passes them; only the unbacked ones (above) get flagged — no false positives.
+    const files = [override('p.md', ['PROMPT_VAR_0', 'PROMPT_VAR_1'])];
+    expect(findOrphans(files, legal({ p: ['PROMPT_VAR_0', 'PROMPT_VAR_1'] }))).toEqual([]);
   });
 
   it('skips overrides that match no prompt in the target version (cannot validate)', () => {
