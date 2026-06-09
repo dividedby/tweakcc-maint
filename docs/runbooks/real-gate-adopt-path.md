@@ -80,7 +80,11 @@ node ~/repos/tweakcc-fixed/dist/index.mjs --restore
   as `dirty-restore`; a missing/unreadable install or backup also fails closed (not clean).
 - **Orphan validator covers the `identifierMap` variable class.** It cross-references each
   override's declared `variables:` against the target version's `prompts-<version>.json`
-  `identifierMap`. Synthetic positional names (`…_VAR_<n>`) are excluded. It does **not**
-  yet model the fork's other backing classes (e.g. `_FN` functions, `_OBJECT`s), so it can
+  `identifierMap` (positional `…_VAR_<n>` names included since #62). It does **not**
+  model the fork's other backing classes (e.g. `_FN` functions, `_OBJECT`s), so it can
   over-report those — adjudicate flagged orphans against `tweakcc-fixed`'s own apply output.
-  `apply` and `boot-verify` are the load-bearing real signals.
+  It is advisory only (ADR 0005): `apply` and `boot-verify` are the load-bearing real signals.
+- **When skrabe's Driver is present** (`skills/showtime/driver.mjs` in the checkout, since
+  #80) the gate sources its apply / orphan / mis-bind signals from `driver.mjs check` +
+  `report` + `tools/auditMisbinds.mjs` instead of the hand-rolled parse — see the
+  ADR 0005 addendum. Driver-absent checkouts use the flow above unchanged.

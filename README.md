@@ -8,11 +8,11 @@ Claude Code ships new versions regularly; each one can drift the patcher's regex
 prompt overrides' placeholder vocabulary. This repo coordinates keeping the fork current and proving
 its value:
 
-- **Version tracking** — detect new CC releases and kick the bump runbook.
-- **Testing** — broaden coverage so a bump can't silently break patches/prompts.
+- **Version tracking** — detect new CC releases and kick the Release adoption runbook.
+- **Testing** — broaden coverage so a Release adoption can't silently break patches/prompts.
 - **CI/CD** — automate the lint → test → build → apply → `claude -p` boot-verify loop.
 - **Runbooks / skills** — codify the recurring "new CC version" work.
-- **Benchmarks** — verify performance / improvement claims over vanilla Claude (extends `~/repos/bench`).
+- **Benchmarks** — verify behavioral claims over stock CC (extends `~/repos/bench`).
 
 ## Status
 
