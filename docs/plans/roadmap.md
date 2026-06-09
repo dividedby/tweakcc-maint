@@ -36,7 +36,7 @@ no other guidance is needed. Follow it top to bottom:
 | ---- | ----- | ------ | ------------- |
 | **W1** | 2.1.168 orphan/boot adoption correctness | #45 #46 #31 #43 | none — active now |
 | **W2** | Verdict-signal trust (triage decisions) | #41 #47 | none — triage anytime |
-| **—**  | Cross-cutting / later | #26 #11 #8 | n/a |
+| **—**  | Cross-cutting / later | #26 #11 #8 #51 #52 #53 | n/a |
 
 ## Master census (all issues)
 
@@ -44,14 +44,17 @@ no other guidance is needed. Follow it top to bottom:
 | # | Issue | Wave | Status | Owner | Skill(s) | Deps | Notes |
 | - | ----- | ---- | ------ | ----- | -------- | ---- | ----- |
 | 45 | Swap tweakcc-fixed#4 detector to the identifierMap-union check | W1 | Blocked | agent | `/tdd` | — | verified commit `bc60baa` pushed to PR #4; agent work done — awaiting HITL boot-verify vs stock 2.1.168 + skrabe merge (both his) |
-| 46 | Authoring-drift pre-check validates vs the leaf's OWN identifierMap | W1 | **Next** | agent | `/tdd` | — | capture lineage rule in CONTEXT.md via `/grill-with-docs` |
+| 46 | Authoring-drift pre-check validates vs the leaf's OWN identifierMap | W1 | Parked | mixed | `/triage` | — | **premise inverted** — skrabe's tweakcc-fixed `38daf92` makes the extractor adopt upstream's identifierMap for shared prompts (verified: `agent-prompt-explore` → `GLOB_TOOL_NAME…`, not `PROMPT_VAR_N`), so the wrong-lineage-drift fixture no longer reproduces; leaf-own-JSON rule survives but needs human re-triage (re-scope vs close as overtaken) |
 | 31 | Gate consumes the patcher orphan report (consumer half) | W1 | Blocked | agent | `/tdd` | #43 | buildable behind a faked `--report-orphans` seam; real shell-out needs #43 |
 | 43 | Patcher `--report-orphans` (producer, leaf PR to skrabe) | W1 | Backlog | human | `/release-adoption` | — | skrabe-facing PR + merge timing not ours |
 | 41 | orphanVariables double-sourced / not trustworthy as authority | W2 | Parked | mixed | `/triage` | — | needs-triage decision on the verdict path |
-| 47 | Partial-identifierMap wrong-capture binding boots clean | W2 | Parked | mixed | `/triage` | — | relates #41/#43; skrabe owns the croncreate data fill |
+| 47 | Partial-identifierMap wrong-capture binding boots clean | W2 | Parked | mixed | `/triage` | — | data-fill **done by skrabe** (`54e0d34`/`6514464`: croncreate realigned to the corrected 7-slot vocabulary) — tier-3 flag: human confirm + close as resolved; relates #41/#43 |
 | 26 | Leaf finding: lobotomized breaks CC 2.1.168 (evidence) | — | Parked | human | — | — | correct root-cause framing + re-baseline gate vs stock tweakcc-fixed |
 | 11 | Roadmap: behavioral A/B benchmark (stock vs lobotomized) | — | Parked | human | — | — | roadmap item |
 | 8 | Roadmap: leaf test broadening (tweakcc-fixed + lobotomized) | — | Parked | human | — | — | roadmap item |
+| 51 | Onboard as an apply-agent-research Consumer loop | — | Backlog | human | `/apply-agent-research` | — | tier-2 slotting: cross-cutting workflow onboarding; operator stands up the loop |
+| 52 | Onboard to the architecture-review loop | — | Backlog | human | `/improve-codebase-architecture` | — | tier-2 slotting: cross-cutting workflow onboarding |
+| 53 | Onboard to the staleness-review loop | — | Backlog | human | `/staleness-audit` | — | tier-2 slotting: cross-cutting workflow onboarding |
 
 ### Done (closed — kept as full record, newest first)
 | # | Issue | Wave | Status | Owner | Skill(s) | Deps | Notes |
