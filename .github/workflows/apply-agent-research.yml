@@ -1,0 +1,176 @@
+name: Apply Agent Research
+
+on:
+  schedule:
+    # 03:27 UTC Saturday = 22:27 CT Friday. Weekly, in the shared Friday-evening
+    # consumer window — slot = sha1("tweakcc-maint/apply-agent-research") within the
+    # Sat 00–04 UTC (= Fri 19–23 CT) band, so this loop self-staggers against every
+    # other Consumer with no schedule coordination (agent-research ADR 0022
+    # hash-stagger). The Saturday-UTC slot IS Friday evening CT: one `* * 6` mask
+    # avoids the UTC-midnight day-of-week straddle. Weekly under the agent-research
+    # cost rebalance (2026-06-08): the upstream corpus refreshes daily-capture /
+    # 2×-week-synthesis, so applying its mirror more often than weekly is wasted
+    # runs — under the $100 Agent SDK credit.
+    # GitHub runs scheduled workflows from the DEFAULT branch only (`main` here), so
+    # the cron ticks from `main`. The checkout below omits `ref:` to follow the
+    # triggering branch (main on cron; the dispatched branch on workflow_dispatch),
+    # so the loop analyzes the freshest integrated agent-meta.
+    - cron: "27 3 * * 6"
+  workflow_dispatch:
+
+# Thin **workflow envelope** (ADR 0014): cron, permissions, tokens, tool scoping,
+# and a clone-and-invoke body. The drift-prone logic — the stream-json cost scrape —
+# lives in the fetched-fresh **proposal-loop harness** (`harness/cli.py`), cloned
+# each run from dividedby/skills, so one fix reaches every loop. This loop files
+# through the apply-agent-research skill's own guarded `cli.py`, so it uses only the
+# harness `digest` (not the publish seam).
+# Onboarding: dividedby/skills docs/onboarding/{proposal-loop-harness,consumer-setup}.md.
+
+jobs:
+  apply-agent-research:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    concurrency:
+      group: apply-agent-research
+      cancel-in-progress: false
+    permissions:
+      contents: read        # never more — the loop proposes via issues, never commits
+      issues: write
+
+    env:
+      # Own-tracker writes (self-improvement + skill-audit channels) use the default token.
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+      LABEL: source:agent-research
+      MIRROR: dividedby/agent-research-knowledge
+      SKILLS_REPO: dividedby/skills
+      # Private markers fed to the leak guard. This repo is PUBLIC, so there is
+      # nothing private to leak to the public skills tracker — leave empty and the
+      # guard falls back to its structural checks. (A private fork would list its
+      # internal tokens here, space-separated.)
+      PRIVATE_MARKERS: ""
+
+    steps:
+      - name: Checkout the default/triggering branch (main on cron)
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+
+      - name: Install Claude Code
+        run: |
+          set -euo pipefail
+          curl -fsSL https://claude.ai/install.sh | bash
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Clone the public knowledge mirror (credential-free, read-only)
+        run: |
+          set -euo pipefail
+          git clone --depth 1 "https://github.com/${MIRROR}.git" "$RUNNER_TEMP/knowledge-mirror"
+          test -d "$RUNNER_TEMP/knowledge-mirror/knowledge"
+          echo "Mirror at $RUNNER_TEMP/knowledge-mirror@$(git -C "$RUNNER_TEMP/knowledge-mirror" rev-parse --short HEAD)"
+
+      - name: Fetch the apply-agent-research skill + harness fresh (ADR 0008/0014) + hard-gate its guard
+        run: |
+          set -euo pipefail
+          # Never vendor the skill: clone the source repo shallow each run so the
+          # leak guard can never silently drift. The same clone triples as (a) the
+          # live published-skill catalog + installed-skills snapshot the
+          # already-do-this filter reads and (b) the fetched-fresh HARNESS (ADR 0014)
+          # — the loop prompt (harness/prompts/apply-agent-research.md) and the cost
+          # scrape (harness/cli.py digest) — so a harness fix reaches this loop on
+          # the next run with no hand-port. No separate fetch.
+          git clone --depth 1 "https://github.com/${SKILLS_REPO}.git" "$RUNNER_TEMP/skills-src"
+          test -f "$RUNNER_TEMP/skills-src/harness/cli.py"
+          test -f "$RUNNER_TEMP/skills-src/harness/prompts/apply-agent-research.md"
+          mkdir -p ~/.claude/skills
+          cp -R "$RUNNER_TEMP/skills-src/skills/meta/apply-agent-research" ~/.claude/skills/
+          test -f ~/.claude/skills/apply-agent-research/SKILL.md
+          echo "Installed apply-agent-research@$(git -C "$RUNNER_TEMP/skills-src" rev-parse --short HEAD)"
+          # HARD GATE: never run with a broken guard. Run its unit tests, then smoke
+          # both CLI seams. Any failure fails the whole run before a single issue.
+          python3 -m unittest discover -s ~/.claude/skills/apply-agent-research/tests
+          printf '%s' "guard smoke" | python3 ~/.claude/skills/apply-agent-research/lib/cli.py sanitize
+          echo '{"candidates":[],"open_issues":[],"min_priority":1}' \
+            | python3 ~/.claude/skills/apply-agent-research/lib/cli.py gate >/dev/null
+
+      - name: Ensure own provenance label exists
+        run: |
+          # Only this repo's OWN provenance label. The skill-request /
+          # skill-promotion labels are owned by dividedby/skills — this Consumer
+          # APPLIES them, never creates them (skill-request-flow.md, consumer-setup.md).
+          gh label create "$LABEL" \
+            --color "5319E7" \
+            --description "Issues proposed by the automated apply-agent-research loop" \
+            >/dev/null 2>&1 || true
+
+      - name: Run apply-agent-research
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # Cross-repo write credential for the skill-request / skill-promotion
+          # channels (writes into dividedby/skills; the default GITHUB_TOKEN is
+          # own-repo scoped and 403s). Least-privilege fine-grained PAT,
+          # dividedby/skills only, Issues:rw.
+          SKILLS_TRACKER_TOKEN: ${{ secrets.SKILLS_TRACKER_TOKEN }}
+          MIRROR_DIR: ${{ runner.temp }}/knowledge-mirror
+          SKILLS_SRC: ${{ runner.temp }}/skills-src
+          SKILL_DIR: /home/runner/.claude/skills/apply-agent-research
+        run: |
+          set -euo pipefail
+          # Bash stays unscoped: the one-proposal GATE is invoked via a pipe
+          # (printf '<json>' | python3 .../cli.py gate), which a scoped pattern like
+          # Bash(python3:*) would block (the command starts with printf), and the
+          # cross-repo channels use a GH_TOKEN env-var swap that needs an unscoped
+          # shell. The leak GUARD is folded into the guarded filing path (cli.py
+          # file/comment sanitizes with the private markers, then shells to gh ONLY
+          # on ALLOW). --disallowedTools removes the casual `gh issue create` /
+          # `gh issue comment` bypass so every filed body — own-tracker AND the
+          # public cross-repo one — goes through that guarded path. The
+          # no-commits/edits invariant holds via contents:read + no Edit/Write, not
+          # via Bash scoping (agent-research#127).
+          # --output-format stream-json --verbose: stream every event so a hung run
+          # leaves a trace and the final result event (total_cost_usd) reaches the
+          # log before claude exits — cost captured even on a failed run.
+          # The system prompt is fetched fresh from the harness (ADR 0015): one
+          # env-parametrized artifact serves both the skills-repo host and every
+          # Consumer. SKILLS_TRACKER_TOKEN being set puts it in consumer mode (the
+          # cross-repo skill-request/skill-promotion channels); PRIVATE_MARKERS (job
+          # env) feeds the leak guard. No vendored consumer-specific copy.
+          claude -p \
+            --output-format stream-json --verbose \
+            --model sonnet \
+            --permission-mode acceptEdits \
+            --allowedTools "Bash Read Grep Glob" \
+            --disallowedTools "Bash(gh issue create:*) Bash(gh issue comment:*)" \
+            --append-system-prompt "$(cat "$SKILLS_SRC/harness/prompts/apply-agent-research.md")" \
+            "Run the scheduled apply-agent-research pass. SKILLS_TRACKER_TOKEN is set, so this is a downstream Consumer (consumer mode). The knowledge mirror is cloned at ${MIRROR_DIR} (read-only), the fresh skills-repo clone (skill source + published catalog + harness) is at ${SKILLS_SRC}, and the installed skill is at ${SKILL_DIR}. PRIVATE_MARKERS carries this repo's private markers (empty — this repo is public). Follow the instructions in the system prompt." \
+            | tee "$RUNNER_TEMP/agent.jsonl"
+
+      - name: Digest the run (result log + cost ledger)
+        if: always()
+        env:
+          SKILLS_SRC: ${{ runner.temp }}/skills-src
+        run: |
+          set -euo pipefail
+          # JSONL -> the LAST result event's .result whole (multi-line per-channel
+          # summary preserved) + the unchanged total_cost_usd=…  duration_ms=…
+          # num_turns=… ledger line the cross-repo cost hub scrapes. This loop files
+          # through the skill's own guarded cli.py, so it uses only the shared
+          # `digest`, not the publish seam. Best-effort, so it runs (and captures
+          # cost) even on a failed agent run.
+          python3 "$SKILLS_SRC/harness/cli.py" digest \
+            --jsonl "$RUNNER_TEMP/agent.jsonl" \
+            --result-out "$RUNNER_TEMP/agent.log" \
+            --cost-out "$RUNNER_TEMP/agent.cost"
+
+      - name: Summarise run
+        if: always()
+        run: |
+          {
+            echo "## Apply agent research"
+            echo ""
+            echo "**Cost:** $(cat "$RUNNER_TEMP/agent.cost" 2>/dev/null || echo "n/a")"
+            echo ""
+            echo '```'
+            tail -n 50 "$RUNNER_TEMP/agent.log" 2>/dev/null || echo "(no log produced)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
