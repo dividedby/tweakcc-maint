@@ -49,6 +49,10 @@ const CLEAN: CapturedSignals = {
   apply: 'patch: spinnerWords: applied\npatch: thinkingVerb: applied\nAll patches applied.',
   bootVerify: 'Boot-verify OK: patched binary responded to prompt.',
   validator: 'Orphan-variable check: 0 orphans across 42 overrides.',
+  // The patcher report is the authoritative orphan signal (ADR 0005); a clean run reports
+  // zero surviving placeholders. The orphanVar breach drives this signal, not the (advisory)
+  // static validator.
+  orphanReport: JSON.stringify({ version: '0.0.0', prompts: {} }),
 };
 
 /** Mutate a clean signal set to carry exactly one Four-zeros breach. */
@@ -59,7 +63,10 @@ function withBreach(kind: BreachKind): CapturedSignals {
     case 'missingPrompt':
       return { ...CLEAN, apply: "Could not find system prompt 'main-loop'" };
     case 'orphanVar':
-      return { ...CLEAN, validator: 'ReferenceError: TODAYS_DATE is not defined' };
+      return {
+        ...CLEAN,
+        orphanReport: JSON.stringify({ version: '0.0.0', prompts: { 'main-loop': ['TODAYS_DATE'] } }),
+      };
     case 'bootCrash':
       return { ...CLEAN, bootVerify: 'SyntaxError: Unexpected token — claude failed to start' };
   }

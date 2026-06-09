@@ -65,7 +65,7 @@ describe('combinedOutput', () => {
 describe('orphan validator → FourZerosVerdict end-to-end (pure)', () => {
   const legal = (vs: string[]) => new Map([['a', new Set(vs)]]);
 
-  it('an orphan in the override signal fails the verdict on the orphan-variable axis', () => {
+  it('a static-validator orphan is surfaced as ADVISORY, not a hard fail (ADR 0005)', () => {
     const validator = formatValidatorOutput(
       [{ path: 'a.md', content: '<!--\nvariables:\n  - MISSING\n-->\nbody' }],
       legal([]),
@@ -75,11 +75,14 @@ describe('orphan validator → FourZerosVerdict end-to-end (pure)', () => {
       bootVerify: 'Boot-verify OK',
       validator,
     });
-    expect(verdict.orphanVariables).toEqual(['MISSING']);
-    expect(verdict.pass).toBe(false);
+    // The authoring-drift check no longer fails the bar; it is advisory only.
+    expect(verdict.advisoryOrphans).toEqual(['MISSING']);
+    expect(verdict.orphanVariables).toEqual([]);
+    expect(verdict.orphanSource).toBe('boot-verify-fallback');
+    expect(verdict.pass).toBe(true);
   });
 
-  it('a clean override signal passes the orphan-variable axis', () => {
+  it('a clean override signal yields no advisory findings and passes', () => {
     const validator = formatValidatorOutput(
       [{ path: 'a.md', content: '<!--\nvariables:\n  - X\n-->\nbody' }],
       legal(['X']),
@@ -89,6 +92,7 @@ describe('orphan validator → FourZerosVerdict end-to-end (pure)', () => {
       bootVerify: 'Boot-verify OK',
       validator,
     });
+    expect(verdict.advisoryOrphans).toEqual([]);
     expect(verdict.orphanVariables).toEqual([]);
     expect(verdict.pass).toBe(true);
   });

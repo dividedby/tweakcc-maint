@@ -157,6 +157,10 @@ export class RealAdoptionEnvironment implements AdoptionEnvironment {
     );
     const validator = runOrphanValidator(overrideDirs, stringsFile);
 
+    // No `orphanReport`: the patcher's `--report-orphans` (producer, #43) has not landed in
+    // tweakcc-fixed yet, so this adapter does not shell out to it. FourZerosVerdict sees the
+    // absent report and falls back to Boot-verify as the orphan authority (#31 AC 4), with the
+    // static `validator` advisory only. Wiring the real shell-out is deferred to #43.
     return { apply, bootVerify, validator };
   }
 

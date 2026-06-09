@@ -64,23 +64,83 @@ describe('FourZerosVerdict.evaluate — missing system prompt', () => {
   });
 });
 
-describe('FourZerosVerdict.evaluate — orphan variable', () => {
-  it('reports an Orphan variable from a ReferenceError and is not a pass', () => {
+// The patcher `--report-orphans` JSON is the AUTHORITATIVE orphan input (ADR 0005, #31):
+// `{ version, prompts: { <promptId>: [VAR, ...] } }`.
+const reportOf = (prompts: Record<string, string[]>): string =>
+  JSON.stringify({ version: '2.1.169', prompts });
+
+describe('FourZerosVerdict.evaluate — patcher orphan report is the authority', () => {
+  it('a report naming a surviving placeholder fails the orphan bar, attributed to the patcher report', () => {
     const result = evaluate({
       ...clean,
-      validator: 'ReferenceError: TODAYS_DATE is not defined',
+      orphanReport: reportOf({ 'tool-description-agent-usage-notes': ['IS_TRUTHY_FN'] }),
     });
     expect(result.pass).toBe(false);
-    expect(result.orphanVariables).toEqual(['TODAYS_DATE']);
+    expect(result.orphanVariables).toEqual(['IS_TRUTHY_FN']);
+    expect(result.orphanSource).toBe('patcher-report');
   });
 
-  it('reports every Orphan variable', () => {
+  it('a report whose prompt arrays are all empty passes the orphan bar', () => {
+    const result = evaluate({ ...clean, orphanReport: reportOf({ 'prompt-a': [] }) });
+    expect(result.pass).toBe(true);
+    expect(result.orphanVariables).toEqual([]);
+    expect(result.orphanSource).toBe('patcher-report');
+  });
+
+  it('dedups a variable surviving across multiple prompts to one orphan-bar finding', () => {
     const result = evaluate({
       ...clean,
-      validator:
-        'ReferenceError: TODAYS_DATE is not defined\nReferenceError: CWD is not defined',
+      orphanReport: reportOf({ 'prompt-a': ['CWD'], 'prompt-b': ['CWD', 'TODAYS_DATE'] }),
     });
-    expect(result.orphanVariables).toEqual(['TODAYS_DATE', 'CWD']);
+    expect(result.orphanVariables).toEqual(['CWD', 'TODAYS_DATE']);
+  });
+});
+
+describe('FourZerosVerdict.evaluate — static check demoted to advisory (ADR 0005)', () => {
+  it('a static-validator orphan no longer fails the bar; it is surfaced as advisory', () => {
+    const result = evaluate({
+      ...clean,
+      orphanReport: reportOf({}),
+      validator: 'ReferenceError: TODAYS_DATE is not defined',
+    });
+    expect(result.pass).toBe(true);
+    expect(result.orphanVariables).toEqual([]);
+    expect(result.advisoryOrphans).toEqual(['TODAYS_DATE']);
+  });
+
+  it('dedups advisory orphans (same VAR flagged across N override files)', () => {
+    const result = evaluate({
+      ...clean,
+      orphanReport: reportOf({}),
+      validator:
+        '# a.md\nReferenceError: CWD is not defined\n# b.md\nReferenceError: CWD is not defined',
+    });
+    expect(result.advisoryOrphans).toEqual(['CWD']);
+  });
+});
+
+describe('FourZerosVerdict.evaluate — no report → Boot-verify fallback (#31 AC 4)', () => {
+  it('absent report falls back to Boot-verify as the orphan authority, not the static check', () => {
+    const result = evaluate({
+      ...clean,
+      // no orphanReport — leaf does not support the flag yet (#43 unlanded)
+      validator: 'ReferenceError: TODAYS_DATE is not defined',
+    });
+    expect(result.orphanSource).toBe('boot-verify-fallback');
+    expect(result.orphanVariables).toEqual([]);
+    expect(result.advisoryOrphans).toEqual(['TODAYS_DATE']);
+    // Boot-verify is clean here, so the static advisory finding does NOT fail the run.
+    expect(result.pass).toBe(true);
+  });
+
+  it('in fallback, a boot crash still fails the run (runtime orphan authority)', () => {
+    const result = evaluate({
+      ...clean,
+      bootVerify: 'ReferenceError: IS_TRUTHY_FN is not defined — claude failed to start',
+    });
+    expect(result.orphanSource).toBe('boot-verify-fallback');
+    expect(result.bootVerifyPassed).toBe(false);
+    expect(result.pass).toBe(false);
   });
 });
 
@@ -112,7 +172,9 @@ describe('FourZerosVerdict.evaluate — edge cases', () => {
     expect(result.pass).toBe(false);
     expect(result.failedPatches).toEqual(['spinnerWords']);
     expect(result.missingSystemPrompts).toEqual(['compact']);
-    expect(result.orphanVariables).toEqual(['CWD']);
+    // No report → fallback; the static validator orphan is advisory, not a hard input.
+    expect(result.orphanVariables).toEqual([]);
+    expect(result.advisoryOrphans).toEqual(['CWD']);
     expect(result.bootVerifyPassed).toBe(false);
   });
 
