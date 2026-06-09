@@ -150,3 +150,6 @@ Override-surface naming classes inside `system-prompts-opus-4-8/` (filename-pref
   sweeps over the full history for `NEW_PROMPT_ASSIGNMENTS`, escape rules, and
   upstream-relationship commits. lcc history is complete (12/12).
 - PR/issue axis is complete: tf 7/7 PRs (issues disabled on that repo), lcc 6/6 PRs + 3/3 issues.
+- **Currency check (2026-06-09, #84 pickup):** both leaves' `origin/main` re-fetched and
+  still at the snapshot refs above (tf PR #7 / lcc PR #6 — the CC 2.1.170 pair — still open,
+  unmerged). No deltas; no addendum needed.

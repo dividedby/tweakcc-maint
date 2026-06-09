@@ -8,6 +8,8 @@ human overview; this file is the agent index. Keep entries earn-the-line.
 - `docs/adr/0001`–`0003` — load-bearing decisions (verification gate split by altitude ·
   vs-vanilla benchmark measures targeted behavior · gate runs local-first then CI). Check the
   relevant one before changing gate, benchmark, or CI design.
+- `docs/adr/0007` — the recorded defer-vs-reinvent verdicts for skrabe's canonical pieces
+  (Showtime, the Driver, the Four-zeros bar, `auditMisbinds`). Don't re-litigate them.
 
 ## Contributor cockpit, not owner
 The leaf repos — `tweakcc-fixed`, `lobotomized-claude-code` — are owned by a *separate*
@@ -19,7 +21,10 @@ cost it puts on the leaf owner (e.g. a version-pinned snapshot he'd have to
 regenerate on each bump) — and let him pull it ready. *Prepare*, don't *impose*:
 unsolicited "please merge" PRs into someone else's repo are out of bounds even
 when the diff is green. Map the contribution onto his stated bar
-(four-zeros + `auditMisbinds=0`) and conventions before proposing.
+(Four-zeros incl. `auditMisbinds=0`) and his review bar — keep
+version-independent helper units; reject coverage redundant with a gate he
+already runs; root-cause a quirk rather than snapshot it (tweakcc-fixed#6;
+ADR 0007) — before proposing.
 
 ## Build / test / run
 Stack: **TypeScript + vitest + pnpm + ESM, run via `tsx` (no build step)** — see
