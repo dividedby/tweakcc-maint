@@ -44,8 +44,8 @@ no other guidance is needed. Follow it top to bottom:
 | # | Issue | Wave | Status | Owner | Skill(s) | Deps | Notes |
 | - | ----- | ---- | ------ | ----- | -------- | ---- | ----- |
 | 58 | Adopt CC 2.1.169 | W1 | Next | human | `/release-adoption` | — | new version shipped; nothing extracted yet (matrix tops at 2.1.168). Step 1–2 (extract `prompts-2.1.169.json` + diff vs 2.1.168) is **agent-doable now** and decides whether lobotomized needs a PR; step 7 gate run + leaf PRs are HITL/skrabe. Use upstream's 2.1.169 JSON for `TWEAKCC_UPSTREAM_JSON` (`38daf92` convergence) |
-| 45 | Swap tweakcc-fixed#4 detector to the identifierMap-union check | W1 | Blocked | agent | `/tdd` | — | verified commit `bc60baa` pushed to PR #4; agent work done — awaiting HITL boot-verify vs stock 2.1.168 + skrabe merge (both his) |
-| 31 | Gate consumes the patcher orphan report (consumer half) | W1 | Blocked | agent | `/tdd` | #43 | buildable behind a faked `--report-orphans` seam; real shell-out needs #43 |
+| 45 | Swap tweakcc-fixed#4 detector to the identifierMap-union check | W1 | Blocked | human | `/tdd` | — | agent work **done** (commit `bc60baa` on leaf PR #4); owner now human — remaining is HITL boot-verify vs stock 2.1.168 + skrabe merge (both his), relabeled `ready-for-human`. Not agent-pickable |
+| 31 | Gate consumes the patcher orphan report (consumer half) | W1 | Blocked | agent | `/tdd` | #43 | buildable behind a faked `--report-orphans` seam; real shell-out needs #43. Now also carries #41's folded residuals (demote static orphan list to advisory per ADR 0005; dedup + source-attribute the surfaced orphans) — see #31 comment |
 | 43 | Patcher `--report-orphans` (producer, leaf PR to skrabe) | W1 | Backlog | human | `/release-adoption` | — | skrabe-facing PR + merge timing not ours |
 | 26 | Leaf finding: lobotomized breaks CC 2.1.168 (evidence) | — | Parked | human | — | — | correct root-cause framing + re-baseline gate vs stock tweakcc-fixed |
 | 11 | Roadmap: behavioral A/B benchmark (stock vs lobotomized) | — | Parked | human | — | — | roadmap item |
