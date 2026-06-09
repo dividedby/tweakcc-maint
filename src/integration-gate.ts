@@ -125,8 +125,12 @@ function runVersion(ccVersion: string, env: AdoptionEnvironment): VersionResult 
   };
 }
 
-/** True iff this version cleared BOTH the Four-zeros bar and the Restore drill. */
-function versionPassed(v: VersionResult): boolean {
+/**
+ * True iff this version cleared BOTH the Four-zeros bar and the Restore drill.
+ * The gate is the sole author of this pass condition — consumers (e.g. the
+ * Adoption-history aggregator) import it rather than redefining it.
+ */
+export function versionPassed(v: VersionResult): boolean {
   return v.restoreDrill.pass && v.fourZeros?.pass === true;
 }
 

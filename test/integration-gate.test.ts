@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { runGate, recordToExitCode } from '../src/integration-gate.js';
+import { runGate, recordToExitCode, versionPassed } from '../src/integration-gate.js';
 import type { AdoptionRecord } from '../src/integration-gate.js';
 import { FakeAdoptionEnvironment } from '../src/fake-adoption-environment.js';
 import type { CapturedSignals } from '../src/four-zeros-verdict.js';
@@ -310,5 +310,52 @@ describe('IntegrationGate.recordToExitCode', () => {
     };
     expect(recordToExitCode(pass)).toBe(0);
     expect(recordToExitCode(fail)).not.toBe(0);
+  });
+});
+
+describe('IntegrationGate.versionPassed — the exported pass predicate (single source of truth)', () => {
+  const passingFourZeros = {
+    pass: true,
+    failedPatches: [],
+    missingSystemPrompts: [],
+    orphanVariables: [],
+    orphanSource: 'patcher-report' as const,
+    advisoryOrphans: [],
+    misbinds: [],
+    bootVerifyPassed: true,
+  };
+  const passingDrill = {
+    pass: true,
+    status: 'pass' as const,
+    backupExists: true,
+    restored: true,
+    cleanStock: true,
+  };
+
+  it('passes only when BOTH the Four-zeros bar and the Restore drill cleared', () => {
+    expect(versionPassed({ ccVersion: '1.2.3', fourZeros: passingFourZeros, restoreDrill: passingDrill })).toBe(true);
+    expect(
+      versionPassed({
+        ccVersion: '1.2.3',
+        fourZeros: { ...passingFourZeros, pass: false },
+        restoreDrill: passingDrill,
+      }),
+    ).toBe(false);
+    expect(
+      versionPassed({
+        ccVersion: '1.2.3',
+        fourZeros: passingFourZeros,
+        restoreDrill: { ...passingDrill, pass: false, status: 'dirty-restore' as const, cleanStock: false },
+      }),
+    ).toBe(false);
+  });
+
+  it('fails when the Four-zeros verdict is absent (missing-backup bail: no verdict to report)', () => {
+    expect(
+      versionPassed({
+        ccVersion: '1.2.3',
+        restoreDrill: { pass: false, status: 'missing-backup', backupExists: false, restored: false, cleanStock: false },
+      }),
+    ).toBe(false);
   });
 });

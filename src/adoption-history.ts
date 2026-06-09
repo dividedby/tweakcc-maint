@@ -15,7 +15,8 @@
  * from the record today and out of scope here.
  */
 
-import type { AdoptionRecord, RestoreDrillStatus, VersionResult } from './integration-gate.js';
+import { versionPassed } from './integration-gate.js';
+import type { AdoptionRecord, RestoreDrillStatus } from './integration-gate.js';
 
 /** A Restore-drill track record: pass/fail tallies plus a per-terminal-status breakdown. */
 export interface RestoreDrillTrackRecord {
@@ -78,11 +79,6 @@ export interface AdoptionHistory {
   latest?: LatestMatrixOutcome;
   /** The Restore-drill track record across every version-run. */
   restoreDrill: RestoreDrillTrackRecord;
-}
-
-/** True iff this version cleared BOTH the Four-zeros bar and the Restore drill in a run. */
-function versionPassed(v: VersionResult): boolean {
-  return v.restoreDrill.pass && v.fourZeros?.pass === true;
 }
 
 /** Empty track record — the zero value used both for empty input and as a fold seed. */
