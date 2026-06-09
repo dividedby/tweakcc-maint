@@ -30,9 +30,13 @@ import re
 import subprocess
 import sys
 
-# Any command segment that creates a commit. `[^|;&\n]*` keeps the match within
-# a single command segment, mirroring the sibling guards.
-_GIT_COMMIT = re.compile(r'\bgit\s+(?:[^|;&\n]*\s)?commit\b([^|;&\n]*)', re.IGNORECASE)
+# Any command segment that creates a commit. Only git *global options* may sit
+# between `git` and `commit` (`-C <dir>`, `-c k=v`, `--git-dir=…`, …) so another
+# subcommand mentioning "commit" in its args (`git log --grep commit`,
+# `git push origin commit-fix`) doesn't false-positive. `[^|;&\n]*` keeps the
+# trailing-args capture within a single command segment, mirroring the siblings.
+_GIT_COMMIT = re.compile(
+    r'\bgit\s+(?:(?:-[cC]\s+\S+|--?\S+)\s+)*commit\b([^|;&\n]*)', re.IGNORECASE)
 # `git commit -a/--all` also sweeps in modified-but-unstaged tracked files.
 _ALL_FLAG = re.compile(r'(?:^|\s)(?:--all\b|-[a-z]*a[a-z]*(?=\s|$))', re.IGNORECASE)
 

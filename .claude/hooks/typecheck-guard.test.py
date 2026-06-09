@@ -27,6 +27,12 @@ ALLOW = False
 CASES = [
     ("non-git command", "ls -la", ["src/a.ts"], [], 1, ALLOW, False),
     ("non-commit git", "git status", ["src/a.ts"], [], 1, ALLOW, False),
+    ("'commit' as an argument, not the subcommand", "git log --grep commit",
+     ["src/a.ts"], [], 1, ALLOW, False),
+    ("'commit' as a ref name", "git push origin commit-fix",
+     ["src/a.ts"], [], 1, ALLOW, False),
+    ("global option before commit", "git -C . commit -m 'msg'",
+     ["src/a.ts"], [], 1, BLOCK, True),
     ("staged TS, typecheck fails", "git commit -m 'msg'",
      ["src/a.ts"], [], 1, BLOCK, True),
     ("staged TS, typecheck passes", "git commit -m 'msg'",
