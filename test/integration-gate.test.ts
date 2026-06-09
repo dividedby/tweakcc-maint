@@ -273,6 +273,8 @@ describe('IntegrationGate.recordToExitCode', () => {
             failedPatches: [],
             missingSystemPrompts: [],
             orphanVariables: [],
+            orphanSource: 'patcher-report',
+            advisoryOrphans: [],
             bootVerifyPassed: true,
           },
           restoreDrill: {
@@ -297,6 +299,8 @@ describe('IntegrationGate.recordToExitCode', () => {
             failedPatches: [],
             missingSystemPrompts: [],
             orphanVariables: [],
+            orphanSource: 'boot-verify-fallback',
+            advisoryOrphans: [],
             bootVerifyPassed: false,
           },
         },

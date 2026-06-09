@@ -34,7 +34,7 @@ no other guidance is needed. Follow it top to bottom:
 ## Priority waves
 | Wave | Theme | Issues | Gate to enter |
 | ---- | ----- | ------ | ------------- |
-| **W1** | 2.1.169 adoption + 2.1.168 orphan/boot correctness | #58 #45 #31 #43 | none — active now |
+| **W1** | 2.1.169 adoption + 2.1.168 orphan/boot correctness | #58 #45 #43 | none — active now |
 | **W2** | Verdict-signal trust (triage decisions) | — (cleared) | none — triage anytime |
 | **—**  | Cross-cutting / later | #26 #11 #8 #51 #52 #53 | n/a |
 
@@ -45,8 +45,7 @@ no other guidance is needed. Follow it top to bottom:
 | - | ----- | ---- | ------ | ----- | -------- | ---- | ----- |
 | 58 | Adopt CC 2.1.169 | W1 | Next | human | `/release-adoption` | — | new version shipped; nothing extracted yet (matrix tops at 2.1.168). Step 1–2 (extract `prompts-2.1.169.json` + diff vs 2.1.168) is **agent-doable now** and decides whether lobotomized needs a PR; step 7 gate run + leaf PRs are HITL/skrabe. Use upstream's 2.1.169 JSON for `TWEAKCC_UPSTREAM_JSON` (`38daf92` convergence) |
 | 45 | Swap tweakcc-fixed#4 detector to the identifierMap-union check | W1 | Blocked | human | `/tdd` | — | agent work **done** (commit `bc60baa` on leaf PR #4); owner now human — remaining is HITL boot-verify vs stock 2.1.168 + skrabe merge (both his), relabeled `ready-for-human`. Not agent-pickable |
-| 31 | Gate consumes the patcher orphan report (consumer half) | W1 | Blocked | agent | `/tdd` | #43 | buildable behind a faked `--report-orphans` seam; real shell-out needs #43. Now also carries #41's folded residuals (demote static orphan list to advisory per ADR 0005; dedup + source-attribute the surfaced orphans) — see #31 comment |
-| 43 | Patcher `--report-orphans` (producer, leaf PR to skrabe) | W1 | Backlog | human | `/release-adoption` | — | skrabe-facing PR + merge timing not ours |
+| 43 | Patcher `--report-orphans` (producer, leaf PR to skrabe) | W1 | Backlog | human | `/release-adoption` | — | skrabe-facing PR + merge timing not ours. On landing, also wire `RealAdoptionEnvironment.adopt` to call the flag and populate `orphanReport` — the consumer is ready (#31), the env just omits the call until the flag exists |
 | 26 | Leaf finding: lobotomized breaks CC 2.1.168 (evidence) | — | Parked | human | — | — | correct root-cause framing + re-baseline gate vs stock tweakcc-fixed |
 | 11 | Roadmap: behavioral A/B benchmark (stock vs lobotomized) | — | Parked | human | — | — | roadmap item |
 | 8 | Roadmap: leaf test broadening (tweakcc-fixed + lobotomized) | — | Parked | human | — | — | roadmap item |
@@ -57,6 +56,7 @@ no other guidance is needed. Follow it top to bottom:
 ### Done (closed — kept as full record, newest first)
 | # | Issue | Wave | Status | Owner | Skill(s) | Deps | Notes |
 | - | ----- | ---- | ------ | ----- | -------- | ---- | ----- |
+| 31 | Gate consumes the patcher orphan report (consumer half) | W1 | Done | agent | `/tdd` | _#43_ | consumer half **shipped**: `orphan-report.ts` pure parser + Four-zeros now treats the patcher report as the authoritative orphan input, static authoring-drift check demoted to advisory (ADR 0005), dedup + source-attribution `patcher-report`/`boot-verify-fallback` (folds #41's residuals), Boot-verify fallback when the flag is unsupported. Real-env `--report-orphans` shell-out wiring deferred to #43 (flag doesn't exist until the producer lands; env omits the call → fallback) |
 | 46 | Authoring-drift pre-check validates vs the leaf's OWN identifierMap | W1 | Done | mixed | `/triage` | — | closed as **overtaken** — skrabe solved mis-binds at the patcher altitude (`38daf92` extractor adopts upstream's authoritative identifierMap → mis-bind structurally impossible for shared prompts; `4e1b245` audit gate; `322ba20` capture/read-consistency test), so the wrong-lineage fixture can no longer reproduce and a control-plane pre-check is redundant. The leaf-own-JSON validation rule survives (self-correcting; in CONTEXT notes); Boot-verify stays the Four-zeros authority (ADR 0005) |
 | 41 | orphanVariables double-sourced / not trustworthy as authority | W2 | Done | mixed | `/triage` | — | triaged → **closed as superseded-by-#31**: headline double-sourcing premise overtaken (verdict single-sources the static validator, `four-zeros-verdict.ts:55`); two real residuals (static list is a hard input vs ADR 0005's advisory; no dedup + static/runtime `ReferenceError` signature collision) folded into #31's acceptance — same `validator`/`FourZerosVerdict` seam #31 rewires |
 | 47 | Partial-identifierMap wrong-capture binding boots clean | W2 | Done | mixed | `/triage` | — | resolved by skrabe at the patcher altitude, verified vs tweakcc-fixed main `322ba20`: croncreate 7-slot fill (`50e1ff0` — `CANCEL_TIMEFRAME_DAYS` now at correct slot) + mis-bind audit gate (`4e1b245`) + extractor adopts upstream's authoritative identifierMap (`38daf92`); override realigned (lobotomized `54e0d34`). Boot-verify remains the Four-zeros authority (ADR 0005) |

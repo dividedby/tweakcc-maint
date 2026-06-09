@@ -10,6 +10,8 @@ const passFourZeros: FourZerosResult = {
   failedPatches: [],
   missingSystemPrompts: [],
   orphanVariables: [],
+  orphanSource: 'patcher-report',
+  advisoryOrphans: [],
   bootVerifyPassed: true,
 };
 
@@ -18,6 +20,8 @@ const failFourZeros: FourZerosResult = {
   failedPatches: ['spinnerWords'],
   missingSystemPrompts: [],
   orphanVariables: [],
+  orphanSource: 'patcher-report',
+  advisoryOrphans: [],
   bootVerifyPassed: true,
 };
 
