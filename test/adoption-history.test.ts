@@ -13,6 +13,7 @@ const passFourZeros: FourZerosResult = {
   orphanSource: 'patcher-report',
   advisoryOrphans: [],
   bootVerifyPassed: true,
+  misbinds: [],
 };
 
 const failFourZeros: FourZerosResult = {
@@ -23,6 +24,7 @@ const failFourZeros: FourZerosResult = {
   orphanSource: 'patcher-report',
   advisoryOrphans: [],
   bootVerifyPassed: true,
+  misbinds: [],
 };
 
 /** A passing version result (clean Four-zeros + clean Restore drill). */

@@ -161,6 +161,84 @@ describe('FourZerosVerdict.evaluate — boot-verify failure', () => {
   });
 });
 
+// The leaf's `tools/auditMisbinds.mjs` output — skrabe's four-zero #4 (#80). Golden
+// fragments match the real tool: `mis-bind audit: 0 …` on pass, `MIS-BINDS: N …` +
+// indented finding lines on fail, `mis-bind audit: SKIPPED — …` when the upstream
+// reference dump is unavailable (exit 0 — explicitly not a failure).
+describe('FourZerosVerdict.evaluate — auditMisbinds is the fourth zero (#80)', () => {
+  it('a clean mis-bind audit passes and is attributed as a hard input', () => {
+    const result = evaluate({
+      ...clean,
+      auditMisbinds: 'mis-bind audit: 0 (every used placeholder sits at the upstream slot)',
+    });
+    expect(result.pass).toBe(true);
+    expect(result.auditMisbindsPassed).toBe(true);
+    expect(result.misbinds).toEqual([]);
+  });
+
+  it('a mis-bind fails the bar even when the other three zeros are clean (wrong-but-valid var)', () => {
+    const result = evaluate({
+      ...clean,
+      auditMisbinds:
+        'MIS-BINDS: 1 (override placeholder at wrong slot)\n' +
+        '  main-loop: ${TODAYS_DATE} ours=slotB upstream=slotQ\n' +
+        '\nFix: adopt upstream’s identifierMap for the prompt',
+    });
+    expect(result.pass).toBe(false);
+    expect(result.auditMisbindsPassed).toBe(false);
+    expect(result.misbinds).toEqual(['main-loop: ${TODAYS_DATE} ours=slotB upstream=slotQ']);
+  });
+
+  it('a SKIPPED audit (no upstream reference dump) is not a hard input and does not fail the bar', () => {
+    const result = evaluate({
+      ...clean,
+      auditMisbinds:
+        "mis-bind audit: SKIPPED — upstream reference '/tmp/pieb-2.1.169.json' missing/empty",
+    });
+    expect(result.pass).toBe(true);
+    expect(result.auditMisbindsPassed).toBeUndefined();
+  });
+
+  it('an absent audit signal (fake / hand-rolled fallback) leaves the bar at three zeros + Boot-verify', () => {
+    const result = evaluate(clean);
+    expect(result.pass).toBe(true);
+    expect(result.auditMisbindsPassed).toBeUndefined();
+    expect(result.misbinds).toEqual([]);
+  });
+
+  it('a mis-bind in ANY audited override dir fails, even when another dir audited clean', () => {
+    // The real adapter audits once per override dir and joins the outputs; a clean
+    // `mis-bind audit: 0` from one dir must not mask a MIS-BINDS from another.
+    const result = evaluate({
+      ...clean,
+      auditMisbinds:
+        'mis-bind audit: 0 (every used placeholder sits at the upstream slot)\n' +
+        'MIS-BINDS: 1 (override placeholder at wrong slot)\n' +
+        '  compact: ${CWD} ours=slotA upstream=slotB',
+    });
+    expect(result.pass).toBe(false);
+    expect(result.auditMisbindsPassed).toBe(false);
+    expect(result.misbinds).toEqual(['compact: ${CWD} ours=slotA upstream=slotB']);
+  });
+
+  it('a clean audit alongside a SKIPPED one is still a hard, passing input', () => {
+    const result = evaluate({
+      ...clean,
+      auditMisbinds:
+        "mis-bind audit: SKIPPED — upstream reference missing/empty\n" +
+        'mis-bind audit: 0 (every used placeholder sits at the upstream slot)',
+    });
+    expect(result.pass).toBe(true);
+    expect(result.auditMisbindsPassed).toBe(true);
+  });
+
+  it('unrecognized audit output must NOT false-pass', () => {
+    const result = evaluate({ ...clean, auditMisbinds: 'some unexpected blob' });
+    expect(result.pass).toBe(false);
+    expect(result.auditMisbindsPassed).toBe(false);
+  });
+});
+
 describe('FourZerosVerdict.evaluate — edge cases', () => {
   it('reports multiple simultaneous failures across all four signals', () => {
     const result = evaluate({

@@ -276,6 +276,7 @@ describe('IntegrationGate.recordToExitCode', () => {
             orphanSource: 'patcher-report',
             advisoryOrphans: [],
             bootVerifyPassed: true,
+            misbinds: [],
           },
           restoreDrill: {
             pass: true,
@@ -302,6 +303,7 @@ describe('IntegrationGate.recordToExitCode', () => {
             orphanSource: 'boot-verify-fallback',
             advisoryOrphans: [],
             bootVerifyPassed: false,
+            misbinds: [],
           },
         },
       ],

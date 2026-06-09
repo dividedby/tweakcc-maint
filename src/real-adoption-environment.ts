@@ -24,6 +24,7 @@ import { delimiter, join } from 'node:path';
 
 import type { AdoptionEnvironment, RestoreOutcome } from './adoption-environment.js';
 import type { CapturedSignals } from './four-zeros-verdict.js';
+import { driverPresent, runDriverVerification } from './driver-verification.js';
 import { runSync, runBootVerify, combinedOutput, normalizeBootVerify } from './leaf-shell.js';
 import { runOrphanValidator, resolveStringsFilePath } from './orphan-validator.js';
 
@@ -124,11 +125,20 @@ export class RealAdoptionEnvironment implements AdoptionEnvironment {
   }
 
   /**
-   * Adopt one version: run the three real tools and capture their output. `ccVersion` must
+   * Adopt one version: run the real tools and capture their output. `ccVersion` must
    * match the installed version — the tool cannot target another (installed-version-only).
+   *
+   * Signal source (#80): when skrabe's published `skills/showtime/driver.mjs` is present
+   * in the checkout, the CANONICAL driver supplies the apply / orphan / mis-bind signals
+   * (`check` runs the idempotent `--apply` itself; `report` + `auditMisbinds.mjs` cover
+   * zeros #3/#4) — see driver-verification.ts. When it is absent (older leaf checkout)
+   * this falls back to the hand-rolled path, like the #31 consumer fallback:
    *  - apply  ← `node dist/index.mjs --apply` (raw combined output)
+   * Both paths share:
    *  - boot-verify ← `claude -p "<prompt>"` on a cheap model, normalized to the marker
-   *  - validator ← the real Orphan-variable check over the override dirs
+   *    (ADR 0005: runtime authority stays ours — the driver's smoke is inconclusive-tolerant
+   *    and the gate's boot-verify carries the cost-ledger wiring)
+   *  - validator ← the ADVISORY Orphan-variable authoring-drift pre-check (ADR 0005)
    */
   adopt(ccVersion: string): CapturedSignals {
     const installed = this.installedVersion();
@@ -151,17 +161,20 @@ export class RealAdoptionEnvironment implements AdoptionEnvironment {
     const overrideDirs = this.promptDirs;
     const stringsFile = resolveStringsFilePath(this.cfg.tweakccFixedDir, ccVersion);
 
-    const apply = combinedOutput(runSync('node', [this.tweakccCli, '--apply']));
+    // Canonical driver path (#80): the driver's `check` performs the idempotent re-apply
+    // itself, so it runs first and Boot-verify exercises the patched binary it left behind.
+    // Hand-rolled fallback (driver-absent older checkout — the #31 fallback shape): plain
+    // `--apply`, and no `orphanReport` — the patcher's `--report-orphans` (producer, #43) has
+    // not landed, so FourZerosVerdict sees the absent report and falls back to Boot-verify as
+    // the orphan authority (#31 AC 4), with the static `validator` advisory only.
+    const sourced = driverPresent(this.cfg.tweakccFixedDir)
+      ? runDriverVerification(this.cfg.tweakccFixedDir, ccVersion, stringsFile, overrideDirs)
+      : { apply: combinedOutput(runSync('node', [this.tweakccCli, '--apply'])) };
     const bootVerify = normalizeBootVerify(
       runBootVerify(this.cfg.bootVerifyPrompt, this.cfg.bootVerifyModel),
     );
     const validator = runOrphanValidator(overrideDirs, stringsFile);
-
-    // No `orphanReport`: the patcher's `--report-orphans` (producer, #43) has not landed in
-    // tweakcc-fixed yet, so this adapter does not shell out to it. FourZerosVerdict sees the
-    // absent report and falls back to Boot-verify as the orphan authority (#31 AC 4), with the
-    // static `validator` advisory only. Wiring the real shell-out is deferred to #43.
-    return { apply, bootVerify, validator };
+    return { ...sourced, bootVerify, validator };
   }
 
   // ── Restore-drill trio (#23) — real backup/restore/verify-clean ──────────────────────

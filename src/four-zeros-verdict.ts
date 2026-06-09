@@ -7,7 +7,8 @@
  * exit code (that is IntegrationGate).
  *
  * A verdict is "pass" iff: 0 failed patches, 0 missing system prompts,
- * 0 Orphan variables, and a passing Boot-verify.
+ * 0 Orphan variables, and a passing Boot-verify — plus, when the mis-bind audit ran
+ * (#80, skrabe's fourth zero), `auditMisbinds=0`.
  *
  * Orphan authority follows ADR 0005 / #31: the patcher's `--report-orphans` output
  * (`signals.orphanReport`) is the AUTHORITATIVE static orphan input — the fork owns the
@@ -35,6 +36,14 @@ export interface CapturedSignals {
    * falls back to Boot-verify as the orphan authority.
    */
   orphanReport?: string;
+  /**
+   * Output of the leaf's `tools/auditMisbinds.mjs` — skrabe's fourth zero (#80): an
+   * override placeholder bound to the wrong identifierMap slot resolves to a valid-but-
+   * wrong var (wrong content, no crash), invisible to the other three zeros. Absent when
+   * the path that produced the signals did not run the audit (fake / hand-rolled
+   * fallback) → not a hard input, mirroring the orphanReport fallback.
+   */
+  auditMisbinds?: string;
 }
 
 /** Where the verdict's hard orphan input came from (#31 source attribution). */
@@ -62,6 +71,14 @@ export interface FourZerosResult {
   advisoryOrphans: string[];
   /** Whether Boot-verify proved the patched binary started and ran the patched path. */
   bootVerifyPassed: boolean;
+  /**
+   * Whether the leaf's mis-bind audit came back clean (`auditMisbinds=0`, skrabe's fourth
+   * zero, #80). `undefined` when the audit is not a hard input for this run: the signal is
+   * absent, or the audit SKIPPED itself (no upstream reference dump — the leaf exits 0).
+   */
+  auditMisbindsPassed?: boolean;
+  /** The audit's mis-bind finding lines (`<id>: ${NAME} ours=slotX upstream=slotY`), deduped. */
+  misbinds: string[];
 }
 
 // `patch: <name>: failed to find …` — anything after "failed to" counts as a failure.
@@ -72,6 +89,14 @@ const MISSING_PROMPT = /Could not find system prompt '([^']+)'/g;
 const ORPHAN_VAR = /ReferenceError:\s*(\S+) is not defined/g;
 // Boot-verify must positively assert success; absence of this marker is a failure.
 const BOOT_VERIFY_OK = /Boot-verify OK\b/;
+// auditMisbinds.mjs markers: it must positively assert `mis-bind audit: 0`; SKIPPED
+// (no upstream reference dump) exits 0 and is explicitly not a failure. Anything else
+// (MIS-BINDS or garbage) must not false-pass.
+const AUDIT_CLEAN = /mis-bind audit:\s*0\b/;
+const AUDIT_SKIPPED = /mis-bind audit:\s*SKIPPED\b/;
+const MISBINDS_FOUND = /MIS-BINDS:\s*\d+/;
+// `  <id>: ${NAME} ours=slotX upstream=slotY` — the audit's per-finding lines.
+const MISBIND_LINE = /^\s+(\S+:\s*\$\{[A-Z][A-Z0-9_]*\}.*)$/gm;
 
 function captureAll(text: string, re: RegExp): string[] {
   const out: string[] = [];
@@ -101,11 +126,18 @@ export function evaluate(signals: CapturedSignals): FourZerosResult {
   // The static authoring-drift check is advisory only (ADR 0005) — surfaced, never failing.
   const advisoryOrphans = dedup(captureAll(signals.validator, ORPHAN_VAR));
 
+  // The mis-bind audit (skrabe's fourth zero, #80): a hard input only when it ran and
+  // did not SKIP itself; like Boot-verify it must positively assert cleanliness.
+  const auditMisbindsPassed = parseAuditMisbinds(signals.auditMisbinds);
+  const misbinds =
+    signals.auditMisbinds === undefined ? [] : dedup(captureAll(signals.auditMisbinds, MISBIND_LINE));
+
   const pass =
     failedPatches.length === 0 &&
     missingSystemPrompts.length === 0 &&
     orphanVariables.length === 0 &&
-    bootVerifyPassed;
+    bootVerifyPassed &&
+    auditMisbindsPassed !== false;
 
   return {
     pass,
@@ -115,5 +147,20 @@ export function evaluate(signals: CapturedSignals): FourZerosResult {
     orphanSource,
     advisoryOrphans,
     bootVerifyPassed,
+    auditMisbindsPassed,
+    misbinds,
   };
+}
+
+/**
+ * `undefined` = not a hard input (signal absent, or every audit SKIPPED itself); else
+ * clean? The signal may join several per-override-dir audit runs, so failure wins over
+ * a clean assertion from another dir, which wins over SKIPPED.
+ */
+function parseAuditMisbinds(raw: string | undefined): boolean | undefined {
+  if (raw === undefined) return undefined;
+  if (MISBINDS_FOUND.test(raw)) return false;
+  if (AUDIT_CLEAN.test(raw)) return true;
+  if (AUDIT_SKIPPED.test(raw)) return undefined;
+  return false;
 }
