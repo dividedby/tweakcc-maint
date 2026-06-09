@@ -34,7 +34,7 @@ no other guidance is needed. Follow it top to bottom:
 ## Priority waves
 | Wave | Theme | Issues | Gate to enter |
 | ---- | ----- | ------ | ------------- |
-| **W1** | 2.1.168 orphan/boot adoption correctness | #45 #31 #43 | none — active now |
+| **W1** | 2.1.169 adoption + 2.1.168 orphan/boot correctness | #58 #45 #31 #43 | none — active now |
 | **W2** | Verdict-signal trust (triage decisions) | — (cleared) | none — triage anytime |
 | **—**  | Cross-cutting / later | #26 #11 #8 #51 #52 #53 | n/a |
 
@@ -43,6 +43,7 @@ no other guidance is needed. Follow it top to bottom:
 ### Open
 | # | Issue | Wave | Status | Owner | Skill(s) | Deps | Notes |
 | - | ----- | ---- | ------ | ----- | -------- | ---- | ----- |
+| 58 | Adopt CC 2.1.169 | W1 | Next | human | `/release-adoption` | — | new version shipped; nothing extracted yet (matrix tops at 2.1.168). Step 1–2 (extract `prompts-2.1.169.json` + diff vs 2.1.168) is **agent-doable now** and decides whether lobotomized needs a PR; step 7 gate run + leaf PRs are HITL/skrabe. Use upstream's 2.1.169 JSON for `TWEAKCC_UPSTREAM_JSON` (`38daf92` convergence) |
 | 45 | Swap tweakcc-fixed#4 detector to the identifierMap-union check | W1 | Blocked | agent | `/tdd` | — | verified commit `bc60baa` pushed to PR #4; agent work done — awaiting HITL boot-verify vs stock 2.1.168 + skrabe merge (both his) |
 | 31 | Gate consumes the patcher orphan report (consumer half) | W1 | Blocked | agent | `/tdd` | #43 | buildable behind a faked `--report-orphans` seam; real shell-out needs #43 |
 | 43 | Patcher `--report-orphans` (producer, leaf PR to skrabe) | W1 | Backlog | human | `/release-adoption` | — | skrabe-facing PR + merge timing not ours |
