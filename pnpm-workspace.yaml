@@ -1,5 +1,9 @@
 allowBuilds:
   esbuild: true
+# Name pattern (not name@version): this setting matches package-name globs, so a
+# version suffix never matches and the entry is inert. Exempt our own first-party
+# @dividedby/bench-core (any version) from the supply-chain age gate — a fresh
+# publish of our own package must never red a required check. Third-party deps
+# keep the age gate.
 minimumReleaseAgeExclude:
-  - '@dividedby/bench-core@0.1.0'
-  - '@dividedby/bench-core@0.2.0'
+  - '@dividedby/bench-core'

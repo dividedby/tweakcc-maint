@@ -33,10 +33,12 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
 
-      # --frozen-lockfile enforces lockfile integrity; minimumReleaseAge=0
-      # disables pnpm's supply-chain age gate so a required check can never red
-      # on a fresh @dividedby/bench-core publish (matches fallow-report.yml).
-      - run: pnpm install --frozen-lockfile --config.minimumReleaseAge=0
+      # --frozen-lockfile enforces lockfile integrity. The supply-chain age gate
+      # stays on for third-party deps; our own freshly-published
+      # @dividedby/bench-core is exempted by minimumReleaseAgeExclude in
+      # pnpm-workspace.yaml (name pattern), so a fresh bump can't red this
+      # required check.
+      - run: pnpm install --frozen-lockfile
 
       - name: Test
         run: pnpm test
