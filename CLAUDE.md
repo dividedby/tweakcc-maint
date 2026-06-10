@@ -26,6 +26,20 @@ version-independent helper units; reject coverage redundant with a gate he
 already runs; root-cause a quirk rather than snapshot it (tweakcc-fixed#6;
 ADR 0007) — before proposing.
 
+## Owned sibling: `bench` / `@dividedby/bench-core`
+We also **own** `github.com/dividedby/bench` (the `@dividedby/bench-core` public-npm
+package; local clone `~/repos/bench`) — it is *dividedby's own* repo, **not** a skrabe
+leaf, so the cockpit rule above does **not** apply: normal full write access, branch →
+PR → squash-merge (PR-number-in-title), no draft/intent-ping dance. Work it from sessions
+**here** rather than spinning up a session in that repo. Its issues live in
+`dividedby/bench`; tweakcc-maint depends on it for the Behavioral A/B bench primitives
+(`executeRun`, `normalize`/`groupByCell`, cost, the `JudgeBackend` panel backend).
+
+Different stack from this repo: **plain Node ESM `.mjs` + JSDoc types + `node --test`**
+(no TypeScript/vitest/tsx). Test: `node --test` from its root. Public surface is
+hand-written `core/index.d.ts` + the `core/index.mjs` barrel; `files:["core"]` is the
+publish allowlist (no fixtures/results). Bump the dep pin here when it publishes.
+
 ## Build / test / run
 Stack: **TypeScript + vitest + pnpm + ESM, run via `tsx` (no build step)** — see
 `docs/adr/0004`. Design: `docs/design/release-adoption-substrate.md`.
