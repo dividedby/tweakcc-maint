@@ -39,27 +39,27 @@ no other guidance is needed. Follow it top to bottom:
 
 ## Burn-down (2026-06-10)
 Reconciled against live `gh` across **both** repos (`/roadmap`).
-**68 issues — 65 closed (96%), 3 open.**
+**71 issues — 65 closed (92%), 6 open.**
 **Closed (cumulative): 65.** ← integer total of all closed issues ever, including
 those whose rows are pruned from collapsed waves; bumped, never recomputed from the
 table (pruned rows are gone), so the count survives wave pruning.
 
 | Bucket | Count | Issues |
 |---|---|---|
-| **Ready (agent)** — loop-eligible | 0 | — (all agent-eligible `Next` work closed or blocked on a maintainer decision) |
-| **Ready (human / HITL)**          | 1 | #102 (the finale — maintainer schedules) |
-| **Blocked / deferred**            | 1 | bench#7 (time-gated: rotate NPM_TOKEN ~2026-09-08) |
-| **Tracking** (epic / PRD parents) | 0 | — |
+| **Ready (agent)** — loop-eligible | 2 | #166 #167 (fallow dead-code hygiene round 2 — unblocked) |
+| **Ready (human / HITL)**          | 0 | — |
+| **Blocked / deferred**            | 2 | #168 (deps #166+#167), bench#7 (time-gated: rotate NPM_TOKEN ~2026-09-08) |
+| **Tracking** (epic / PRD parents) | 1 | #102 (fallow refactor plan accepted + split → #166–#168; closes when they land) |
 | **Meta** (idea-inbox / onboarding)| 1 | #99 (Idea Inbox) |
 
-Open by wave: W1 0 · W2 0 · unscoped 3 (#99 #102 bench#7).
+Open by wave: W1 0 · W2 0 · unscoped 6 (#99 #102 #166 #167 #168 bench#7).
 
 ## Priority waves
 | Wave | Theme | Issues | Gate to enter |
 | ---- | ----- | ------ | ------------- |
 | **W1** | 2.1.169 adoption + 2.1.168 orphan/boot correctness | — (wholly closed) | done |
 | **W2** | Verdict-signal trust (triage decisions) | — (wholly closed) | done |
-| **—**  | Cross-cutting / ongoing (incl. all `bench#NN` work) | #99 #102 bench#7 | n/a |
+| **—**  | Cross-cutting / ongoing (incl. all `bench#NN` work) | #99 #102 #166 #167 #168 bench#7 | n/a |
 
 ## Master census (active waves inline)
 
@@ -70,7 +70,10 @@ prune to a one-line summary and the cumulative count above is bumped — ADR 002
 
 | # | Issue | Wave | Status | Owner | Skill(s) | Deps | Notes |
 | - | ----- | ---- | ------ | ----- | -------- | ---- | ----- |
-| 102 | Post-backlog: complete refactor plan from a fallow static-analysis pass | — | Next | human | `/improve-codebase-architecture` | — | The finale. Gate satisfied — the entire pre-existing backlog and the Behavioral A/B tree are closed; maintainer decides whether/when to schedule the whole-repo refactor. When picked up: fallow static JSON → `/improve-codebase-architecture` (ADR 0004 no-build + ADR 0007 defer verdicts) → plan only, split via `/to-issues` if accepted. Spawned from Idea Inbox #99 |
+| 102 | Post-backlog: complete refactor plan from a fallow static-analysis pass | — | Tracking | human | `/improve-codebase-architecture` | — | Plan **accepted** (fresh re-run, fallow 2.91.0 @ `196d3e0`) and split via `/to-issues` → **#166 #167 #168**. P3/P4 stayed monitoring notes (not ticketed). Prior P2/P5 obsolete (entry-points + baseline already landed via #126/#128). `/software-design` early-exited (single-module hygiene → `/tdd`). Parent row — closes when #166–#168 land. Spawned from Idea Inbox #99 |
+| 166 | fallow P1: resolve 5 dead exports in the A/B tree | — | Next | agent | `/tdd` | — | 4 de-export internal helpers (orphan-report-producer, persona-prompts) + delete 1 dead re-export (stub-judge `BEHAVIORAL_AXES`). Gate-covered mechanical (ADR 0004 no-build, ADR 0007 untouched). From #102 P1 |
+| 167 | fallow P2: suppress 3 port-fake DI false positives | — | Next | agent | `/tdd` | — | Suppress `VariantRunner`/`Rng` adapter members fallow can't see through the port (ADR-0004 seam). No deletions. From #102 P2 |
+| 168 | fallow P1 follow-up: regenerate committed fallow-baselines after dead-code cleanup | — | Blocked | agent | `/tdd` | #166 #167 | Regenerate `fallow-baselines/` to the new dead-code floor once #166+#167 land; report-only CI tracks the new delta. From #102 sequencing |
 | 99 | 💡 Idea Inbox | — | Tracking | human | — | — | **Standing Meta row — exempt from burn-down as pickable work.** Canonical intake for unstructured ideas across **both** repos (ADR 0009); a drained idea is filed in tweakcc-maint or `dividedby/bench` and registered as a census row here. First idea actioned → #102 |
 | bench#7 | Rotate NPM_TOKEN before it expires (~2026-09-08) | — | Blocked | human | — | — | `dividedby/bench`. Time-gated ops: rotate the `@dividedby/bench-core` publish token before ~2026-09-08 |
 
