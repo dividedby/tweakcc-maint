@@ -29,7 +29,12 @@ the merged leaf mains) lands.
   backup (tweakcc-fixed startupCheck), and the re-run was green. New advisory orphan
   `JSON` vs 2.1.169 is static-scan noise: `${JSON.stringify(…)}` JS template literals in
   `workflow-script-*` / `skill-design-sync-*` overrides (present in both fable-5 and
-  opus-4-8 sets) — backtick-delimiter class, relevant to #96. Mis-bind audit: 0.
+  opus-4-8 sets) — backtick-delimiter class, relevant to #96. Mis-bind audit: **executed**
+  (no longer SKIPPED) against the Piebald upstream dump `prompts-2.1.170.json` (346 prompts)
+  present on the box, vs lcc PR 6 head `07e75b9` × tf PR 7 head `e096008` →
+  `auditMisbindsPassed: true`, **0** across all three override surfaces (system-prompts-fable-5,
+  -opus-4-7, -opus-4-8; fable-5: 89 prompts compared, 277 placeholder→slot comparisons, all
+  at upstream slot). Closes the SKIPPED gap from the prior steps-1–2 record (#94/#95).
 
 - **2.1.169** (2026-06-10, local run; leaves: tweakcc-fixed@1304bda, lobotomized@411f5e6)
   — gate run with **overrides isolated** (`~/.tweakcc/system-prompts` → empty dir), the

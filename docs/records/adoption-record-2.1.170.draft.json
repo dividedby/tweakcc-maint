@@ -19,6 +19,7 @@
           "JSON"
         ],
         "bootVerifyPassed": true,
+        "auditMisbindsPassed": true,
         "misbinds": []
       },
       "restoreDrill": {
