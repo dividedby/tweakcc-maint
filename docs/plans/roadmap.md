@@ -54,23 +54,23 @@ authoritative for *how*; this list only orders. Two pickup modes:
 | Order | # | Mode | What unblocks it |
 | ----- | - | ---- | ---------------- |
 | 3 | #26 | CLOSED | **CLOSED — lcc#7 merged; inline-* remainder premise disproven (patcher positional-remaps inline blobs, all verified green, no fix needed).** |
-| — | #11 | ACTIVATED → spawned | **activated 2026-06-10 (interactive decision session): 6 design decisions settled → PRD #134 → slices #135–#138.** Parked-until-#102 fate reversed by maintainer. Tracking row; work now lives in the spawned slices |
+| — | #11 | ACTIVATED → spawned | **activated 2026-06-10 (interactive decision session): 6 design decisions settled → PRD #134 → slices #135–#139.** Parked-until-#102 fate reversed by maintainer. Net-new post-burn-down work (grew the backlog); tracked in the master census, not part of the burn-down's clear-the-backlog set. Work now lives in the spawned slices |
 | 5 | #94 | CLOSED | **CLOSED — skrabe merged tf#7 + lcc#6; merge-day gate green; 2.1.170 record finalized.** |
 | 6 | #8 | CLOSED | **CLOSED — skrabe merged tf#6 commit `7d9b30b`; landed his reviewed shape (helper units kept, golden snapshot dropped).** |
 | 7 | #43 | CLOSED | **CLOSED — producer relocated to control plane, #124 merged.** |
-| 8 | #102 | Interactive go → AFK | orders 1–7 closed or reduced to external waits — the finale |
+| 8 | #102 | Interactive go → AFK — **GATE SATISFIED** | orders 1–7 all CLOSED; entire pre-existing backlog cleared (only net-new #11→#134–139 tree + standing #99 remain open) — the finale is unblocked, maintainer schedules |
 | — | #99 | standing | Idea Inbox — exempt from burn-down by design |
-| — | #125 | DONE (PR open) | 4 dead exports made module-private — #102 P1 follow-on |
-| — | #126 | DONE (PR open) | registered tsx CLI entry points in `.fallowrc.json` — #102 P2 follow-on |
-| — | #127 | DONE (PR open) | DI port/seam false-positives suppressed (config `usedClassMembers` + dead-`breach` drop) — #102 P3 follow-on |
-| — | #128 | DONE (PR open) | committed health + dead-code baselines, wired `audit --health-baseline`/`--dead-code-baseline` into report CI — #102 P5 follow-on |
+| — | #125 | CLOSED (merged #130) | 4 dead exports made module-private — #102 P1 follow-on |
+| — | #126 | CLOSED (merged #131) | registered tsx CLI entry points in `.fallowrc.json` — #102 P2 follow-on |
+| — | #127 | CLOSED (merged #132) | DI port/seam false-positives suppressed (config `usedClassMembers` + dead-`breach` drop) — #102 P3 follow-on |
+| — | #128 | CLOSED (merged #133) | committed health + dead-code baselines, wired `audit --health-baseline`/`--dead-code-baseline` into report CI — #102 P5 follow-on |
 
 ## Master census (all issues)
 
 ### Open
 | # | Issue | Wave | Status | Owner | Skill(s) | Deps | Notes |
 | - | ----- | ---- | ------ | ----- | -------- | ---- | ----- |
-| 102 | Post-backlog: complete refactor plan from a fallow static-analysis pass | — | Blocked | human | `/improve-codebase-architecture` | — | **Burn-down order 8 — the finale (pickup protocol in issue comment).** Gated on the rest of the open backlog completing (issue body lists the gate set; several already closed — #93 #95 #96) — maintainer decides when the gate is satisfied and whether the whole-repo refactor is worth scheduling. When unblocked: fallow static JSON evidence → `/improve-codebase-architecture` (respecting ADR 0004 no-build + ADR 0007 defer verdicts) → plan only, split via `/to-issues` if accepted. Spawned from Idea Inbox #99. #103's CI baseline would make its evidence capture trivial (soft relation, not a dep) |
+| 102 | Post-backlog: complete refactor plan from a fallow static-analysis pass | — | Next | human | `/improve-codebase-architecture` | — | **Burn-down order 8 — the finale (pickup protocol in issue comment). GATE SATISFIED (reconcile 2026-06-10):** the entire pre-existing backlog is now closed — only the net-new #11→#134–139 tree and standing #99 remain open — so #102's gate ("rest of the open backlog completing") is met; flipped Blocked→Next. Maintainer still decides *whether/when* to schedule the whole-repo refactor. When picked up: fallow static JSON evidence → `/improve-codebase-architecture` (respecting ADR 0004 no-build + ADR 0007 defer verdicts) → plan only, split via `/to-issues` if accepted. Spawned from Idea Inbox #99. #103's CI baseline would make its evidence capture trivial (soft relation, not a dep) |
 | 11 | Roadmap: behavioral A/B benchmark (stock vs lobotomized) | — | Activated → tracking | mixed | `/to-prd` `/to-issues` | — | **ACTIVATED 2026-06-10 (interactive decision session).** Parked-until-#102 fate reversed by maintainer. 6 design decisions settled: full-design upfront · bench published as a package (`@dividedby/bench-core`) · two pinned installs (stock + lobotomized leaf) · 4 rubric axes (anti-sycophancy/anti-hedging/fewer-offers/terse-directness) · all-Claude 3-judge panel persona-varied (Opus: literalist/devil's-advocate/holistic), self-preference cancels since both arms are Claude · hybrid correctness guardrail. ADR 0002 unchanged. `/software-design` (2026-06-10) added module map + TDD-ready bodies → `docs/design/behavioral-ab-benchmark.md`; split #135 → #135 + **#139**. → **PRD #134**, slices **#135** (driver tracer, AFK) **#139** (aggregation, AFK ←#136) **#136** (bench refactor+publish, leaf/HITL) **#137** (rubric+fixtures, HITL ←#135) **#138** (real wiring, AFK ←#135 #136 #137 #139). Work now lives in the slices |
 | 134 | PRD: Behavioral A/B benchmark (stock vs lobotomized-CC) | — | PRD | agent | `/to-issues` | — | Codifies #11's 6 decisions. Split into slices #135–#139. Design plan: `docs/design/behavioral-ab-benchmark.md` |
 | 135 | Behavioral A/B: driver skeleton end-to-end on stub ports | — | Ready | agent | `/tdd` | — | **AFK tracer bullet.** ABDriver: `JudgePort`+`VariantRunner` seams, `StubJudge`+`FakeVariantRunner`, pairing/seeded-randomization/trivial-mean/guardrail → writes Adoption-record Behavioral A/B field. No bench dep, no live models. (z-score/variance split to #139) |
