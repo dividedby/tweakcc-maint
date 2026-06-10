@@ -67,5 +67,5 @@ Terms from CONTEXT.md this plan relies on (not redefined here):
 
 ## Open Questions
 
-- [ ] Public npm vs private GitHub Packages for the published bench package. (blocks #136)
+- [x] Public npm vs private GitHub Packages for the published bench package. **Resolved: public npm, scoped `@dividedby/bench-core`** — tweakcc-maint is public, a private dep would 401 outside contributors + force a CI auth secret; the package exports only generic plumbing (no fork fixtures/rubric/`results`), so public is hygiene-clean (ADR 0002). (#136)
 - [ ] Disagreement threshold + significance noise-floor values — concrete numbers. (refines #139; settle during implementation)
