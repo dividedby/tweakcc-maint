@@ -17,24 +17,25 @@ the merged leaf mains) lands.
 
 ## Run-context notes
 
-- **2.1.170 — DRAFT / PRE-STAGED** (2026-06-10, local run; leaves pinned at the **open
-  PR pair**: tweakcc-fixed PR 7 head `e096008`, lobotomized PR 6 head `07e75b9`, via
-  detached worktrees) — anticipation pre-stage (#94, backlog L2): green Four-zeros +
-  Boot-verify + clean Restore drill, **not** a Support-matrix add. Finalize by re-running
-  against the merged leaf mains (the `e335fb9` merge-time-regen lesson) and saving the
-  suffix-less record. Overrides isolated (same discipline as 2.1.169; the #26 offender
-  would red any full-override run). First run came back red on `driver-check`: the
-  driver's backup-vintage guard correctly refused while `native-binary.backup` still held
-  2.1.169 bytes against the live 2.1.170 install — the gate's own apply refreshed the
-  backup (tweakcc-fixed startupCheck), and the re-run was green. New advisory orphan
-  `JSON` vs 2.1.169 is static-scan noise: `${JSON.stringify(…)}` JS template literals in
-  `workflow-script-*` / `skill-design-sync-*` overrides (present in both fable-5 and
-  opus-4-8 sets) — backtick-delimiter class, relevant to #96. Mis-bind audit: **executed**
-  (no longer SKIPPED) against the Piebald upstream dump `prompts-2.1.170.json` (346 prompts)
-  present on the box, vs lcc PR 6 head `07e75b9` × tf PR 7 head `e096008` →
-  `auditMisbindsPassed: true`, **0** across all three override surfaces (system-prompts-fable-5,
-  -opus-4-7, -opus-4-8; fable-5: 89 prompts compared, 277 placeholder→slot comparisons, all
-  at upstream slot). Closes the SKIPPED gap from the prior steps-1–2 record (#94/#95).
+- **2.1.170 — FINALIZED / MATRIX MEMBER** (2026-06-10, merge-day re-run against the
+  **merged leaf mains**: tweakcc-fixed@`7d9b30b` × lobotomized@`f1db0de` — the merged
+  mains that carry tf PR #7 / lcc PR #6, via detached worktrees) — the suffix-less record
+  is now the 2.1.170 Support-matrix add (#94 step 3). Re-run vs the merged mains per the
+  `e335fb9` merge-time-regen lesson (do **not** reuse the pre-merge PR-head run): green
+  Four-zeros (`failedPatches` / `missingSystemPrompts` / `orphanVariables` / `misbinds`
+  all empty) + Boot-verify + executed `auditMisbindsPassed: true` + clean Restore drill
+  (byte-identical clean stock). Overrides isolated (same discipline as 2.1.169; the #26
+  offender would red any full-override run) — the gate's runtime writes landed in a
+  throwaway dir, the work clone untouched. Advisory orphan `JSON` vs 2.1.169 is static-scan
+  noise: `${JSON.stringify(…)}` JS template literals in `workflow-script-*` /
+  `skill-design-sync-*` overrides (present in both fable-5 and opus-4-8 sets) —
+  backtick-delimiter class, relevant to #96. Mis-bind audit: **executed** (not SKIPPED)
+  against the Piebald upstream dump `/tmp/pieb-2.1.170.json` (346 prompts) present on the
+  box, vs the merged mains' `prompts-2.1.170.json` × each override surface →
+  `auditMisbindsPassed: true`, **0** across all three surfaces (`system-prompts-fable-5`,
+  `-opus-4-7`, `-opus-4-8`; each: "mis-bind audit: 0 — every used placeholder sits at the
+  upstream slot"). The pre-merge PR-pair draft (tf PR 7 head `e096008` × lcc PR 6 head
+  `07e75b9`) it supersedes was identical green; this finalizes it against the merged mains.
 
 - **2.1.169** (2026-06-10, local run; leaves: tweakcc-fixed@1304bda, lobotomized@411f5e6)
   — gate run with **overrides isolated** (`~/.tweakcc/system-prompts` → empty dir), the
