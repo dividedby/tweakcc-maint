@@ -43,7 +43,9 @@ jobs:
       - name: fallow audit (report-only)
         run: |
           mkdir -p fallow-report
-          pnpm dlx fallow@2 audit --format json > fallow-report/audit.json || true
+          # --base explicit: the Actions checkout is a detached merge commit,
+          # so fallow can't auto-detect the comparison branch there.
+          pnpm dlx fallow@2 audit --base origin/main --format json > fallow-report/audit.json || true
           echo "--- audit.json ---"
           cat fallow-report/audit.json || true
 
