@@ -112,11 +112,6 @@ export class FakeAdoptionEnvironment implements AdoptionEnvironment {
     return this.override(ccVersion).cleanStock ?? true;
   }
 
-  /** Convenience: an env whose single version yields exactly one breach kind. */
-  static breach(ccVersion: string, kind: BreachKind): FakeAdoptionEnvironment {
-    return new FakeAdoptionEnvironment({ [ccVersion]: withBreach(kind) });
-  }
-
   /**
    * Canned {@link CapturedSignals} carrying exactly one breach kind — for composing
    * per-version outcomes in a multi-version matrix, e.g.
