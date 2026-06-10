@@ -18,6 +18,16 @@ import sys
 import time
 
 # --- config (edit per repo) -------------------------------------------------
+# Two-repo census (ADR 0009): one census in tweakcc-maint tracks issues from BOTH
+# `dividedby/tweakcc-maint` (rows written as a bare integer) and `dividedby/bench`
+# (rows written `bench#NN`). Rows and gh state are keyed by a composite (repo,
+# number) identity, so a `bench#NN` row matches its bench issue rather than reading
+# as "unfiled". `bench` has no roadmap/inbox/mirror of its own.
+HOME_REPO = "dividedby/tweakcc-maint"   # bare-integer rows resolve here
+REPOS = ("dividedby/tweakcc-maint", "dividedby/bench")
+# A census issue cell prefixed with one of these short tags binds the row to the
+# matching repo; an unprefixed bare integer binds to HOME_REPO. (short-tag -> repo)
+REPO_TAGS = {"bench": "dividedby/bench"}
 ROADMAP = "docs/plans/roadmap.md"
 STAMP = ".git/roadmap-drift-nudge.stamp"  # never committed (lives under .git/).
 # If .git/ must stay pristine, repoint STAMP outside the repo — e.g. a temp path
@@ -36,11 +46,14 @@ DONE_TOKEN = "done"  # substring in the status cell that means closed/done; matc
 # Header cells the auto-deriver matches (lowercased, exact) to find each column.
 ISSUE_HEADERS = ("#", "issue")
 STATUS_HEADERS = ("status",)
-# Issue numbers tracked by an aggregate/epic row (e.g. `| K3 | … filed #298–#304 |`)
-# rather than one bare-integer row each. The parser can't see aggregate coverage,
-# so without this list those children read as "unfiled" on every session forever.
-# Curate this when you create an aggregate row (see the runbook note).
-AGGREGATE_COVERED: set[int] = set()
+# Issues tracked by an aggregate/epic row (e.g. `| K3 | … filed #298–#304 |`)
+# rather than one row each. The parser can't see aggregate coverage, so without
+# this set those children read as "unfiled" on every session forever. Curate it
+# when you create an aggregate row (see the runbook note). Keyed by the same
+# composite identity as the census — `(HOME_REPO, NN)` for a tweakcc-maint child,
+# `("dividedby/bench", NN)` for a bench child. Also absorbs the pinned 🗺️ Roadmap
+# mirror issue (machine-owned render target, ADR 0020 — never a census row).
+AGGREGATE_COVERED: set[tuple[str, int]] = {(HOME_REPO, 159)}
 # ---------------------------------------------------------------------------
 
 
@@ -92,40 +105,59 @@ def resolve_cols(text: str) -> tuple[int, int] | None:
     return issue_col, status_col
 
 
-def parse_census(text: str) -> dict[int, str]:
-    """Map issue number -> normalized status from the census table. Pure; column
-    indices are resolved from the header (see resolve_cols), then a row counts
-    only when its issue cell is an integer (skips header and `| --- |` separator
-    rows automatically)."""
+def _parse_issue_cell(cell: str) -> tuple[str, int] | None:
+    """Parse a census issue cell into a composite (repo, number) identity, or None
+    if it is not an issue cell (header / separator / prose). A bare integer binds
+    to HOME_REPO; a `<tag>#NN` cell (e.g. `bench#7`) binds to REPO_TAGS[tag]. A
+    leading `#` on a bare number is tolerated (`#148`)."""
+    raw = cell.strip()
+    if "#" in raw and not raw.startswith("#"):
+        tag, _, rest = raw.partition("#")
+        tag = tag.strip().lower()
+        rest = rest.strip()
+        if tag in REPO_TAGS and rest.isdigit():
+            return REPO_TAGS[tag], int(rest)
+        return None
+    num = raw.lstrip("#").strip()
+    if num.isdigit():
+        return HOME_REPO, int(num)
+    return None
+
+
+def parse_census(text: str) -> dict[tuple[str, int], str]:
+    """Map (repo, number) -> normalized status from the census table. Pure; column
+    indices are resolved from the header (see resolve_cols), then a row counts only
+    when its issue cell parses as a repo-qualified or bare issue id (skips header
+    and `| --- |` separator rows automatically)."""
     cols = resolve_cols(text)
     if cols is None:
         return {}
     issue_col, status_col = cols
-    rows: dict[int, str] = {}
+    rows: dict[tuple[str, int], str] = {}
     for line in text.splitlines():
         if not line.lstrip().startswith("|"):
             continue
         cells = _split_row(line)
         if len(cells) <= max(issue_col, status_col):
             continue
-        num_cell = cells[issue_col].lstrip("#").strip()
-        if not num_cell.isdigit():
+        key = _parse_issue_cell(cells[issue_col])
+        if key is None:
             continue
         status = cells[status_col].replace("*", "").replace("`", "").strip().lower()
-        rows[int(num_cell)] = status
+        rows[key] = status
     return rows
 
 
-def compute_drift(rows: dict[int, str], states: dict[int, str]):
-    """Pure. Returns (stale_closed, unfiled_open):
+def compute_drift(rows: dict[tuple[str, int], str], states: dict[tuple[str, int], str]):
+    """Pure. Returns (stale_closed, unfiled_open) as lists of (repo, number):
     - stale_closed: issues closed on GitHub but not yet Done in the census.
     - unfiled_open: issues open on GitHub with no census row."""
     done = DONE_TOKEN.lower()  # status is already lowercased; emoji pass through unchanged
-    stale_closed = sorted(n for n, st in rows.items()
-                          if states.get(n) == "closed" and done not in st)
-    unfiled_open = sorted(n for n, st in states.items()
-                          if st == "open" and n not in rows
-                          and n not in AGGREGATE_COVERED)
+    stale_closed = sorted(k for k, st in rows.items()
+                          if states.get(k) == "closed" and done not in st)
+    unfiled_open = sorted(k for k, st in states.items()
+                          if st == "open" and k not in rows
+                          and k not in AGGREGATE_COVERED)
     return stale_closed, unfiled_open
 
 
@@ -144,15 +176,34 @@ def _stamp() -> None:
         pass
 
 
+def _label(key: tuple[str, int]) -> str:
+    """Render a composite identity for the nudge message: `#NN` for HOME_REPO,
+    `<tag>#NN` for a tracked sibling repo (e.g. `bench#7`)."""
+    repo, num = key
+    if repo == HOME_REPO:
+        return f"#{num}"
+    for tag, r in REPO_TAGS.items():
+        if r == repo:
+            return f"{tag}#{num}"
+    return f"{repo}#{num}"
+
+
 def _issue_states():
-    try:
-        out = subprocess.check_output(
-            ["gh", "issue", "list", "--state", "all", "--limit", "400",
-             "--json", "number,state"],
-            text=True, stderr=subprocess.DEVNULL, timeout=GH_TIMEOUT)
-        return {it["number"]: it["state"].lower() for it in json.loads(out)}
-    except Exception:
-        return None
+    """Composite (repo, number) -> state across all REPOS (ADR 0009). Fails open:
+    if ANY repo's `gh` call errors (offline / no gh / not found), returns None so
+    the caller skips the nudge rather than mis-reporting a partial-state drift."""
+    states: dict[tuple[str, int], str] = {}
+    for repo in REPOS:
+        try:
+            out = subprocess.check_output(
+                ["gh", "issue", "list", "-R", repo, "--state", "all",
+                 "--limit", "400", "--json", "number,state"],
+                text=True, stderr=subprocess.DEVNULL, timeout=GH_TIMEOUT)
+        except Exception:
+            return None
+        for it in json.loads(out):
+            states[(repo, it["number"])] = it["state"].lower()
+    return states
 
 
 def main() -> int:
@@ -177,10 +228,10 @@ def main() -> int:
     parts = []
     if stale_closed:
         parts.append(f"{len(stale_closed)} closed issue(s) still non-Done in the census "
-                     f"(#{', #'.join(map(str, stale_closed))})")
+                     f"({', '.join(_label(k) for k in stale_closed)})")
     if unfiled_open:
         parts.append(f"{len(unfiled_open)} open issue(s) with no census row "
-                     f"(#{', #'.join(map(str, unfiled_open))}) — some may be aggregate-covered")
+                     f"({', '.join(_label(k) for k in unfiled_open)}) — some may be aggregate-covered")
     msg = ("Roadmap drift: " + ROADMAP + " may be stale vs `gh` issue state — "
            + "; ".join(parts) + ". Run `/doc-regen` to reconcile (it edits the "
            "working tree for review and writes additive issue comments; it never commits).")
