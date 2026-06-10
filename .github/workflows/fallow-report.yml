@@ -5,6 +5,12 @@
 # fail the build at this stage: graduating to a gating check is a separate
 # future decision (see issue #103 / #102). Every fallow step is `|| true`.
 #
+# The audit step consumes COMMITTED baselines (#128, fallow P5) so it reports
+# introduced-vs-inherited deltas instead of the steady-state grade:
+#   fallow-baselines/health-baseline.json    (from `health --save-baseline`)
+#   fallow-baselines/dead-code-baseline.json (from `dead-code --save-baseline`)
+# Regenerate after an intentional cleanup so the baseline tracks the new floor.
+#
 # Plain package-runner invocation — no headless Claude, so the cost-ledger
 # requirement does not apply. The issue brief says `npx fallow`, but this
 # repo's devEngines pins pnpm (npx refuses to run in-tree), so `pnpm dlx`
@@ -45,7 +51,12 @@ jobs:
           mkdir -p fallow-report
           # --base explicit: the Actions checkout is a detached merge commit,
           # so fallow can't auto-detect the comparison branch there.
-          pnpm dlx fallow@2 audit --base origin/main --format json > fallow-report/audit.json || true
+          # --health-baseline / --dead-code-baseline: attribute findings as
+          # introduced-vs-inherited against the committed baselines (#128).
+          pnpm dlx fallow@2 audit --base origin/main \
+            --health-baseline fallow-baselines/health-baseline.json \
+            --dead-code-baseline fallow-baselines/dead-code-baseline.json \
+            --format json > fallow-report/audit.json || true
           echo "--- audit.json ---"
           cat fallow-report/audit.json || true
 
@@ -79,6 +90,18 @@ jobs:
             echo
             if jq -e .verdict fallow-report/audit.json > /dev/null 2>&1; then
               jq -r '"**Audit (changed files vs \(.base_ref)):** verdict \(.verdict) — dead code \(.summary.dead_code_issues), complexity \(.summary.complexity_findings), clone groups \(.summary.duplication_clone_groups)"' fallow-report/audit.json
+              echo
+              # introduced-vs-inherited delta vs the committed baselines (#128)
+              if jq -e '.summary.dead_code_introduced' fallow-report/audit.json > /dev/null 2>&1; then
+                echo "_Delta vs committed baseline (introduced / inherited):_"
+                echo
+                echo "| category | introduced | inherited |"
+                echo "| --- | --- | --- |"
+                jq -r '.summary |
+                  "| dead code | \(.dead_code_introduced) | \(.dead_code_inherited) |",
+                  "| complexity | \(.complexity_introduced) | \(.complexity_inherited) |",
+                  "| duplication | \(.duplication_introduced) | \(.duplication_inherited) |"' fallow-report/audit.json
+              fi
             else
               echo "_audit.json missing or unparsable — see job log._"
             fi
