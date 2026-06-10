@@ -129,8 +129,7 @@ export function evaluate(signals: CapturedSignals): FourZerosResult {
   // The mis-bind audit (skrabe's fourth zero, #80): a hard input only when it ran and
   // did not SKIP itself; like Boot-verify it must positively assert cleanliness.
   const auditMisbindsPassed = parseAuditMisbinds(signals.auditMisbinds);
-  const misbinds =
-    signals.auditMisbinds === undefined ? [] : dedup(captureAll(signals.auditMisbinds, MISBIND_LINE));
+  const misbinds = signals.auditMisbinds === undefined ? [] : extractMisbinds(signals.auditMisbinds);
 
   const pass =
     failedPatches.length === 0 &&
@@ -156,11 +155,19 @@ export function evaluate(signals: CapturedSignals): FourZerosResult {
  * `undefined` = not a hard input (signal absent, or every audit SKIPPED itself); else
  * clean? The signal may join several per-override-dir audit runs, so failure wins over
  * a clean assertion from another dir, which wins over SKIPPED.
+ *
+ * Exported so the cross-leaf pairing-coherence check (#95) reuses THE parser for skrabe's
+ * audit vocabulary rather than growing a second one (ADR 0007 §4 — his tool, one reading).
  */
-function parseAuditMisbinds(raw: string | undefined): boolean | undefined {
+export function parseAuditMisbinds(raw: string | undefined): boolean | undefined {
   if (raw === undefined) return undefined;
   if (MISBINDS_FOUND.test(raw)) return false;
   if (AUDIT_CLEAN.test(raw)) return true;
   if (AUDIT_SKIPPED.test(raw)) return undefined;
   return false;
+}
+
+/** The audit's per-finding lines, deduped — shared with the pairing-coherence check (#95). */
+export function extractMisbinds(raw: string): string[] {
+  return dedup(captureAll(raw, MISBIND_LINE));
 }

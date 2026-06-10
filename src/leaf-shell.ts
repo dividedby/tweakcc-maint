@@ -29,13 +29,17 @@ export interface ShellResult {
  * is written to the child's stdin (used to pass the boot-verify prompt headlessly, since
  * `claude`'s `--allowedTools` is variadic and would swallow a trailing positional prompt).
  */
+// spawnSync's default maxBuffer (1 MiB) silently truncates and kills the child; the
+// pairing-coherence check reads multi-megabyte prompts JSONs via `git show` (#95).
+const MAX_CAPTURE = 64 * 1024 * 1024;
+
 export function runSync(
   command: string,
   args: string[],
   env: NodeJS.ProcessEnv = process.env,
   input?: string,
 ): ShellResult {
-  const r = spawnSync(command, args, { encoding: 'utf8', env, input });
+  const r = spawnSync(command, args, { encoding: 'utf8', env, input, maxBuffer: MAX_CAPTURE });
   return {
     status: r.status,
     stdout: r.stdout ?? '',
