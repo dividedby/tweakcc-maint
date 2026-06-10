@@ -46,14 +46,14 @@ jobs:
           fi
 
       - name: Checkout tweakcc-maint
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
         with:
           version: 11.5.2  # exact pin; satisfies devEngines.packageManager (pnpm ^11.5.2)
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
           cache: pnpm
@@ -78,7 +78,7 @@ jobs:
       # --- Pinned Claude Code binary (CI owns install + cache; ADR 0006) ---
       - name: Cache Claude Code ${{ inputs.cc_version }}
         id: cc-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.local/bin/claude
@@ -130,7 +130,7 @@ jobs:
 
       - name: Upload Adoption record + agent stream (PR evidence)
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: adoption-record-${{ inputs.cc_version }}
           path: |
