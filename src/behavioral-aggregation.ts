@@ -93,8 +93,6 @@ export interface BehavioralAggregationVerdict {
   axes: Record<BehavioralAxis, AxisVerdict>;
 }
 
-const VARIANTS: readonly AggVariant[] = ['stock', 'lobotomized'];
-
 function blindId(variant: AggVariant, fixtureId: string): string {
   return `${variant}::${fixtureId}`;
 }

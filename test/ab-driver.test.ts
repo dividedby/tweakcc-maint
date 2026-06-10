@@ -5,6 +5,9 @@ import { StubJudge } from '../src/stub-judge.js';
 import { FakeVariantRunner } from '../src/fake-variant-runner.js';
 import { SeededRng } from '../src/seeded-rng.js';
 import type { AdoptionRecord } from '../src/integration-gate.js';
+import { panelOf, JUDGE_PERSONAS } from '../src/judge-panel-port.js';
+import type { JudgePanelPort } from '../src/judge-panel-port.js';
+import type { PresentedOutput } from '../src/judge-port.js';
 
 /** A fixture whose stock/lobotomized outputs and correctness both pass by default. */
 function fixture(id: string): BaitFixture {
@@ -31,7 +34,7 @@ describe('ABDriver.runBenchmark', () => {
     const verdict = await runBenchmark({
       fixtures,
       runner: runnerFor(fixtures),
-      judge,
+      judge: panelOf(judge),
       correctnessCheck: allPass,
       rng: new SeededRng(1),
     });
@@ -48,10 +51,10 @@ describe('ABDriver.runBenchmark', () => {
     const fixtures = [fixture('f1'), fixture('f2'), fixture('f3'), fixture('f4'), fixture('f5')];
 
     const judgeA = new StubJudge();
-    await runBenchmark({ fixtures, runner: runnerFor(fixtures), judge: judgeA, correctnessCheck: allPass, rng: new SeededRng(42) });
+    await runBenchmark({ fixtures, runner: runnerFor(fixtures), judge: panelOf(judgeA), correctnessCheck: allPass, rng: new SeededRng(42) });
 
     const judgeB = new StubJudge();
-    await runBenchmark({ fixtures, runner: runnerFor(fixtures), judge: judgeB, correctnessCheck: allPass, rng: new SeededRng(42) });
+    await runBenchmark({ fixtures, runner: runnerFor(fixtures), judge: panelOf(judgeB), correctnessCheck: allPass, rng: new SeededRng(42) });
 
     const firstOutputs = (j: StubJudge) => j.captured.map((c) => c.outputs[0]);
     // Reproducible: same seed → identical presentation order across runs.
@@ -64,7 +67,7 @@ describe('ABDriver.runBenchmark', () => {
 
     // A different seed produces a different order (not a constant).
     const judgeC = new StubJudge();
-    await runBenchmark({ fixtures, runner: runnerFor(fixtures), judge: judgeC, correctnessCheck: allPass, rng: new SeededRng(7) });
+    await runBenchmark({ fixtures, runner: runnerFor(fixtures), judge: panelOf(judgeC), correctnessCheck: allPass, rng: new SeededRng(7) });
     expect(firstOutputs(judgeC)).not.toEqual(firstOutputs(judgeA));
   });
 
@@ -81,7 +84,7 @@ describe('ABDriver.runBenchmark', () => {
     const verdict = await runBenchmark({
       fixtures,
       runner: runnerFor(fixtures),
-      judge,
+      judge: panelOf(judge),
       correctnessCheck: allPass,
       rng: new SeededRng(1),
     });
@@ -115,7 +118,7 @@ describe('ABDriver.runBenchmark', () => {
     const verdict = await runBenchmark({
       fixtures,
       runner: runnerFor(fixtures),
-      judge,
+      judge: panelOf(judge),
       correctnessCheck,
       rng: new SeededRng(1),
     });
@@ -133,7 +136,7 @@ describe('ABDriver.runBenchmark', () => {
     const verdict = await runBenchmark({
       fixtures,
       runner: runnerFor(fixtures),
-      judge,
+      judge: panelOf(judge),
       correctnessCheck,
       rng: new SeededRng(1),
     });
@@ -150,7 +153,7 @@ describe('ABDriver.runBenchmark', () => {
     const verdict = await runBenchmark({
       fixtures,
       runner: runnerFor(fixtures),
-      judge,
+      judge: panelOf(judge),
       correctnessCheck,
       rng: new SeededRng(1),
     });
@@ -166,7 +169,7 @@ describe('ABDriver.runBenchmark', () => {
     const verdict = await runBenchmark({
       fixtures,
       runner: runnerFor(fixtures),
-      judge,
+      judge: panelOf(judge),
       correctnessCheck: allPass,
       rng: new SeededRng(1),
     });
@@ -179,7 +182,7 @@ describe('ABDriver.runBenchmark', () => {
     const verdict = await runBenchmark({
       fixtures: [],
       runner: new FakeVariantRunner(),
-      judge,
+      judge: panelOf(judge),
       correctnessCheck: allPass,
       rng: new SeededRng(1),
     });
@@ -189,5 +192,37 @@ describe('ABDriver.runBenchmark', () => {
     // Aggregation is present and inert on an empty run (no significant/disagreement).
     expect(verdict.aggregation.axes['anti-sycophancy'].significant).toBe(false);
     expect(verdict.aggregation.axes['anti-sycophancy'].disagreement).toBe(false);
+  });
+
+  it('feeds a 3-persona panel to aggregation as distinct judges → judges>1 + disagreement', async () => {
+    // Three StubJudges, one per persona. Across enough fixtures, persona C ranks the lobo
+    // arm in the OPPOSITE order to A/B, so the lobo cells' judge rank-gap clears the
+    // disagreement threshold — only possible because the panel feeds 3 distinct judges.
+    const personas = JUDGE_PERSONAS.map(() => new StubJudge());
+    const [pa, pb, pc] = personas as [StubJudge, StubJudge, StubJudge];
+    const fixtures = [fixture('f1'), fixture('f2'), fixture('f3'), fixture('f4'), fixture('f5')];
+    fixtures.forEach((f, i) => {
+      // A/B: lobo score rises with i; C: lobo score falls with i → inverted ranking.
+      for (const j of [pa, pb]) j.setScores(`${f.id}:lobo`, { 'anti-hedging': i });
+      pc.setScores(`${f.id}:lobo`, { 'anti-hedging': 4 - i });
+    });
+
+    const panel: JudgePanelPort = {
+      async scorePanel(fixtureId, first: PresentedOutput, second: PresentedOutput) {
+        return Promise.all(personas.map((j) => j.score(fixtureId, first, second)));
+      },
+    };
+
+    const verdict = await runBenchmark({
+      fixtures,
+      runner: runnerFor(fixtures),
+      judge: panel,
+      correctnessCheck: allPass,
+      rng: new SeededRng(1),
+    });
+
+    // Each persona scored every fixture → three judges per cell drove aggregation.
+    for (const j of personas) expect(j.captured).toHaveLength(5);
+    expect(verdict.aggregation.axes['anti-hedging'].disagreement).toBe(true);
   });
 });

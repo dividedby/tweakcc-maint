@@ -14,21 +14,21 @@
  * SCOPE: the driver collects each pairing's per-axis scores and folds them through
  * {@link aggregate} (#139, BehavioralAggregation) for the normalized per-axis verdict
  * (z-score normalize + disagreement + variance/significance via bench primitives). The
- * raw trivial per-axis mean (#135) is retained alongside as a cheap raw summary. Real
- * adapters / live wiring (incl. the multi-persona Judge panel) are #138 — until then a
- * single JudgePort feeds aggregation as one judge, so its z-score is degenerate.
+ * raw trivial per-axis mean (#135) is retained alongside as a cheap raw summary. The
+ * Judge sits behind {@link JudgePanelPort} (#138): each fixture is scored by EVERY panel
+ * persona, so aggregation sees `judges>1` per cell — real disagreement/variance, not a
+ * degenerate single-judge z.
  */
 
 import { BEHAVIORAL_AXES } from './judge-port.js';
-import type { AxisScores, BehavioralAxis, JudgePort, PresentedOutput } from './judge-port.js';
+import type { AxisScores, BehavioralAxis, PresentedOutput } from './judge-port.js';
+import type { JudgePanelPort } from './judge-panel-port.js';
+import { JUDGE_PERSONAS } from './judge-panel-port.js';
 import type { Variant, VariantRunner } from './variant-runner.js';
 import type { Rng } from './seeded-rng.js';
 import type { AdoptionRecord } from './integration-gate.js';
 import { aggregate } from './behavioral-aggregation.js';
 import type { BehavioralAggregationVerdict, MultiJudgeScore } from './behavioral-aggregation.js';
-
-/** The single JudgePort's identity when fed to multi-judge aggregation (one persona until #138). */
-const SINGLE_JUDGE = 'panel';
 
 /** A Behavior-bait fixture: an id plus the prompt fed identically to both arms. */
 export interface BaitFixture {
@@ -38,10 +38,10 @@ export interface BaitFixture {
 
 /**
  * Decide pass/fail for one arm's output on one fixture (CONTEXT.md → "Correctness
- * guardrail"). Deterministic in this tracer bullet; #138 adds a judge fallback for
- * open-ended fixtures.
+ * guardrail"). May be async: the #138 open-ended fallback routes to a correctness judge
+ * (a model call), while deterministic fixtures and test stubs stay synchronous.
  */
-export type CorrectnessCheck = (fixtureId: string, output: string) => boolean;
+export type CorrectnessCheck = (fixtureId: string, output: string) => boolean | Promise<boolean>;
 
 /** The Correctness guardrail's outcome — the benchmark records it, never raises it. */
 export type GuardrailOutcome = 'passed' | 'failed';
@@ -71,7 +71,7 @@ export interface BehavioralVerdict {
 export interface BenchmarkRun {
   fixtures: readonly BaitFixture[];
   runner: VariantRunner;
-  judge: JudgePort;
+  judge: JudgePanelPort;
   correctnessCheck: CorrectnessCheck;
   rng: Rng;
 }
@@ -105,6 +105,8 @@ export async function runBenchmark(run: BenchmarkRun): Promise<BehavioralVerdict
   // Raw per-arm, per-fixture scores collected for the normalized aggregation (#139).
   const judgeScores: MultiJudgeScore[] = [];
   const guardrailRegressions: string[] = [];
+  // Per-arm count of (fixture × persona) scores folded into the trivial mean.
+  let personaScoreCount = 0;
 
   for (const fixture of fixtures) {
     const outputs = {} as Record<Variant, string>;
@@ -114,8 +116,8 @@ export async function runBenchmark(run: BenchmarkRun): Promise<BehavioralVerdict
     }
 
     // Correctness guardrail: a regression is lobotomized failing where stock passed.
-    const stockPassed = correctnessCheck(fixture.id, outputs.stock);
-    const lobotomizedPassed = correctnessCheck(fixture.id, outputs.lobotomized);
+    const stockPassed = await correctnessCheck(fixture.id, outputs.stock);
+    const lobotomizedPassed = await correctnessCheck(fixture.id, outputs.lobotomized);
     if (stockPassed && !lobotomizedPassed) guardrailRegressions.push(fixture.id);
 
     // Present the pairing blind and order-randomized (kills position bias).
@@ -128,24 +130,35 @@ export async function runBenchmark(run: BenchmarkRun): Promise<BehavioralVerdict
       ? [stockPresented, lobotomizedPresented]
       : [lobotomizedPresented, stockPresented];
 
-    const scores = await judge.score(fixture.id, first, second);
-    const stockScores = scores[stockSlot];
-    const lobotomizedScores = scores[lobotomizedSlot];
-    for (const axis of BEHAVIORAL_AXES) {
-      totals.stock[axis] += stockScores[axis];
-      totals.lobotomized[axis] += lobotomizedScores[axis];
-    }
-    judgeScores.push(
-      { fixtureId: fixture.id, variant: 'stock', judge: SINGLE_JUDGE, axisScores: stockScores },
-      { fixtureId: fixture.id, variant: 'lobotomized', judge: SINGLE_JUDGE, axisScores: lobotomizedScores },
-    );
+    // The whole panel scores this pairing; each persona is a distinct judge in aggregation.
+    const panel = await judge.scorePanel(fixture.id, first, second);
+    panel.forEach((scores, i) => {
+      // Label each persona by its panel-order slot; a 1-element panel (panelOf) is persona 0.
+      const persona = JUDGE_PERSONAS[i] ?? `persona-${i}`;
+      const stockScores = scores[stockSlot];
+      const lobotomizedScores = scores[lobotomizedSlot];
+      for (const axis of BEHAVIORAL_AXES) {
+        totals.stock[axis] += stockScores[axis];
+        totals.lobotomized[axis] += lobotomizedScores[axis];
+      }
+      judgeScores.push(
+        { fixtureId: fixture.id, variant: 'stock', judge: persona, axisScores: stockScores },
+        { fixtureId: fixture.id, variant: 'lobotomized', judge: persona, axisScores: lobotomizedScores },
+      );
+      personaScoreCount += 1;
+    });
   }
 
   const n = fixtures.length;
   const axisMeans = emptyAxisMeans();
-  if (n > 0) {
+  // Trivial mean is per arm across every (fixture × persona) score, so a 3-persona panel
+  // and a 1-persona panel both yield a per-axis mean on the same 0–4 scale.
+  if (personaScoreCount > 0) {
     for (const axis of BEHAVIORAL_AXES) {
-      axisMeans[axis] = { stock: totals.stock[axis] / n, lobotomized: totals.lobotomized[axis] / n };
+      axisMeans[axis] = {
+        stock: totals.stock[axis] / personaScoreCount,
+        lobotomized: totals.lobotomized[axis] / personaScoreCount,
+      };
     }
   }
 
