@@ -45,7 +45,9 @@ export interface RealAdoptionEnvironmentConfig {
 }
 
 const DEFAULT_PROMPT = 'Reply with exactly the word: ok';
-const DEFAULT_MODEL = 'haiku';
+// Deliberate pin: keep boot-verify on the cheap haiku tier intentionally, but pin the exact
+// snapshot rather than ride the floating `haiku` alias (verified current as of CC 2.1.170).
+const DEFAULT_MODEL = 'claude-haiku-4-5-20251001';
 // `2.1.168 (Claude Code)` → `2.1.168`.
 const SEMVER = /(\d+\.\d+\.\d+)/;
 // tweakcc-fixed's backup filenames under its config dir (src/config.ts: CLIJS_BACKUP_FILE /
