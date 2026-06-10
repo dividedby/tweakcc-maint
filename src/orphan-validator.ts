@@ -155,7 +155,7 @@ export function formatValidatorOutput(
 // ── fs / JSON wrappers (HITL-exercised) ──────────────────────────────────────────────
 
 /** Read every `*.md` override under the given directories (non-recursive). */
-export function readOverrideFiles(dirs: string[]): OverrideFile[] {
+function readOverrideFiles(dirs: string[]): OverrideFile[] {
   const files: OverrideFile[] = [];
   for (const dir of dirs) {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -216,7 +216,8 @@ export function resolveStringsFilePath(tweakccFixedDir: string, version: string)
 }
 
 /** Load the per-prompt legal-variable map from a `prompts-<version>.json` on disk. */
-export function loadLegalMap(stringsFilePath: string): Map<string, Set<string>> {
+// Module-private: the legal-map seam consumers use is buildLegalMap; this is its fs/JSON wrapper (#125).
+function loadLegalMap(stringsFilePath: string): Map<string, Set<string>> {
   return buildLegalMap(JSON.parse(readFileSync(stringsFilePath, 'utf8')) as StringsFile);
 }
 

@@ -33,7 +33,9 @@ import { runSync, combinedOutput } from './leaf-shell.js';
 import { runOrphanReport } from './orphan-report-producer.js';
 
 /** Where skrabe publishes the driver inside a tweakcc-fixed checkout. */
-export function driverPath(tweakccFixedDir: string): string {
+// Module-private: the Driver seam other modules consume is the shell-out
+// (driverPresent/runDriverVerification), not this path helper (#125).
+function driverPath(tweakccFixedDir: string): string {
   return join(tweakccFixedDir, 'skills', 'showtime', 'driver.mjs');
 }
 
