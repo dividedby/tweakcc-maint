@@ -11,13 +11,15 @@
  * record to a process exit code via {@link recordToExitCode}.
  *
  * Each version's flow is bracketed by the Restore drill (CONTEXT.md → "Restore drill"):
- * backup-exists → apply → Four-zeros → restore → verify-clean. The Behavioral A/B
- * field is absent until slice 5.
+ * backup-exists → apply → Four-zeros → restore → verify-clean. The optional Behavioral
+ * A/B field is the value-proving track's evidence (CONTEXT.md → "Behavioral A/B
+ * benchmark"); the ABDriver writes it, the gate never reads it (it is evidence, not a gate).
  */
 
 import { evaluate } from './four-zeros-verdict.js';
 import type { FourZerosResult } from './four-zeros-verdict.js';
 import type { AdoptionEnvironment } from './adoption-environment.js';
+import type { BehavioralVerdict } from './ab-driver.js';
 
 /**
  * Why a version's Restore drill landed where it did. Exactly one terminal status per
@@ -60,8 +62,8 @@ export interface VersionResult {
  * The structured artifact the gate emits per run (CONTEXT.md → "Adoption record").
  * It covers the whole Support matrix: a per-version Four-zeros result and Restore-drill
  * result, plus a run-level pass that is true iff EVERY version passed BOTH bars.
- * Machine-readable so slice-6 reporting can aggregate it. The Behavioral A/B field is
- * deferred (slice 5) and intentionally absent.
+ * Machine-readable so slice-6 reporting can aggregate it. The optional Behavioral A/B
+ * field carries the value-proving track's verdict when it ran (evidence, not a gate).
  */
 export interface AdoptionRecord {
   /** True iff every Support-matrix version passed both its Four-zeros bar and Restore drill. */
@@ -70,6 +72,12 @@ export interface AdoptionRecord {
   versions: VersionResult[];
   /** ISO-8601 timestamp of the run. */
   date: string;
+  /**
+   * The Behavioral A/B verdict, when the value-proving track ran for this adoption
+   * (CONTEXT.md → "Behavioral A/B benchmark"). Evidence, never a gate input: absent
+   * when no benchmark ran, and never folded into {@link AdoptionRecord.pass}.
+   */
+  behavioralAB?: BehavioralVerdict;
 }
 
 /**
