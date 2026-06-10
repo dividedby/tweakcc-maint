@@ -104,7 +104,7 @@ describe('ABDriver.runBenchmark', () => {
     const fixtures = [fixture('f1'), fixture('f2')];
     const judge = new StubJudge();
     // Correctness: stock passes everything; lobotomized fails fixture f2.
-    const correctnessCheck = (fixtureId: string, output: string) => !(output === 'f2:lobo');
+    const correctnessCheck = (_fixtureId: string, output: string) => !(output === 'f2:lobo');
 
     const verdict = await runBenchmark({
       fixtures,
@@ -139,7 +139,7 @@ describe('ABDriver.runBenchmark', () => {
   it('returns a verdict and never throws as a gate, even on a failing arm (AC5)', async () => {
     const fixtures = [fixture('f1')];
     const judge = new StubJudge();
-    const correctnessCheck = (fixtureId: string, output: string) => !(output === 'f1:lobo');
+    const correctnessCheck = (_fixtureId: string, output: string) => !(output === 'f1:lobo');
 
     const verdict = await runBenchmark({
       fixtures,
