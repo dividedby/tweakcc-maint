@@ -105,10 +105,14 @@ jobs:
           # access` and nothing is ranked by EOL.
           # --output-format stream-json --verbose so the final result event
           # (total_cost_usd) lands before claude exits — cost captured even on
-          # failure. --model pinned sonnet for deterministic cost.
+          # failure. --model pinned to the exact model ID (skills#180) — a floating
+          # alias would silently inherit the next release into this unattended
+          # loop — and --max-budget-usd is the per-run spend backstop (skills#181):
+          # ~2.5-3x the observed max from the cross-repo cost ledger.
           claude -p \
             --output-format stream-json --verbose \
-            --model sonnet \
+            --model claude-sonnet-4-6 \
+            --max-budget-usd 3.00 \
             --permission-mode acceptEdits \
             --allowedTools "Bash(gh issue list:*) Bash(gh issue view:*) Bash(gh search:*) Bash(gh api:*) Bash(git:*) Bash(python3:*) Read Grep Glob WebSearch WebFetch" \
             --append-system-prompt "$(sed "s#@SKILL_DIR@#$SKILL_DIR#g" "$HARNESS/prompts/staleness-audit.md")" \

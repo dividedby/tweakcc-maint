@@ -135,9 +135,14 @@ jobs:
           # Consumer. SKILLS_TRACKER_TOKEN being set puts it in consumer mode (the
           # cross-repo skill-request/skill-promotion channels); PRIVATE_MARKERS (job
           # env) feeds the leak guard. No vendored consumer-specific copy.
+          # --model pinned to the exact model ID (skills#180): the floating
+          # `sonnet` alias would silently inherit the next release into this
+          # unattended loop. --max-budget-usd is the per-run spend backstop
+          # (skills#181): ~2.5-3x the observed max from the cross-repo cost ledger.
           claude -p \
             --output-format stream-json --verbose \
-            --model sonnet \
+            --model claude-sonnet-4-6 \
+            --max-budget-usd 3.00 \
             --permission-mode acceptEdits \
             --allowedTools "Bash Read Grep Glob" \
             --disallowedTools "Bash(gh issue create:*) Bash(gh issue comment:*)" \
