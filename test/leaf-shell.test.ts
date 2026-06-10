@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { normalizeBootVerify, combinedOutput, extractResultText, type ShellResult } from '../src/leaf-shell.js';
+import { runSync, normalizeBootVerify, combinedOutput, extractResultText, type ShellResult } from '../src/leaf-shell.js';
 import { evaluate } from '../src/four-zeros-verdict.js';
 import { formatValidatorOutput } from '../src/orphan-validator.js';
 
@@ -95,5 +95,13 @@ describe('orphan validator → FourZerosVerdict end-to-end (pure)', () => {
     expect(verdict.advisoryOrphans).toEqual([]);
     expect(verdict.orphanVariables).toEqual([]);
     expect(verdict.pass).toBe(true);
+  });
+});
+
+describe('runSync — capture is not truncated at the 1 MiB spawnSync default (#95)', () => {
+  it('captures multi-megabyte stdout intact (a tf prompts JSON via `git show` is ~1.5 MB)', () => {
+    const r = runSync('node', ['-e', "process.stdout.write('x'.repeat(2 * 1024 * 1024))"]);
+    expect(r.status).toBe(0);
+    expect(r.stdout.length).toBe(2 * 1024 * 1024);
   });
 });
