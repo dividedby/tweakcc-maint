@@ -9,7 +9,6 @@
  * an unregistered output scores zero on every axis.
  */
 
-import { BEHAVIORAL_AXES } from './judge-port.js';
 import type { AxisScores, JudgePort, JudgeScores, PresentedOutput } from './judge-port.js';
 
 function zeroAxes(): AxisScores {
@@ -51,6 +50,3 @@ export class StubJudge implements JudgePort {
     return Promise.resolve({ A: slots.A, B: slots.B });
   }
 }
-
-/** Re-export the axis list so test/score builders need only import the stub. */
-export { BEHAVIORAL_AXES };

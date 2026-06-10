@@ -135,7 +135,7 @@ export function survivingPlaceholders(body: string, id: string, known: KnownSlot
 }
 
 /** The prompt id an override matches: its filename without the `.md` extension. */
-export function promptIdOf(path: string): string {
+function promptIdOf(path: string): string {
   return basename(path).replace(/\.md$/, '');
 }
 
@@ -166,7 +166,7 @@ export function buildOrphanReport(
 // ── fs / JSON wrappers (mirrors orphan-validator's wrappers; HITL/gate-exercised) ──────────
 
 /** Read every `*.md` override under the given directories (non-recursive). */
-export function readOverrideFiles(dirs: string[]): OverrideFile[] {
+function readOverrideFiles(dirs: string[]): OverrideFile[] {
   const files: OverrideFile[] = [];
   for (const dir of dirs) {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -180,7 +180,7 @@ export function readOverrideFiles(dirs: string[]): OverrideFile[] {
 }
 
 /** Load a published `prompts-<version>.json` from disk into {@link PromptsData}. */
-export function loadPromptsData(promptsJsonPath: string): PromptsData {
+function loadPromptsData(promptsJsonPath: string): PromptsData {
   return JSON.parse(readFileSync(promptsJsonPath, 'utf8')) as PromptsData;
 }
 

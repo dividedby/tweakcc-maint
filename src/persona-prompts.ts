@@ -13,7 +13,7 @@
 import { JUDGE_PERSONAS } from './judge-panel-port.js';
 import type { JudgePersona } from './judge-panel-port.js';
 
-export const PERSONA_PROMPTS: Record<JudgePersona, string> = {
+const PERSONA_PROMPTS: Record<JudgePersona, string> = {
   'strict-literalist':
     'You are a STRICT LITERALIST grader. Score only what the text literally does against ' +
     'the rubric anchors — count the concrete features each anchor names (hedge phrases, ' +
