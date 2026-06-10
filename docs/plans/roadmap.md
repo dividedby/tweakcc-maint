@@ -39,27 +39,27 @@ no other guidance is needed. Follow it top to bottom:
 
 ## Burn-down (2026-06-10)
 Reconciled against live `gh` across **both** repos (`/roadmap`).
-**68 issues — 59 closed (87%), 9 open.**
-**Closed (cumulative): 59.** ← integer total of all closed issues ever, including
+**68 issues — 63 closed (93%), 5 open.**
+**Closed (cumulative): 63.** ← integer total of all closed issues ever, including
 those whose rows are pruned from collapsed waves; bumped, never recomputed from the
 table (pruned rows are gone), so the count survives wave pruning.
 
 | Bucket | Count | Issues |
 |---|---|---|
-| **Ready (agent)** — loop-eligible | 6 | #102 #148 #156 · bench#1 bench#2 bench#8 |
-| **Ready (human / HITL)**          | 0 | — |
+| **Ready (agent)** — loop-eligible | 0 | — (all agent-eligible `Next` work closed or blocked on a maintainer decision) |
+| **Ready (human / HITL)**          | 3 | #102 (the finale — maintainer schedules) · #148 (needs a new PR-check workflow decision) · bench#2 (needs results input-model + Pages decision) |
 | **Blocked / deferred**            | 1 | bench#7 (time-gated: rotate NPM_TOKEN ~2026-09-08) |
 | **Tracking** (epic / PRD parents) | 0 | — |
-| **Meta** (idea-inbox / onboarding)| 2 | #99 (Idea Inbox) · #151 (this onboarding) |
+| **Meta** (idea-inbox / onboarding)| 1 | #99 (Idea Inbox) |
 
-Open by wave: W1 0 · W2 0 · unscoped 9 (#99 #102 #148 #151 #156 · bench#1 bench#2 bench#7 bench#8).
+Open by wave: W1 0 · W2 0 · unscoped 5 (#99 #102 #148 · bench#2 bench#7).
 
 ## Priority waves
 | Wave | Theme | Issues | Gate to enter |
 | ---- | ----- | ------ | ------------- |
 | **W1** | 2.1.169 adoption + 2.1.168 orphan/boot correctness | — (wholly closed) | done |
 | **W2** | Verdict-signal trust (triage decisions) | — (wholly closed) | done |
-| **—**  | Cross-cutting / ongoing (incl. all `bench#NN` work) | #99 #102 #148 #151 #156 · bench#1 bench#2 bench#7 bench#8 | n/a |
+| **—**  | Cross-cutting / ongoing (incl. all `bench#NN` work) | #99 #102 #148 · bench#2 bench#7 | n/a |
 
 ## Master census (active waves inline)
 
@@ -71,14 +71,10 @@ prune to a one-line summary and the cumulative count above is bumped — ADR 002
 | # | Issue | Wave | Status | Owner | Skill(s) | Deps | Notes |
 | - | ----- | ---- | ------ | ----- | -------- | ---- | ----- |
 | 102 | Post-backlog: complete refactor plan from a fallow static-analysis pass | — | Next | human | `/improve-codebase-architecture` | — | The finale. Gate satisfied — the entire pre-existing backlog and the Behavioral A/B tree are closed; maintainer decides whether/when to schedule the whole-repo refactor. When picked up: fallow static JSON → `/improve-codebase-architecture` (ADR 0004 no-build + ADR 0007 defer verdicts) → plan only, split via `/to-issues` if accepted. Spawned from Idea Inbox #99 |
-| 148 | Enforce gate as a required status check on main | — | Next | agent | `/update-config` | — | Make the Integration gate a required status check on `main` via branch protection. `integration-gate.yml` is `workflow_dispatch`-only (never runs on PRs) — a required check needs a PR-triggered run or a different always-green PR check first; report-only `fallow-report` is non-gating by design (#103) |
-| 151 | Onboard Idea Inbox + roadmap mirror, reconcile roadmap to new format (ADR 0023) | — | Next | agent | `/roadmap` | — | **This onboarding.** Idea Inbox (#99) + CI-owned read-only mirror (#159) + the two-repo census departure (ADR 0009) + this format migration. Meta-tooling on the roadmap itself |
-| 156 | Bump GitHub Actions off deprecated Node 20 (integration-gate + fallow-report @v4 → current majors) | — | Done | agent | — | — | All five `@v4` refs bumped per the issue table (checkout→v6, setup-node→v6, action-setup→v6, cache→v5, upload-artifact→v7). pnpm/action-setup v6 unaffected: both workflows pass `version: 11.5.2` explicitly (v5/v6 resolution change only bites when version is omitted). Gate green locally; awaits PR/merge by lead |
+| 148 | Enforce gate as a required status check on main | — | Parked | human | `/update-config` | — | **HITL: needs a maintainer decision.** Burn-down loop found the issue-as-written unbuildable: its named `gate` job (`integration-gate.yml`) is `workflow_dispatch`-only, CC-version-parameterized, license-secret-gated, and costs money per run — it can't be an always-green PR check. The repo has no `pull_request` test/typecheck workflow to require (only the non-gating `fallow-report`, #103). Token has admin + `main` is unprotected, so branch protection is a 1-call follow-up — the gap is purely "no green PR check exists to require." Standing up a new PR `pnpm test`+`typecheck` workflow (its name + `enforce_admins` posture) is a net-new decision (see comment on the issue) |
 | 99 | 💡 Idea Inbox | — | Tracking | human | — | — | **Standing Meta row — exempt from burn-down as pickable work.** Canonical intake for unstructured ideas across **both** repos (ADR 0009); a drained idea is filed in tweakcc-maint or `dividedby/bench` and registered as a census row here. First idea actioned → #102 |
-| bench#1 | Add an npm test PR gate on main | — | Next | agent | — | — | `dividedby/bench`. `node --test` PR gate on bench's `main` (its stack is plain Node ESM `.mjs`, no vitest) |
-| bench#2 | Publish benchmark results to GitHub Pages (model × effort × cost/quality) | — | Next | agent | — | — | `dividedby/bench`. Publish the sweep results surface |
+| bench#2 | Publish benchmark results to GitHub Pages (model × effort × cost/quality) | — | Parked | human | — | — | `dividedby/bench`. **HITL: needs a maintainer decision.** Burn-down loop halted: AC #2 ("regenerate + deploy on push to main") is incompatible with the data model — `results/` is gitignored (0 tracked files), so CI has nothing to render and "regenerate" would re-run the paid sweep + live judge panel per push. Maintainer must pick the input model (commit a derived `site/data.json` snapshot vs. a manual `workflow_dispatch` publish) and enable Pages (admin step). See comment on the issue |
 | bench#7 | Rotate NPM_TOKEN before it expires (~2026-09-08) | — | Blocked | human | — | — | `dividedby/bench`. Time-gated ops: rotate the `@dividedby/bench-core` publish token before ~2026-09-08 |
-| bench#8 | Adopt label convention v1 (dividedby/skills #218) — full set | — | Next | agent | `/triage` | — | `dividedby/bench`. Mirror of tweakcc-maint #154 (closed): adopt the v1 label set on bench's tracker |
 
 <details>
 <summary>Closed waves W1 + W2 + cross-cutting — 59 issues Done (collapsed; superseded backlog)</summary>
@@ -93,6 +89,10 @@ these rows prune to a one-line summary per wave and the cumulative count is bump
 
 | # | Issue | Wave | Status | Owner | Skill(s) | Notes |
 | - | ----- | ---- | ------ | ----- | -------- | ----- |
+| 156 | Bump GitHub Actions off deprecated Node 20 (integration-gate + fallow-report @v4 → current majors) | — | Done | agent | — | All five `@v4` refs bumped (checkout→v6, setup-node→v6, action-setup→v6, cache→v5, upload-artifact→v7) across both workflows; pnpm pin (11.5.2) passed explicitly to action-setup so resolution is unaffected. fallow PR run went green on the bumped actions (PR #161) |
+| 151 | Onboard Idea Inbox + roadmap mirror, reconcile roadmap to new format (ADR 0023) | — | Done | agent | `/roadmap` | Idea Inbox (#99) + CI-owned read-only mirror (#159) + two-repo census departure (ADR 0009) + format migration (PR #160) |
+| bench#8 | Adopt label convention v1 (dividedby/skills #218) — full set | — | Done | agent | `/triage` | `dividedby/bench`. v1 set (6 CORE + 2 CHANNEL) applied; 8 stock labels removed (issue-free); `source:*`/LOOP labels not seeded (no proposal loops yet). Mirror of #154 |
+| bench#1 | Add an npm test PR gate on main | — | Done | agent | — | `dividedby/bench`. `test.yml` runs `node --test` PR gate on `main` (Node 24, checkout@v6 + setup-node@v6); also moved publish.yml off EOL Node 20 / `@v4` (bench PR #9). Branch protection to require the `test` check is a follow-up admin step |
 | bench#3 | Add a model-calling JudgeBackend (live Opus grading) alongside the no-model default | — | Done | agent | — | `dividedby/bench`. Shipped `createModelJudgeBackend`, published `@dividedby/bench-core@0.2.0`; consumed here via #152 |
 | 154 | Adopt label convention v1 (dividedby/skills #218) — full set | — | Done | agent | `/triage` | Closed — v1 label set adopted on tweakcc-maint's tracker; bench mirror is bench#8 |
 | 152 | Behavioral A/B: swap judge adapters to bench-core live model backend | — | Done | agent | — | Bumped dep `^0.1.0`→`^0.2.0`, swapped default backend to `createModelJudgeBackend` (PR #155) |
