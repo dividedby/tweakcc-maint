@@ -36,7 +36,7 @@ no other guidance is needed. Follow it top to bottom:
 | ---- | ----- | ------ | ------------- |
 | **W1** | 2.1.169 adoption + 2.1.168 orphan/boot correctness | — (#26 #43 #45 #58 shipped) | none — active now |
 | **W2** | Verdict-signal trust (triage decisions) | — (#62 shipped) | none — triage anytime |
-| **—**  | Cross-cutting / later | #11 #102 (#75 #76 #77 #80 #81 #83 #84 #85 #93 #94 #95 #96 #103 #125 #126 #127 #128 shipped) | n/a |
+| **—**  | Cross-cutting / later | #11→#134 #135 #136 #137 #138 · #102 (#75 #76 #77 #80 #81 #83 #84 #85 #93 #94 #95 #96 #103 #125 #126 #127 #128 shipped) | n/a |
 
 ## Burn-down order (2026-06-10 — overrides wave ordering while this section exists)
 
@@ -54,7 +54,7 @@ authoritative for *how*; this list only orders. Two pickup modes:
 | Order | # | Mode | What unblocks it |
 | ----- | - | ---- | ---------------- |
 | 3 | #26 | CLOSED | **CLOSED — lcc#7 merged; inline-* remainder premise disproven (patcher positional-remaps inline blobs, all verified green, no fix needed).** |
-| — | #11 | Parked (trigger) | **fate decided 2026-06-09: re-parked with named trigger — revisit after #102's refactor plan lands.** Out of active burn-down |
+| — | #11 | ACTIVATED → spawned | **activated 2026-06-10 (interactive decision session): 6 design decisions settled → PRD #134 → slices #135–#138.** Parked-until-#102 fate reversed by maintainer. Tracking row; work now lives in the spawned slices |
 | 5 | #94 | CLOSED | **CLOSED — skrabe merged tf#7 + lcc#6; merge-day gate green; 2.1.170 record finalized.** |
 | 6 | #8 | CLOSED | **CLOSED — skrabe merged tf#6 commit `7d9b30b`; landed his reviewed shape (helper units kept, golden snapshot dropped).** |
 | 7 | #43 | CLOSED | **CLOSED — producer relocated to control plane, #124 merged.** |
@@ -71,7 +71,12 @@ authoritative for *how*; this list only orders. Two pickup modes:
 | # | Issue | Wave | Status | Owner | Skill(s) | Deps | Notes |
 | - | ----- | ---- | ------ | ----- | -------- | ---- | ----- |
 | 102 | Post-backlog: complete refactor plan from a fallow static-analysis pass | — | Blocked | human | `/improve-codebase-architecture` | — | **Burn-down order 8 — the finale (pickup protocol in issue comment).** Gated on the rest of the open backlog completing (issue body lists the gate set; several already closed — #93 #95 #96) — maintainer decides when the gate is satisfied and whether the whole-repo refactor is worth scheduling. When unblocked: fallow static JSON evidence → `/improve-codebase-architecture` (respecting ADR 0004 no-build + ADR 0007 defer verdicts) → plan only, split via `/to-issues` if accepted. Spawned from Idea Inbox #99. #103's CI baseline would make its evidence capture trivial (soft relation, not a dep) |
-| 11 | Roadmap: behavioral A/B benchmark (stock vs lobotomized) | — | Parked | mixed | `/grill-with-docs` | — | **Fate decided 2026-06-09 (interactive decision session): RE-PARKED with a named trigger — revisit after #102's refactor plan lands.** Out of active burn-down until then. ADR 0002 remains the recorded design stance (vs-vanilla measures targeted behavior + correctness guardrail; hybrid home: bench primitives reused, fork fixtures/rubric/driver here). Activating now would grow the backlog mid-burn-down (cross-repo `~/repos/bench` library refactor + rubric/bait-fixture design + live LLM judge + spawned follow-on issues) against the clear-the-backlog goal — deferred, not abandoned. Revisit naturally pairs with #102 since the refactor plan is the named trigger |
+| 11 | Roadmap: behavioral A/B benchmark (stock vs lobotomized) | — | Activated → tracking | mixed | `/to-prd` `/to-issues` | — | **ACTIVATED 2026-06-10 (interactive decision session).** Parked-until-#102 fate reversed by maintainer. 6 design decisions settled: full-design upfront · bench published as a package (`@dividedby/bench-core`) · two pinned installs (stock + lobotomized leaf) · 4 rubric axes (anti-sycophancy/anti-hedging/fewer-offers/terse-directness) · all-Claude 3-judge panel persona-varied (Opus: literalist/devil's-advocate/holistic), self-preference cancels since both arms are Claude · hybrid correctness guardrail. ADR 0002 unchanged. → **PRD #134**, slices **#135** (driver+stubs, AFK) **#136** (bench refactor+publish, leaf/HITL) **#137** (rubric+fixtures, HITL ←#135) **#138** (real wiring, AFK ←#135 #136 #137). Work now lives in the slices |
+| 134 | PRD: Behavioral A/B benchmark (stock vs lobotomized-CC) | — | PRD | agent | `/to-issues` | — | Codifies #11's 6 decisions. Split into slices #135–#138 |
+| 135 | Behavioral A/B: driver skeleton end-to-end on stub ports | — | Ready | agent | `/tdd` | — | **AFK tracer bullet.** `JudgePort`+`VariantRunner` seams, `StubJudge`+`FakeVariantRunner`, pure pairing/randomization/z-score aggregation/disagreement/variance/guardrail → writes Adoption-record Behavioral A/B field. No bench dep, no live models |
+| 136 | Behavioral A/B: bench refactor + publish as library package (leaf) | — | Ready | human | — | — | **HITL leaf (cross-repo).** Extract `executeRun`/judge-backend/`normalize`+`groupByCell`/cost into importable primitives, CLIs → thin wrappers, publish package. Settles public-npm-vs-private-GH-Packages. Prepared as a leaf PR, not direct-pushed |
+| 137 | Behavioral A/B: behavioral rubric + bait-fixture suite | — | Blocked | human | — | #135 | **HITL design review (ADR 0002's heart).** 4-axis rubric (rubric-anchored, blind) + one bait fixture/axis + per-fixture deterministic correctness checks (open-ended → judge fallback). Axes/approach pre-decided in #134 |
+| 138 | Behavioral A/B: real adapters + live wiring | — | Blocked | agent | `/tdd` | #135 #136 #137 | **AFK.** `RealVariantRunner` (two pinned installs via bench `executeRun`) + `RealJudgePanel` (3 persona Opus sub-agents, blind/randomized) + correctness judge fallback; swap stubs → real on the on-demand path; populate Adoption record on a real run |
 | 99 | 💡 Idea Inbox | — | Tracking | human | — | — | **Standing inbox — exempt from burn-down.** Not pickable work — raw ideas live in the issue body with embedded agent operating instructions (capture → dedup → grill → promote via `/to-prd`/`/to-issues`). First idea already actioned → #102 |
 
 ### Done (closed — kept as full record, newest first)
