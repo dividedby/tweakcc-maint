@@ -1,0 +1,94 @@
+# Standing fallow static-analysis report (#103) — REPORT-ONLY.
+#
+# Runs fallow's static layer (audit + health) on PRs and pushes to main,
+# uploads the JSON as an artifact, and writes a step summary. It must never
+# fail the build at this stage: graduating to a gating check is a separate
+# future decision (see issue #103 / #102). Every fallow step is `|| true`.
+#
+# Plain package-runner invocation — no headless Claude, so the cost-ledger
+# requirement does not apply. The issue brief says `npx fallow`, but this
+# repo's devEngines pins pnpm (npx refuses to run in-tree), so `pnpm dlx`
+# is the working equivalent.
+name: fallow-report
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fallow:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (full history — fallow churn/hotspot analysis needs it)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11  # matches devEngines.packageManager (pnpm ^11.5.2)
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: fallow audit (report-only)
+        run: |
+          mkdir -p fallow-report
+          # --base explicit: the Actions checkout is a detached merge commit,
+          # so fallow can't auto-detect the comparison branch there.
+          pnpm dlx fallow@2 audit --base origin/main --format json > fallow-report/audit.json || true
+          echo "--- audit.json ---"
+          cat fallow-report/audit.json || true
+
+      - name: fallow health (report-only)
+        run: |
+          pnpm dlx fallow@2 health --score --hotspots --targets || true
+          pnpm dlx fallow@2 health --score --hotspots --targets --format json > fallow-report/health.json || true
+
+      - name: Step summary
+        run: |
+          {
+            echo "## fallow static-analysis report (report-only)"
+            echo
+            if jq -e .health_score fallow-report/health.json > /dev/null 2>&1; then
+              jq -r '"**Health score:** \(.health_score.score) (\(.health_score.grade))"' fallow-report/health.json
+              echo
+              echo "| metric | value |"
+              echo "| --- | --- |"
+              jq -r '.vital_signs |
+                "| dead files | \(.counts.dead_files) (\(.dead_file_pct)%) |",
+                "| dead exports | \(.counts.dead_exports) (\(.dead_export_pct)%) |",
+                "| duplication | \(.duplication_pct)% |",
+                "| circular deps | \(.circular_dep_count) |",
+                "| unused deps | \(.unused_dep_count) |",
+                "| avg / p90 cyclomatic | \(.avg_cyclomatic) / \(.p90_cyclomatic) |",
+                "| maintainability avg | \(.maintainability_avg) |",
+                "| hotspots | \(.hotspot_count) |"' fallow-report/health.json
+            else
+              echo "_health.json missing or unparsable — see job log._"
+            fi
+            echo
+            if jq -e .verdict fallow-report/audit.json > /dev/null 2>&1; then
+              jq -r '"**Audit (changed files vs \(.base_ref)):** verdict \(.verdict) — dead code \(.summary.dead_code_issues), complexity \(.summary.complexity_findings), clone groups \(.summary.duplication_clone_groups)"' fallow-report/audit.json
+            else
+              echo "_audit.json missing or unparsable — see job log._"
+            fi
+            echo
+            echo "_Report-only: this job never fails the build (#103). Full JSON in the \`fallow-report\` artifact._"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload JSON artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: fallow-report
+          path: fallow-report/
+          if-no-files-found: warn
