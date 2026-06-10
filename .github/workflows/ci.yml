@@ -1,0 +1,41 @@
+# PR gate (#148) — the always-green required check on `main`.
+#
+# Runs the repo's existing gate (`pnpm test` + `pnpm typecheck`) on every PR
+# and on push to main. Unlike `integration-gate.yml` (dispatch-only, CC-version
+# parameterized, license-secret-gated, paid headless Boot-verify — ADR 0006),
+# this is a cheap, secret-free, deterministic check fit to be a required status
+# check. No headless Claude, so the cost-ledger requirement does not apply.
+name: ci
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 11.5.2  # exact pin; satisfies devEngines.packageManager (pnpm ^11.5.2)
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Test
+        run: pnpm test
+      - name: Typecheck
+        run: pnpm typecheck
