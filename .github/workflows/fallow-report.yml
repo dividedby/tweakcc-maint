@@ -44,7 +44,12 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      # Report-only job (#103) must never red the build. --frozen-lockfile still
+      # enforces lockfile integrity, but minimumReleaseAge=0 disables pnpm's
+      # supply-chain age gate, which otherwise hard-fails this job whenever a
+      # freshly-published (<24h) dependency — e.g. our own @dividedby/bench-core
+      # bump — is in the lockfile. The real Integration gate keeps the age gate.
+      - run: pnpm install --frozen-lockfile --config.minimumReleaseAge=0
 
       - name: fallow audit (report-only)
         run: |
