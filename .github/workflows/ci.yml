@@ -33,7 +33,10 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
 
-      - run: pnpm install --frozen-lockfile
+      # --frozen-lockfile enforces lockfile integrity; minimumReleaseAge=0
+      # disables pnpm's supply-chain age gate so a required check can never red
+      # on a fresh @dividedby/bench-core publish (matches fallow-report.yml).
+      - run: pnpm install --frozen-lockfile --config.minimumReleaseAge=0
 
       - name: Test
         run: pnpm test
