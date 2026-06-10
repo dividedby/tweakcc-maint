@@ -3,7 +3,7 @@
  * (#138). It answers the one boolean the {@link CorrectnessChecker} asks for an OPEN-ENDED
  * Behavior-bait fixture (e.g. the anti-sycophancy fixture, whose premise correction has no
  * deterministic string check): "did this output get the ground truth right?" — via a bench
- * `createDefaultJudgeBackend` grade call against the fixture's ground truth.
+ * `createModelJudgeBackend` grade call against the fixture's ground truth.
  *
  * It scores ONLY correctness, never the Behavioral axes (those are {@link JudgePanelPort}'s
  * job, kept separate). A deferred/failed backend is surfaced as a thrown error, not
@@ -12,7 +12,7 @@
  * unit-tested with no real model call.
  */
 
-import { createDefaultJudgeBackend } from '@dividedby/bench-core';
+import { createModelJudgeBackend } from '@dividedby/bench-core';
 import type { JudgeBackend } from '@dividedby/bench-core';
 import type { CorrectnessJudgePort } from './correctness-judge-port.js';
 
@@ -30,7 +30,7 @@ export class RealCorrectnessJudge implements CorrectnessJudgePort {
   private readonly makeBackend: () => JudgeBackend;
 
   constructor(opts: RealCorrectnessJudgeOptions = {}) {
-    this.makeBackend = opts.makeBackend ?? (() => createDefaultJudgeBackend({ name: 'correctness' }));
+    this.makeBackend = opts.makeBackend ?? (() => createModelJudgeBackend({ name: 'correctness' }));
   }
 
   async isCorrect(fixtureId: string, groundTruth: string, output: string): Promise<boolean> {

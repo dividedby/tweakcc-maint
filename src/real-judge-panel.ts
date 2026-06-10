@@ -2,7 +2,7 @@
  * RealJudgePanel — the prod adapter behind the {@link JudgePanelPort} seam (ADR 0008;
  * #138). It scores one blind, order-randomized pairing through three persona-varied
  * Claude judge-agents (strict literalist / devil's-advocate / holistic reviewer), each a
- * fresh-context backend built via bench `createDefaultJudgeBackend`. For every persona it
+ * fresh-context backend built via bench `createModelJudgeBackend`. For every persona it
  * constructs the SAME rubric-anchored grade prompt — persona preamble + the four-axis
  * rubric + the two outputs labelled only by opaque slot A/B (never variant identity) —
  * and a JSON schema asking for a 0–4 score per axis for both slots, then parses the reply
@@ -16,7 +16,7 @@
  * injected so the contract is unit-tested with no real model call.
  */
 
-import { createDefaultJudgeBackend } from '@dividedby/bench-core';
+import { createModelJudgeBackend } from '@dividedby/bench-core';
 import type { GradeResult, JudgeBackend } from '@dividedby/bench-core';
 import { BEHAVIORAL_AXES } from './judge-port.js';
 import type { AxisScores, JudgeScores, PresentedOutput } from './judge-port.js';
@@ -50,7 +50,7 @@ export class RealJudgePanel implements JudgePanelPort {
   private readonly makeBackend: (name: JudgePersona) => JudgeBackend;
 
   constructor(opts: RealJudgePanelOptions = {}) {
-    this.makeBackend = opts.makeBackend ?? ((name) => createDefaultJudgeBackend({ name }));
+    this.makeBackend = opts.makeBackend ?? ((name) => createModelJudgeBackend({ name }));
   }
 
   /** Build the blind grade prompt for one persona (no variant labels — only slots A/B). */
