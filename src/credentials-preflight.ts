@@ -56,7 +56,7 @@ export function credentialMessage(source: CredentialSource): string | undefined 
  * else the file-based credential store other platforms use. Existence only — never reads the
  * secret. A false here is "could not confirm", not "definitely no auth".
  */
-export function defaultStoredAuthProbe(): boolean {
+function defaultStoredAuthProbe(): boolean {
   if (process.platform === 'darwin') {
     const r = runSync('security', ['find-generic-password', '-s', 'Claude Code-credentials']);
     if (r.status === 0) return true;
