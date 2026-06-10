@@ -12,6 +12,14 @@
     {
       "implements": "IssuePublisher",
       "members": ["publish"]
+    },
+    {
+      "implements": "VariantRunner",
+      "members": ["run"]
+    },
+    {
+      "implements": "Rng",
+      "members": ["bool"]
     }
   ]
 }
