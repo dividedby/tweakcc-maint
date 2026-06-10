@@ -39,27 +39,27 @@ no other guidance is needed. Follow it top to bottom:
 
 ## Burn-down (2026-06-10)
 Reconciled against live `gh` across **both** repos (`/roadmap`).
-**68 issues — 63 closed (93%), 5 open.**
-**Closed (cumulative): 63.** ← integer total of all closed issues ever, including
+**68 issues — 65 closed (96%), 3 open.**
+**Closed (cumulative): 65.** ← integer total of all closed issues ever, including
 those whose rows are pruned from collapsed waves; bumped, never recomputed from the
 table (pruned rows are gone), so the count survives wave pruning.
 
 | Bucket | Count | Issues |
 |---|---|---|
 | **Ready (agent)** — loop-eligible | 0 | — (all agent-eligible `Next` work closed or blocked on a maintainer decision) |
-| **Ready (human / HITL)**          | 3 | #102 (the finale — maintainer schedules) · #148 (needs a new PR-check workflow decision) · bench#2 (needs results input-model + Pages decision) |
+| **Ready (human / HITL)**          | 1 | #102 (the finale — maintainer schedules) |
 | **Blocked / deferred**            | 1 | bench#7 (time-gated: rotate NPM_TOKEN ~2026-09-08) |
 | **Tracking** (epic / PRD parents) | 0 | — |
 | **Meta** (idea-inbox / onboarding)| 1 | #99 (Idea Inbox) |
 
-Open by wave: W1 0 · W2 0 · unscoped 5 (#99 #102 #148 · bench#2 bench#7).
+Open by wave: W1 0 · W2 0 · unscoped 3 (#99 #102 bench#7).
 
 ## Priority waves
 | Wave | Theme | Issues | Gate to enter |
 | ---- | ----- | ------ | ------------- |
 | **W1** | 2.1.169 adoption + 2.1.168 orphan/boot correctness | — (wholly closed) | done |
 | **W2** | Verdict-signal trust (triage decisions) | — (wholly closed) | done |
-| **—**  | Cross-cutting / ongoing (incl. all `bench#NN` work) | #99 #102 #148 · bench#2 bench#7 | n/a |
+| **—**  | Cross-cutting / ongoing (incl. all `bench#NN` work) | #99 #102 bench#7 | n/a |
 
 ## Master census (active waves inline)
 
@@ -71,9 +71,7 @@ prune to a one-line summary and the cumulative count above is bumped — ADR 002
 | # | Issue | Wave | Status | Owner | Skill(s) | Deps | Notes |
 | - | ----- | ---- | ------ | ----- | -------- | ---- | ----- |
 | 102 | Post-backlog: complete refactor plan from a fallow static-analysis pass | — | Next | human | `/improve-codebase-architecture` | — | The finale. Gate satisfied — the entire pre-existing backlog and the Behavioral A/B tree are closed; maintainer decides whether/when to schedule the whole-repo refactor. When picked up: fallow static JSON → `/improve-codebase-architecture` (ADR 0004 no-build + ADR 0007 defer verdicts) → plan only, split via `/to-issues` if accepted. Spawned from Idea Inbox #99 |
-| 148 | Enforce gate as a required status check on main | — | Done | agent | `/update-config` | — | Maintainer-approved resolution: stood up `.github/workflows/ci.yml` (`pull_request`→main + push→main) running `pnpm test`+`pnpm typecheck` as the always-green `ci` check — the missing PR check that this issue was blocked on (the dispatch-only, license-gated, paid `integration-gate.yml` can't be a required PR check; ADR 0006). Gap filled. Remaining is the lead's post-merge admin step: branch protection requiring the `ci` check on `main` with `enforce_admins=false` |
 | 99 | 💡 Idea Inbox | — | Tracking | human | — | — | **Standing Meta row — exempt from burn-down as pickable work.** Canonical intake for unstructured ideas across **both** repos (ADR 0009); a drained idea is filed in tweakcc-maint or `dividedby/bench` and registered as a census row here. First idea actioned → #102 |
-| bench#2 | Publish benchmark results to GitHub Pages (model × effort × cost/quality) | — | Parked | human | — | — | `dividedby/bench`. **HITL: needs a maintainer decision.** Burn-down loop halted: AC #2 ("regenerate + deploy on push to main") is incompatible with the data model — `results/` is gitignored (0 tracked files), so CI has nothing to render and "regenerate" would re-run the paid sweep + live judge panel per push. Maintainer must pick the input model (commit a derived `site/data.json` snapshot vs. a manual `workflow_dispatch` publish) and enable Pages (admin step). See comment on the issue |
 | bench#7 | Rotate NPM_TOKEN before it expires (~2026-09-08) | — | Blocked | human | — | — | `dividedby/bench`. Time-gated ops: rotate the `@dividedby/bench-core` publish token before ~2026-09-08 |
 
 <details>
@@ -89,6 +87,8 @@ these rows prune to a one-line summary per wave and the cumulative count is bump
 
 | # | Issue | Wave | Status | Owner | Skill(s) | Notes |
 | - | ----- | ---- | ------ | ----- | -------- | ----- |
+| 148 | Enforce gate as a required status check on main | — | Done | agent | `/update-config` | Stood up `.github/workflows/ci.yml` (`ci` check: `pnpm test`+`pnpm typecheck` on PRs) — the missing always-green PR check; `main` branch protection now requires it (`enforce_admins=false`). Also fixed two latent CI bugs: pnpm devEngines caret → exact 11.5.2, and an inert `minimumReleaseAgeExclude` (version-suffixed → name pattern, exempting first-party bench-core). PR #163 |
+| bench#2 | Publish benchmark results to GitHub Pages (model × effort × cost/quality) | — | Done | agent | — | `dividedby/bench`. Committed-derived-snapshot model: `site/build-data.mjs` joins cost+quality on the `model__effort` cell key → `site/data.json`; `pages.yml` renders+deploys on push (no sweep/secrets). Pages live: https://dividedby.github.io/bench/ (bench PR #10) |
 | 156 | Bump GitHub Actions off deprecated Node 20 (integration-gate + fallow-report @v4 → current majors) | — | Done | agent | — | All five `@v4` refs bumped (checkout→v6, setup-node→v6, action-setup→v6, cache→v5, upload-artifact→v7) across both workflows; pnpm pin (11.5.2) passed explicitly to action-setup so resolution is unaffected. fallow PR run went green on the bumped actions (PR #161) |
 | 151 | Onboard Idea Inbox + roadmap mirror, reconcile roadmap to new format (ADR 0023) | — | Done | agent | `/roadmap` | Idea Inbox (#99) + CI-owned read-only mirror (#159) + two-repo census departure (ADR 0009) + format migration (PR #160) |
 | bench#8 | Adopt label convention v1 (dividedby/skills #218) — full set | — | Done | agent | `/triage` | `dividedby/bench`. v1 set (6 CORE + 2 CHANNEL) applied; 8 stock labels removed (issue-free); `source:*`/LOOP labels not seeded (no proposal loops yet). Mirror of #154 |
