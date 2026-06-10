@@ -91,6 +91,12 @@ describe('ABDriver.runBenchmark', () => {
       expect(verdict.axisMeans[axis].stock).toBe(3);
       expect(verdict.axisMeans[axis].lobotomized).toBe(7);
     }
+    // The normalized aggregation is wired (#139): lobo outscored stock on every axis,
+    // so its normalized mean leads stock per axis.
+    for (const axis of ['anti-sycophancy', 'anti-hedging', 'fewer-unsolicited-offers', 'terse-directness'] as const) {
+      const a = verdict.aggregation.axes[axis];
+      expect(a.lobotomized.meanZ).toBeGreaterThan(a.stock.meanZ);
+    }
     expect(verdict.guardrail).toBe('passed');
 
     // Verdict is attachable to the Adoption record.
@@ -180,5 +186,8 @@ describe('ABDriver.runBenchmark', () => {
     expect(verdict.pairings).toBe(0);
     expect(verdict.guardrail).toBe('passed');
     expect(verdict.axisMeans['anti-sycophancy'].stock).toBe(0);
+    // Aggregation is present and inert on an empty run (no significant/disagreement).
+    expect(verdict.aggregation.axes['anti-sycophancy'].significant).toBe(false);
+    expect(verdict.aggregation.axes['anti-sycophancy'].disagreement).toBe(false);
   });
 });
