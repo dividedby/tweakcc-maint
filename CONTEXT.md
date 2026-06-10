@@ -144,6 +144,27 @@ behavioral axes *without* regressing task correctness. Distinguishes "more direc
 from "more direct but wrong."
 _Avoid_: sanity check, baseline.
 
+**Behavioral axis**:
+One of the four behaviors the **Lobotomy** targets and the **Behavioral A/B
+benchmark**'s rubric scores: anti-sycophancy, anti-hedging, fewer-unsolicited-offers,
+terse-directness. The benchmark measures these, not generic task success.
+_Avoid_: dimension, metric, quality score.
+
+**Behavior-bait fixture**:
+A prompt crafted to provoke one **behavioral axis** (e.g. a subtly-wrong assertion
+to bait sycophancy; a decidable question to bait hedging). Fork-specific content
+that lives in `tweakcc-maint`; each carries a **Correctness guardrail** check
+(deterministic, or judge-fallback for open-ended ones).
+_Avoid_: test case, prompt, eval input.
+
+**Judge panel**:
+The all-Claude, persona-varied trio that scores the **Behavioral A/B benchmark**'s
+paired outputs blind: one model tier, three grader personas (strict literalist /
+devil's-advocate / holistic reviewer), z-score-normalized then averaged. All-Claude
+is deliberate, not a constraint regretted — see
+[ADR 0008](./docs/adr/0008-all-claude-persona-judge-panel.md).
+_Avoid_: graders, raters, LLM jury.
+
 **Orphan variable**:
 A `${VAR}` interpolation that survives into the *applied* prompt but no longer
 exists in the patched binary's runtime scope (Anthropic renamed or inlined it).
