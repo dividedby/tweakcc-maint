@@ -11,9 +11,12 @@
  * an outcome, not raised. The judge sits behind a stubbable port, so pairing,
  * randomization, the guardrail, and aggregation are unit-tested with no real model.
  *
- * SCOPE (#135): a TRIVIAL per-axis mean. z-score normalization, disagreement, and
- * variance/significance are #139 (BehavioralAggregation) — deliberately not here.
- * Real adapters / live wiring are #138.
+ * SCOPE: the driver collects each pairing's per-axis scores and folds them through
+ * {@link aggregate} (#139, BehavioralAggregation) for the normalized per-axis verdict
+ * (z-score normalize + disagreement + variance/significance via bench primitives). The
+ * raw trivial per-axis mean (#135) is retained alongside as a cheap raw summary. Real
+ * adapters / live wiring (incl. the multi-persona Judge panel) are #138 — until then a
+ * single JudgePort feeds aggregation as one judge, so its z-score is degenerate.
  */
 
 import { BEHAVIORAL_AXES } from './judge-port.js';
@@ -21,6 +24,11 @@ import type { AxisScores, BehavioralAxis, JudgePort, PresentedOutput } from './j
 import type { Variant, VariantRunner } from './variant-runner.js';
 import type { Rng } from './seeded-rng.js';
 import type { AdoptionRecord } from './integration-gate.js';
+import { aggregate } from './behavioral-aggregation.js';
+import type { BehavioralAggregationVerdict, MultiJudgeScore } from './behavioral-aggregation.js';
+
+/** The single JudgePort's identity when fed to multi-judge aggregation (one persona until #138). */
+const SINGLE_JUDGE = 'panel';
 
 /** A Behavior-bait fixture: an id plus the prompt fed identically to both arms. */
 export interface BaitFixture {
@@ -42,15 +50,18 @@ export type GuardrailOutcome = 'passed' | 'failed';
 export type AxisMeanPair = Record<BehavioralAxis, { stock: number; lobotomized: number }>;
 
 /**
- * The Behavioral A/B verdict written to the Adoption record: a trivial per-axis mean
- * per arm plus the Correctness-guardrail outcome. Evidence for the fork's claims, not
- * a pass/fail gate.
+ * The Behavioral A/B verdict written to the Adoption record. Evidence for the fork's
+ * claims, not a pass/fail gate. Carries the normalized per-axis {@link aggregation}
+ * (z-scores + disagreement + variance/significance, #139) plus the raw trivial per-axis
+ * mean as a cheap secondary summary, and the Correctness-guardrail outcome.
  */
 export interface BehavioralVerdict {
   /** Number of stock+lobotomized pairings scored (one per fixture). */
   pairings: number;
-  /** Trivial per-axis mean per arm across all fixtures (#139 replaces with z-scores). */
+  /** Raw trivial per-axis mean per arm across all fixtures (secondary to {@link aggregation}). */
   axisMeans: AxisMeanPair;
+  /** Normalized per-axis verdict: z-scores + disagreement + variance/significance (#139). */
+  aggregation: BehavioralAggregationVerdict;
   /** Whether the Lobotomy regressed any correctness the stock arm held. */
   guardrail: GuardrailOutcome;
   /** Fixture ids where the lobotomized arm failed a check the stock arm passed. */
@@ -91,6 +102,8 @@ export async function runBenchmark(run: BenchmarkRun): Promise<BehavioralVerdict
 
   // Per-axis running totals per arm (folded into a trivial mean at the end).
   const totals: Record<Variant, AxisScores> = { stock: zeroAxes(), lobotomized: zeroAxes() };
+  // Raw per-arm, per-fixture scores collected for the normalized aggregation (#139).
+  const judgeScores: MultiJudgeScore[] = [];
   const guardrailRegressions: string[] = [];
 
   for (const fixture of fixtures) {
@@ -122,6 +135,10 @@ export async function runBenchmark(run: BenchmarkRun): Promise<BehavioralVerdict
       totals.stock[axis] += stockScores[axis];
       totals.lobotomized[axis] += lobotomizedScores[axis];
     }
+    judgeScores.push(
+      { fixtureId: fixture.id, variant: 'stock', judge: SINGLE_JUDGE, axisScores: stockScores },
+      { fixtureId: fixture.id, variant: 'lobotomized', judge: SINGLE_JUDGE, axisScores: lobotomizedScores },
+    );
   }
 
   const n = fixtures.length;
@@ -135,6 +152,7 @@ export async function runBenchmark(run: BenchmarkRun): Promise<BehavioralVerdict
   return {
     pairings: n,
     axisMeans,
+    aggregation: aggregate(judgeScores),
     guardrail: guardrailRegressions.length === 0 ? 'passed' : 'failed',
     guardrailRegressions,
   };
