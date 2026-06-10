@@ -30,6 +30,7 @@ import { join } from 'node:path';
 import type { CapturedSignals } from './four-zeros-verdict.js';
 import type { ShellResult } from './leaf-shell.js';
 import { runSync, combinedOutput } from './leaf-shell.js';
+import { runOrphanReport } from './orphan-report-producer.js';
 
 /** Where skrabe publishes the driver inside a tweakcc-fixed checkout. */
 export function driverPath(tweakccFixedDir: string): string {
@@ -45,24 +46,34 @@ export function driverPresent(tweakccFixedDir: string): boolean {
 }
 
 // `UNKNOWN placeholders: N` — the driver report's surviving-placeholder count (skrabe's
-// vocabulary). The apply-time surviving-placeholder SET is #43's ask; until it lands the
-// count is the canonical orphan signal.
+// vocabulary). It still gates the apply channel (a `report` failure explained by UNKNOWNs is
+// the orphan bar's, carried below; one NOT explained is an apply failure). The orphan SET
+// itself now comes from the relocated #43 producer, not this count.
 const UNKNOWN_COUNT = /UNKNOWN placeholders:\s*(\d+)/;
 
 /**
- * Map the driver's `check` / `report` results plus the leaf's mis-bind audit runs onto
- * the driver-sourced slice of {@link CapturedSignals}. Pure over the captured results —
- * unit-tested with a fake driver. `bootVerify` / `validator` are not produced here (see
- * module doc); the caller composes them in.
+ * Map the driver's `check` / `report` results, the leaf's mis-bind audit runs, and the
+ * relocated #43 producer's Orphan report onto the driver-sourced slice of
+ * {@link CapturedSignals}. Pure over the captured results — unit-tested with a fake driver +
+ * a pre-built report. `bootVerify` / `validator` are not produced here (see module doc); the
+ * caller composes them in.
+ *
+ * `orphanReport` (#80 wiring): the surviving-placeholder SET is now the real per-prompt keys
+ * the relocated producer (`orphan-report-producer.ts`) emits against skrabe's published
+ * prompts JSON — replacing the prior `UNKNOWN_1..N` synthesis from the driver's scalar count.
+ * The string is already in the consumer's `{ version, prompts }` contract, so the verdict's
+ * orphan authority (#31) consumes it unchanged. Absent (no producer run on this call — older
+ * fallback path) leaves the channel undefined and the verdict falls back to Boot-verify.
  */
 export function driverSignals(
   check: ShellResult,
   report: ShellResult,
   audits: ShellResult[],
+  orphanReport?: string,
 ): Pick<CapturedSignals, 'apply' | 'orphanReport' | 'auditMisbinds'> {
   return {
     apply: applySignal(check, report),
-    orphanReport: orphanReportSignal(report),
+    orphanReport,
     auditMisbinds: audits.map(combinedOutput).join('\n'),
   };
 }
@@ -85,22 +96,6 @@ function applySignal(check: ShellResult, report: ShellResult): string {
   return lines.join('\n');
 }
 
-/**
- * The orphan channel (zero #3): a clean report is an authoritative empty orphan report; a
- * failing one with UNKNOWN placeholders synthesizes `UNKNOWN_1..N` stand-ins carrying the
- * driver's count in skrabe's own UNKNOWN_N vocabulary (the real surviving-placeholder set
- * is #43's ask against his report). Routed through the existing `--report-orphans` JSON
- * contract so the verdict's orphan authority (#31) consumes it unchanged.
- */
-function orphanReportSignal(report: ShellResult): string {
-  const n = report.status === 0 ? 0 : unknownCount(report);
-  const prompts =
-    n === 0
-      ? {}
-      : { 'version-bump-report': Array.from({ length: n }, (_, i) => `UNKNOWN_${i + 1}`) };
-  return JSON.stringify({ version: 'driver-report', prompts });
-}
-
 function unknownCount(report: ShellResult): number {
   const m = UNKNOWN_COUNT.exec(combinedOutput(report));
   return m === null ? 0 : Number(m[1]);
@@ -115,6 +110,11 @@ function unknownCount(report: ShellResult): number {
  * `prompts-<version>.json` (the fork's repo-local-wins order, ADR 0005) — SKIPPED output
  * (no upstream reference dump on this box) is the leaf's own non-failure and the verdict
  * honors it.
+ *
+ * The surviving-placeholder SET (zero #3) comes from the relocated #43 producer
+ * ({@link runOrphanReport}) over the same `overrideDirs` + already-resolved published
+ * `prompts-<version>.json`, in-process (TS, no shell-out — ADR 0004). It supersedes the
+ * `UNKNOWN_N`-count synthesis: the verdict now keys on real per-prompt keys.
  */
 export function runDriverVerification(
   tweakccFixedDir: string,
@@ -133,5 +133,6 @@ export function runDriverVerification(
   const audits = overrideDirs.map((dir) =>
     runSync('node', [audit, promptsJson, upstreamJson, dir], env),
   );
-  return driverSignals(check, report, audits);
+  const orphanReport = runOrphanReport(overrideDirs, promptsJson);
+  return driverSignals(check, report, audits, orphanReport);
 }

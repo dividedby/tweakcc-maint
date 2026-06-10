@@ -35,9 +35,19 @@ const CLEAN_AUDIT = 'mis-bind audit: 0 (every used placeholder sits at the upstr
 const BOOT_OK = 'Boot-verify OK: patched binary booted and replied.\nok';
 const VALIDATOR = 'Orphan-variable check: 0 orphans across 42 overrides.';
 
-function evaluateDriver(check: ShellResult, report: ShellResult, audit: ShellResult) {
+// The relocated #43 producer's output (orphan-report-producer.ts) now supplies the orphan
+// SET; driverSignals takes it as a param. Default to a clean report; tests that exercise the
+// orphan bar pass a real per-prompt-keyed report.
+const CLEAN_ORPHAN_REPORT = JSON.stringify({ version: '2.1.169', prompts: {} });
+
+function evaluateDriver(
+  check: ShellResult,
+  report: ShellResult,
+  audit: ShellResult,
+  orphanReport: string = CLEAN_ORPHAN_REPORT,
+) {
   return evaluate({
-    ...driverSignals(check, report, [audit]),
+    ...driverSignals(check, report, [audit], orphanReport),
     bootVerify: BOOT_OK,
     validator: VALIDATOR,
   });
@@ -74,14 +84,21 @@ describe('driverSignals — canonical driver output drives the Four-zeros verdic
     expect(result.failedPatches).toEqual(['driver-check']);
   });
 
-  it('a failing report with UNKNOWN placeholders fails the orphan bar, carrying the driver’s count', () => {
+  it('the producer’s real per-prompt orphan SET fails the bar (the #43 wiring, not a UNKNOWN_N count)', () => {
+    // A failing report with UNKNOWN placeholders is no longer synthesized into UNKNOWN_1..N;
+    // the orphan SET is the relocated producer's real per-prompt keys.
+    const orphanReport = JSON.stringify({
+      version: '2.1.169',
+      prompts: { 'tool-description-agent-usage-notes': ['IS_TRUTHY_FN'] },
+    });
     const result = evaluateDriver(
       ok(CLEAN_CHECK),
-      failed('✓ blocking issues: 0\n✗ UNKNOWN placeholders: 2'),
+      failed('✓ blocking issues: 0\n✗ UNKNOWN placeholders: 1'),
       ok(CLEAN_AUDIT),
+      orphanReport,
     );
     expect(result.pass).toBe(false);
-    expect(result.orphanVariables).toEqual(['UNKNOWN_1', 'UNKNOWN_2']);
+    expect(result.orphanVariables).toEqual(['IS_TRUTHY_FN']);
     expect(result.orphanSource).toBe('patcher-report');
     expect(result.failedPatches).toEqual([]);
   });
