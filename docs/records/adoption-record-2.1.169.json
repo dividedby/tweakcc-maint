@@ -1,0 +1,33 @@
+{
+  "pass": true,
+  "versions": [
+    {
+      "ccVersion": "2.1.169",
+      "fourZeros": {
+        "pass": true,
+        "failedPatches": [],
+        "missingSystemPrompts": [],
+        "orphanVariables": [],
+        "orphanSource": "patcher-report",
+        "advisoryOrphans": [
+          "IS_TRUTHY_FN",
+          "PROCESS_OBJECT",
+          "TODO_TOOL_OBJECT",
+          "AGENT_TOOL_NAME",
+          "PR_PREAMBLE_STUB",
+          "CRON_DURABLE_FLAG"
+        ],
+        "bootVerifyPassed": true,
+        "misbinds": []
+      },
+      "restoreDrill": {
+        "pass": true,
+        "status": "pass",
+        "backupExists": true,
+        "restored": true,
+        "cleanStock": true
+      }
+    }
+  ],
+  "date": "2026-06-10T02:13:37.045Z"
+}

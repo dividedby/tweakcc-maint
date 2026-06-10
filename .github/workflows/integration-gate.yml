@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
     inputs:
       cc_version:
-        description: "Claude Code version to adopt-test (e.g. 2.1.168)"
+        description: "Claude Code version to adopt-test (e.g. 2.1.169)"
         required: true
         type: string
 
