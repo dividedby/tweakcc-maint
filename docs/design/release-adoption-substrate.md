@@ -80,5 +80,7 @@ Dependency order: #13 → #3 → {#4, #5} → #7; #6 independent (parallel).
 - [x] **Stack = TypeScript + vitest + pnpm + ESM, run via `tsx` (no build step).** Captured in
       [ADR 0004](../adr/0004-typescript-vitest-run-via-tsx-no-build.md). No bundler: maint is a
       cockpit, not a distributable package; fork publishing happens at the leaf.
-- [ ] Adoption-record on-disk format/location (input to slice-6 reporting) — defer to when
-      reporting is designed; #3 only requires it be structured/machine-readable.
+- [x] **Adoption-record on-disk format/location: `docs/records/adoption-record-<cc-version>.json`,
+      saved verbatim as the gate emits it** (established with the 2.1.169 record, #58). The
+      directory is the durable Support-matrix surface; `docs/records/README.md` carries the
+      per-record run context the JSON cannot.
