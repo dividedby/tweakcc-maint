@@ -86,7 +86,7 @@ export function runBootVerify(
 ): ShellResult {
   const r = runSync(
     'claude',
-    ['-p', '--output-format', 'stream-json', '--verbose', '--model', model],
+    ['-p', '--output-format', 'stream-json', '--verbose', '--model', model, '--max-budget-usd', '1.00'],
     env,
     prompt,
   );
