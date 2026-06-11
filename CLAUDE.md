@@ -26,6 +26,19 @@ version-independent helper units; reject coverage redundant with a gate he
 already runs; root-cause a quirk rather than snapshot it (tweakcc-fixed#6;
 ADR 0007) — before proposing.
 
+### Alignment preflight — reconcile against his current state first
+We **prove, benchmark, and suggest; we do not race** skrabe on realign speed (he's
+faster solo and owns the repos). His leaves move hourly, so before you author OR
+propose *any* leaf contribution, reconcile against his **current** state — a stale
+premise is how redundant/contaminated drafts get closed (lcc#9, tweakcc-fixed#8):
+- leaf `main` HEAD (he often already did the work — his own 2.1.172 realign closed
+  ours), open **and** recently-closed PRs, and his review comments (his actual asks);
+- his published CLI version — `npm view tweakcc-fixed version` — vs our Support matrix.
+A contribution ships only if it's still true against his HEAD **and** still not
+something he runs himself. We **consume** his `tweakcc-fixed` npm CLI; we publish no
+competing customizer (`tweakcc-maint` is `private`). Our published surface is only
+`@dividedby/bench-core`, kept for the prove-value bench.
+
 ## Owned sibling: `bench` / `@dividedby/bench-core`
 We also **own** `github.com/dividedby/bench` (the `@dividedby/bench-core` public-npm
 package; local clone `~/repos/bench`) — it is *dividedby's own* repo, **not** a skrabe
