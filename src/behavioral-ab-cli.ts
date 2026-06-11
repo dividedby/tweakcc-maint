@@ -26,6 +26,9 @@ import { makeRunCli } from './run-cli.js';
 import { makeWorkDirStager } from './work-dir-stager.js';
 import { RealVariantRunner } from './real-variant-runner.js';
 import { runBehavioralAB } from './behavioral-ab-run.js';
+import { buildProveValueResult } from './prove-value-result.js';
+import { writeProveValueArtifact } from './prove-value-artifact.js';
+import type { ArtifactFsSeam } from './prove-value-artifact.js';
 import { RealJudgePanel } from './real-judge-panel.js';
 import { RealCorrectnessJudge } from './real-correctness-judge.js';
 import { detectCredentials, credentialMessage } from './credentials-preflight.js';
@@ -56,6 +59,16 @@ export interface BehavioralABCliDeps {
   log: (line: string) => void;
   /** The exit sink; defaults to `process.exit`. Injected so the test never exits the runner. */
   exit: (code: number) => void;
+  /**
+   * The adopted CC version this run proves value for. When set, the run emits a version-keyed
+   * prove-value artifact ({@link writeProveValueArtifact}) alongside the printed Adoption record
+   * (#214). Absent → wiring-only run, no artifact written (the all-fake wiring test path).
+   */
+  ccVersion?: string;
+  /** Dir the prove-value artifact lands in; required when {@link ccVersion} is set. */
+  artifactDir?: string;
+  /** The artifact fs boundary; defaults to real `node:fs`. Injected so the test writes no real file. */
+  artifactFs?: ArtifactFsSeam;
 }
 
 /** A minimal Adoption record to carry the verdict — this slice proves wiring, not a real adoption. */
@@ -91,6 +104,14 @@ export async function runBehavioralABCli(deps: BehavioralABCliDeps): Promise<voi
       });
 
       deps.log(JSON.stringify(record, null, 2));
+
+      // Version-keyed prove-value run: emit the machine-readable artifact alongside the record,
+      // attachable to a leaf PR as the fork's value evidence (#214). Skipped for a wiring-only run.
+      if (deps.ccVersion && deps.artifactDir && record.behavioralAB) {
+        const result = buildProveValueResult(deps.ccVersion, record.behavioralAB, record.date);
+        const path = writeProveValueArtifact(result, { dir: deps.artifactDir, fs: deps.artifactFs });
+        deps.log(`behavioral-ab-cli: prove-value artifact written → ${path} (provesValue=${result.provesValue})`);
+      }
     } finally {
       stager.cleanup();
     }
@@ -120,6 +141,10 @@ async function main(): Promise<void> {
     effort: process.env.BEHAVIORAL_AB_EFFORT ?? 'high',
     log: (line) => console.log(line),
     exit: (code) => process.exit(code),
+    // The adopted version this run proves value for + where its artifact lands. Set both to emit
+    // the version-keyed prove-value artifact alongside the Adoption record (#214).
+    ccVersion: process.env.BEHAVIORAL_AB_CC_VERSION,
+    artifactDir: process.env.BEHAVIORAL_AB_ARTIFACT_DIR ?? 'fallow-baselines',
   });
 }
 

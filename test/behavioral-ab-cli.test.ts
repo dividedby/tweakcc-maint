@@ -84,6 +84,28 @@ describe('runBehavioralABCli', () => {
     expect(cleanedUp()).toBe(1);
   });
 
+  it('emits a version-keyed prove-value artifact alongside the record when ccVersion is set', async () => {
+    const writes: Array<{ path: string; data: string }> = [];
+    const { deps, logged } = fakeDeps({
+      ccVersion: '2.1.172',
+      artifactDir: '/out',
+      artifactFs: {
+        mkdirSync: () => {},
+        writeFileSync: (p, data) => void writes.push({ path: p, data }),
+      },
+    });
+
+    await runBehavioralABCli(deps);
+
+    expect(writes).toHaveLength(1);
+    expect(writes[0]!.path).toBe('/out/prove-value-2.1.172.json');
+    const artifact = JSON.parse(writes[0]!.data) as { ccVersion: string; pairings: number };
+    expect(artifact.ccVersion).toBe('2.1.172');
+    expect(artifact.pairings).toBe(BEHAVIORAL_FIXTURES.length);
+    // The written-artifact path is surfaced for the leaf-PR attachment.
+    expect(logged().join('\n')).toContain('/out/prove-value-2.1.172.json');
+  });
+
   it('runs cleanup and still exits 0 when a stage throws', async () => {
     const { deps, cleanedUp, exited } = fakeDeps({
       // Force a throw AFTER provisioning, so cleanup must still run in the finally.
