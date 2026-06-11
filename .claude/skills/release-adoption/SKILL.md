@@ -114,10 +114,22 @@ prepare a PR on a red gate.
 Only after the gate is green (`pass: true`, exit `0`):
 
 - Open one PR per touched leaf repo from your fork branch — never direct-push.
-- Attach the green **Adoption record** JSON as the **Four-zeros bar** evidence in the PR body.
+- **Body the PR with the standard evidence body** (#215). Don't hand-roll prose: every realign/
+  adoption leaf PR carries the same three halves, composed by `renderLeafPrEvidence`
+  (`src/leaf-pr-evidence.ts`) into one markdown body —
+  1. the **Adoption record** for this version, mapped onto the **Four-zeros bar** (the four zeros
+     spelled out: 0 failed patches · 0 missing system prompts · 0 **Orphan variables** ·
+     **Boot-verify**; plus `auditMisbinds=0` when the **Mis-bind** audit ran);
+  2. the Behavioral A/B **prove-value** result (`renderProveValueResult`, #214) — the fork's value
+     evidence, explicitly NOT part of the bar (ADR 0002/0003: a vs-vanilla benchmark, evidence not
+     a gate);
+  3. the **pristine** extract provenance (the `npm pack` source the realign was diagnosed against,
+     never a patched tree — #211/#213).
+  The producer throws if the three halves disagree on the CC version, so mismatched evidence can
+  never silently body a PR. It lives HERE and only *prepares* a body — it opens no leaf PR.
 - If an "adopt CC X.Y.Z" proposal issue exists (from the release detector), link the PRs to it.
-- Save the Adoption record — it aggregates into the auditable adoption history (slice-6
-  reporting surface).
+- Save the Adoption record + the prove-value artifact — they aggregate into the auditable adoption
+  history (slice-6 reporting surface).
 
 ## Checklist
 
