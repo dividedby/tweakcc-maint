@@ -31,9 +31,20 @@ no other guidance is needed. Follow it top to bottom:
    that `/roadmap` writes back as the roadmap reconciles. Do not act on the body
    alone; a comment may have changed the plan. This census row only *routes and
    orders* — it never restates scope.
-3. **Invoke the routed skill.** Use the skill(s) named in the row's `Skill(s)`
+3. **If the row prepares a leaf contribution, run the alignment preflight first.**
+   For any work that would author or propose to a skrabe leaf (`tweakcc-fixed`,
+   `lobotomized-claude-code`) — `release-adoption`, a realign, a verified leaf PR —
+   we **prove, benchmark, and suggest; we do not race**. Before authoring, reconcile
+   against his **current** state: leaf `main` HEAD (he may have already done it —
+   his own 2.1.172 realign closed our lcc#9), open **and** recently-closed PRs, his
+   review comments, and his published CLI (`npm view tweakcc-fixed version`) vs our
+   Support matrix. Proceed only if the contribution is still true against his HEAD
+   **and** still not something he runs himself; otherwise re-scope or drop it. Any
+   anchor/finding must come from a **pristine** extract, never a patched install
+   (CLAUDE.md → "Alignment preflight"; MEMORY → alignment-first posture).
+4. **Invoke the routed skill.** Use the skill(s) named in the row's `Skill(s)`
    cell as your method; honor the `Notes` cell for any roadmap-only sequencing.
-4. **Update this doc's row in your branch before you commit** (the guard hook
+5. **Update this doc's row in your branch before you commit** (the guard hook
    blocks an issue-referencing commit otherwise): set `Status`, and update
    `Deps` on anything your change unblocks.
 
