@@ -1,12 +1,18 @@
 import { describe, it, expect } from 'vitest';
 import { join } from 'node:path';
-import { provisionVariants } from '../src/provision-variants.js';
+import { provisionVariants, applySkippedSystemPrompts } from '../src/provision-variants.js';
 import type { ProvisionFsSeam, PatchInvocation } from '../src/provision-variants.js';
 
 /** A recorded copy — `(src → dest)`, asserted instead of a real 200 MB binary copy. */
 interface CopyCall {
   src: string;
   dest: string;
+}
+
+/** A recorded symlink — `(target → path)`, asserted instead of a real fs symlink (#192). */
+interface SymlinkCall {
+  target: string;
+  path: string;
 }
 
 /** A recorded `rm` — the cleanup handle's only side effect. */
@@ -16,8 +22,10 @@ interface RmCall {
 
 function fakeFs(state: {
   copies: CopyCall[];
+  symlinks: SymlinkCall[];
   rms: RmCall[];
   dirs: string[];
+  exists?: (path: string) => boolean;
 }): ProvisionFsSeam {
   return {
     mkdtempSync: (prefix) => {
@@ -28,26 +36,34 @@ function fakeFs(state: {
     mkdirSync: (dir) => void state.dirs.push(dir),
     cpSync: (src, dest) => void state.copies.push({ src, dest }),
     rmSync: (dir) => void state.rms.push({ dir }),
+    symlinkSync: (target, path) => void state.symlinks.push({ target, path }),
+    existsSync: (path) => (state.exists ? state.exists(path) : true),
     tmpdir: () => '/tmp',
   };
 }
 
 const LIVE_INSTALL = '/usr/local/bin/claude-native-binary';
+const LOBO_DIR = '/repos/lobotomized-claude-code';
 
 describe('provisionVariants — stock + lobotomized cli.js producer (copy-then-apply)', () => {
-  function run() {
+  function run(overrides: Partial<Parameters<typeof provisionVariants>[0]> = {}) {
     const copies: CopyCall[] = [];
+    const symlinks: SymlinkCall[] = [];
     const rms: RmCall[] = [];
     const dirs: string[] = [];
     const patches: PatchInvocation[] = [];
 
     const result = provisionVariants({
-      fs: fakeFs({ copies, rms, dirs }),
+      fs: fakeFs({ copies, symlinks, rms, dirs }),
       resolveInstall: () => LIVE_INSTALL,
       patch: (invocation) => void patches.push(invocation),
+      model: 'claude-opus-4-8',
+      lobotomizedDir: LOBO_DIR,
+      promptDataCacheDir: '/home/.tweakcc/prompt-data-cache',
+      ...overrides,
     });
 
-    return { result, copies, rms, dirs, patches };
+    return { result, copies, symlinks, rms, dirs, patches };
   }
 
   it('returns stock + lobotomized cli paths plus a cleanup handle', () => {
@@ -77,8 +93,11 @@ describe('provisionVariants — stock + lobotomized cli.js producer (copy-then-a
 
   it('copies the live install twice (stock + lobo) and patches ONLY the lobo copy', () => {
     const { result, copies, patches } = run();
-    // Exactly two copies, both from the live install.
-    expect(copies.map((c) => c.src)).toEqual([LIVE_INSTALL, LIVE_INSTALL]);
+    // Exactly two copies OF the live install (the prompt-data-cache copy has a different src).
+    expect(copies.filter((c) => c.src === LIVE_INSTALL).map((c) => c.src)).toEqual([
+      LIVE_INSTALL,
+      LIVE_INSTALL,
+    ]);
     // The live install is never a copy DEST and never the patch target — read-only.
     expect(copies.some((c) => c.dest === LIVE_INSTALL)).toBe(false);
     expect(patches[0]!.cliPath).not.toBe(LIVE_INSTALL);
@@ -116,5 +135,53 @@ describe('provisionVariants — stock + lobotomized cli.js producer (copy-then-a
     const { result, rms } = run();
     result.cleanup();
     expect(rms.map((r) => r.dir)).toContain(result.workRoot);
+  });
+
+  it('seeds a system-prompts symlink → the model override set under lobotomizedDir (#192)', () => {
+    const { result, symlinks } = run();
+    const configDir = join(result.workRoot, '.tweakcc');
+    const link = symlinks.find((s) => s.path === join(configDir, 'system-prompts'));
+    expect(link).toBeDefined();
+    expect(link!.target).toBe(join(LOBO_DIR, 'system-prompts-opus-4-8'));
+  });
+
+  it('seeds a system-reminders symlink → the leaf system-reminders (#192)', () => {
+    const { result, symlinks } = run();
+    const configDir = join(result.workRoot, '.tweakcc');
+    const link = symlinks.find((s) => s.path === join(configDir, 'system-reminders'));
+    expect(link).toBeDefined();
+    expect(link!.target).toBe(join(LOBO_DIR, 'system-reminders'));
+  });
+
+  it('copies the prompt-data-cache dir into the sandbox config dir (#192)', () => {
+    const { result, copies } = run();
+    const configDir = join(result.workRoot, '.tweakcc');
+    const cacheCopy = copies.find((c) => c.dest === join(configDir, 'prompt-data-cache'));
+    expect(cacheCopy).toBeDefined();
+    expect(cacheCopy!.src).toBe('/home/.tweakcc/prompt-data-cache');
+  });
+
+  it('refuses an unmapped model: throws when the override set does not exist (#192)', () => {
+    expect(() =>
+      run({ fs: fakeFs({ copies: [], symlinks: [], rms: [], dirs: [], exists: () => false }) }),
+    ).toThrow(/no tracked override set for model "claude-opus-4-8"/);
+  });
+
+  it('override sources are symlinked read-only, never copied (#192)', () => {
+    const { copies } = run();
+    // The override sets + system-reminders are only ever symlink targets, never copy sources.
+    expect(copies.some((c) => c.src === join(LOBO_DIR, 'system-prompts-opus-4-8'))).toBe(false);
+    expect(copies.some((c) => c.src === join(LOBO_DIR, 'system-reminders'))).toBe(false);
+  });
+});
+
+describe('applySkippedSystemPrompts', () => {
+  it('is true on the real --apply skip warning string (#192)', () => {
+    const warning = '⚠ System prompts not available - skipping system prompt customizations';
+    expect(applySkippedSystemPrompts(warning)).toBe(true);
+  });
+
+  it('is false on normal apply output (#192)', () => {
+    expect(applySkippedSystemPrompts('✓ Applied system prompt customizations')).toBe(false);
   });
 });

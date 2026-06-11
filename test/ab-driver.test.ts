@@ -177,6 +177,36 @@ describe('ABDriver.runBenchmark', () => {
     expect(judge.captured).toHaveLength(1);
   });
 
+  it('degenerate is true when both arms produce byte-identical output on every fixture (#192)', async () => {
+    const fixtures = [fixture('f1'), fixture('f2')];
+    const runner = new FakeVariantRunner();
+    // Both arms return the SAME output — the lobotomization had no effect (stock-vs-stock).
+    for (const f of fixtures) {
+      runner.setOutput(f.id, 'stock', `${f.id}:same`);
+      runner.setOutput(f.id, 'lobotomized', `${f.id}:same`);
+    }
+    const verdict = await runBenchmark({
+      fixtures,
+      runner,
+      judge: panelOf(new StubJudge()),
+      correctnessCheck: allPass,
+      rng: new SeededRng(1),
+    });
+    expect(verdict.degenerate).toBe(true);
+  });
+
+  it('degenerate is false when the arms differ on any fixture (#192)', async () => {
+    const fixtures = [fixture('f1'), fixture('f2')];
+    const verdict = await runBenchmark({
+      fixtures,
+      runner: runnerFor(fixtures),
+      judge: panelOf(new StubJudge()),
+      correctnessCheck: allPass,
+      rng: new SeededRng(1),
+    });
+    expect(verdict.degenerate).toBe(false);
+  });
+
   it('handles an empty fixture set without throwing', async () => {
     const judge = new StubJudge();
     const verdict = await runBenchmark({
@@ -188,6 +218,8 @@ describe('ABDriver.runBenchmark', () => {
     });
     expect(verdict.pairings).toBe(0);
     expect(verdict.guardrail).toBe('passed');
+    // No fixtures → no identical outputs to flag; an empty run is not degenerate (#192).
+    expect(verdict.degenerate).toBe(false);
     expect(verdict.axisMeans['anti-sycophancy'].stock).toBe(0);
     // Aggregation is present and inert on an empty run (no significant/disagreement).
     expect(verdict.aggregation.axes['anti-sycophancy'].significant).toBe(false);

@@ -107,12 +107,16 @@ async function main(): Promise<void> {
   const message = credentialMessage(detectCredentials());
   if (message) console.error(message);
 
+  // Read the model once and hold it identical across both arms — the same value seeds the lobo
+  // arm's overrides in provisionVariants and is the held model the runner passes to `claude` (#192).
+  const model = process.env.BEHAVIORAL_AB_MODEL ?? 'claude-opus-4-8';
+
   await runBehavioralABCli({
-    provision: () => provisionVariants(),
+    provision: () => provisionVariants({ model }),
     panel: new RealJudgePanel(),
     correctnessJudge: new RealCorrectnessJudge(),
     runCli: makeRunCli(),
-    model: process.env.BEHAVIORAL_AB_MODEL ?? 'claude-opus-4-8',
+    model,
     effort: process.env.BEHAVIORAL_AB_EFFORT ?? 'high',
     log: (line) => console.log(line),
     exit: (code) => process.exit(code),
