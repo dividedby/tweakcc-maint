@@ -71,10 +71,6 @@ prune to a one-line summary and the cumulative count above is bumped — ADR 002
 
 | # | Issue | Wave | Status | Owner | Skill(s) | Deps | Notes |
 | - | ----- | ---- | ------ | ----- | -------- | ---- | ----- |
-| 102 | Post-backlog: complete refactor plan from a fallow static-analysis pass | — | Done | human | `/improve-codebase-architecture` | — | Plan **accepted** (fresh re-run, fallow 2.91.0 @ `196d3e0`) and split via `/to-issues` → **#166 #167 #168**, all now landed → parent closed. P3/P4 stayed monitoring notes (not ticketed). Prior P2/P5 obsolete (entry-points + baseline already landed via #126/#128). `/software-design` early-exited (single-module hygiene → `/tdd`). Spawned from Idea Inbox #99 |
-| 166 | fallow P1: resolve 5 dead exports in the A/B tree | — | Done | agent | `/tdd` | — | 4 de-export internal helpers (orphan-report-producer, persona-prompts) + delete 1 dead re-export (stub-judge `BEHAVIORAL_AXES`). Gate-covered mechanical (ADR 0004 no-build, ADR 0007 untouched). From #102 P1 |
-| 167 | fallow P2: suppress 3 port-fake DI false positives | — | Done | agent | `/tdd` | — | Suppressed `VariantRunner`/`Rng` adapter members via `.fallowrc.json` `usedClassMembers` rules (#127 convention) — fallow can't see through the port (ADR-0004 seam). 3→0 unused class members, no deletions, no stale suppressions. From #102 P2 |
-| 168 | fallow P1 follow-up: regenerate committed fallow-baselines after dead-code cleanup | — | Done | agent | `/tdd` | ~~#166~~ ~~#167~~ | Regenerated `fallow-baselines/` via `--save-baseline` to the post-cleanup floor: dead-code baseline now 0 unused exports + 0 unused class members; health baseline captures the 1 inherited `ab-driver.ts` moderate-complexity finding. Audit verdict `pass`, 0 introduced. Report-only CI stays non-gating (ADR 0004 / #103). From #102 sequencing |
 | 175 | Behavioral A/B provisioning: spike — discovery-redirect, `--effort`, native-install (R1/R2/R3) | W3 | Next | human | — | — | Read-only spike: can `tweakcc-fixed` discovery be steered to a copy via `HOME`+`TWEAKCC_CONFIG_DIR` alone (R1); does adopted CLI accept `--effort` (R2); native-install fallback + v1 scope (R3). Output: a decision note unblocking #178/#176. EVIDENCE not gate (ADR 0002) |
 | 176 | Behavioral A/B provisioning: prod `runCli` node-spawn wrapper + unit test | W3 | Next | agent | `/tdd` | — | `node <cliPath> -p --output-format json --model --effort …` constant across arms (ADR 0002); mirror `leaf-shell.ts` maxBuffer; keep credential env explicit under sandboxed HOME (R4) |
 | 177 | Behavioral A/B provisioning: `workDir` stager helper + unit test | W3 | Next | agent | `/tdd` | — | Fresh isolated per-(fixture,variant) scratch dir under a removable work root; teardown removes it (R5) |
@@ -85,83 +81,22 @@ prune to a one-line summary and the cumulative count above is bumped — ADR 002
 | bench#7 | Rotate NPM_TOKEN before it expires (~2026-09-08) | — | Blocked | human | — | — | `dividedby/bench`. Time-gated ops: rotate the `@dividedby/bench-core` publish token before ~2026-09-08 |
 
 <details>
-<summary>Closed waves W1 + W2 + cross-cutting — 59 issues Done (collapsed; superseded backlog)</summary>
+<summary>Closed waves W1 + W2 + cross-cutting — 63 issues Done (pruned to one-line wave summaries)</summary>
 
-Rows retained on first collapse (ADR 0023). Closed issues live on GitHub + in git
-history; the Burn-down **Closed (cumulative)** integer carries the all-time total.
-W1 (2.1.169 adoption + 2.1.168 orphan/boot correctness) and W2 (verdict-signal
-trust) shipped fully; the cross-cutting `—` set covers the maintenance-machine epic,
-the Behavioral A/B tree, the loop-onboarding work, fallow hygiene, and the
-`@dividedby/bench-core` extraction (`bench#3`). Once a *newer numbered* wave opens,
-these rows prune to a one-line summary per wave and the cumulative count is bumped.
+Pruned to a one-line summary per wave (ADR 0023): W3 is now an active *newer
+numbered* wave, so the retained full rows are pruned and the Burn-down **Closed
+(cumulative)** integer below carries the all-time total. The detailed rows are not
+lost — every closed issue persists on GitHub, and every old census row persists in
+git history; this `<details>` is an index, not the archive.
 
-| # | Issue | Wave | Status | Owner | Skill(s) | Notes |
-| - | ----- | ---- | ------ | ----- | -------- | ----- |
-| 148 | Enforce gate as a required status check on main | — | Done | agent | `/update-config` | Stood up `.github/workflows/ci.yml` (`ci` check: `pnpm test`+`pnpm typecheck` on PRs) — the missing always-green PR check; `main` branch protection now requires it (`enforce_admins=false`). Also fixed two latent CI bugs: pnpm devEngines caret → exact 11.5.2, and an inert `minimumReleaseAgeExclude` (version-suffixed → name pattern, exempting first-party bench-core). PR #163 |
-| bench#2 | Publish benchmark results to GitHub Pages (model × effort × cost/quality) | — | Done | agent | — | `dividedby/bench`. Committed-derived-snapshot model: `site/build-data.mjs` joins cost+quality on the `model__effort` cell key → `site/data.json`; `pages.yml` renders+deploys on push (no sweep/secrets). Pages live: https://dividedby.github.io/bench/ (bench PR #10) |
-| 156 | Bump GitHub Actions off deprecated Node 20 (integration-gate + fallow-report @v4 → current majors) | — | Done | agent | — | All five `@v4` refs bumped (checkout→v6, setup-node→v6, action-setup→v6, cache→v5, upload-artifact→v7) across both workflows; pnpm pin (11.5.2) passed explicitly to action-setup so resolution is unaffected. fallow PR run went green on the bumped actions (PR #161) |
-| 151 | Onboard Idea Inbox + roadmap mirror, reconcile roadmap to new format (ADR 0023) | — | Done | agent | `/roadmap` | Idea Inbox (#99) + CI-owned read-only mirror (#159) + two-repo census departure (ADR 0009) + format migration (PR #160) |
-| bench#8 | Adopt label convention v1 (dividedby/skills #218) — full set | — | Done | agent | `/triage` | `dividedby/bench`. v1 set (6 CORE + 2 CHANNEL) applied; 8 stock labels removed (issue-free); `source:*`/LOOP labels not seeded (no proposal loops yet). Mirror of #154 |
-| bench#1 | Add an npm test PR gate on main | — | Done | agent | — | `dividedby/bench`. `test.yml` runs `node --test` PR gate on `main` (Node 24, checkout@v6 + setup-node@v6); also moved publish.yml off EOL Node 20 / `@v4` (bench PR #9). Branch protection to require the `test` check is a follow-up admin step |
-| bench#3 | Add a model-calling JudgeBackend (live Opus grading) alongside the no-model default | — | Done | agent | — | `dividedby/bench`. Shipped `createModelJudgeBackend`, published `@dividedby/bench-core@0.2.0`; consumed here via #152 |
-| 154 | Adopt label convention v1 (dividedby/skills #218) — full set | — | Done | agent | `/triage` | Closed — v1 label set adopted on tweakcc-maint's tracker; bench mirror is bench#8 |
-| 152 | Behavioral A/B: swap judge adapters to bench-core live model backend | — | Done | agent | — | Bumped dep `^0.1.0`→`^0.2.0`, swapped default backend to `createModelJudgeBackend` (PR #155) |
-| 139 | Behavioral A/B: BehavioralAggregation (z-score + disagreement + variance/significance) | — | Done | agent | `/tdd` | Pure `aggregate()` reusing bench `normalize`/`groupByCell`; driver swap done |
-| 138 | Behavioral A/B: real adapters + live wiring | — | Done | agent | `/tdd` | JudgePanelPort + AFK adapters; driver scores a 3-persona panel (PR #149) |
-| 137 | Behavioral A/B: behavioral rubric + bait-fixture suite | — | Done | human | — | Rubric-anchored 0–4 axes + 4 bait fixtures + CorrectnessChecker seam |
-| 136 | Behavioral A/B: bench refactor + publish as library package (leaf) | — | Done | human | — | Published `@dividedby/bench-core@0.1.0`; stood up `dividedby/bench` |
-| 135 | Behavioral A/B: driver skeleton end-to-end on stub ports | — | Done | agent | `/tdd` | ABDriver tracer-bullet on stub ports |
-| 134 | PRD: Behavioral A/B benchmark (stock vs lobotomized-CC) | — | Done | agent | `/to-issues` | Codified #11's 6 decisions; whole slice set shipped |
-| 128 | fallow hygiene: save health baseline + wire report-only CI delta (#102 P5) | — | Done | agent | `/tdd` | Committed baselines + introduced/inherited delta in `fallow-report.yml` |
-| 127 | fallow hygiene: suppress DI port/seam false-positives (#102 P3) | — | Done | agent | `/tdd` | `usedClassMembers` rules + one dead-method drop |
-| 126 | fallow hygiene: register tsx CLI entry points in fallow config (#102 P2) | — | Done | agent | `/tdd` | Root `.fallowrc.json` entry roots |
-| 125 | fallow hygiene: triage 4 genuinely-dead exports (#102 P1) | — | Done | agent | `/tdd` | 4 dead exports made module-private |
-| 114 | integration-gate: boot-verify `claude -p` has no `--model` pin or `--max-budget-usd` cap | — | Done | agent | — | Pinned haiku snapshot model + `--max-budget-usd 1.00` cap |
-| 107 | staleness-review: pnpm CI pin exact + Node cross-major (2 findings) | — | Done | agent | `/staleness-audit` | CI pnpm pinned exact; `.nvmrc`→26.3.0, gate green under live Node 26 |
-| 103 | CI: standing fallow static-analysis check (report-only first) | — | Done | agent | — | `fallow-report.yml`, report-only baseline for #102 |
-| 96 | Leaf ask: make escape-or-not mechanical (per-prompt delimiter or escape audit) | — | Done | agent | — | Framed ask delivered as an intent-ping on tf#7 |
-| 95 | Gate: standing cross-leaf pairing-coherence check | — | Done | agent | `/tdd` | `pairing-coherence-cli.ts` invokes skrabe's `auditMisbinds` across tf×lcc pairings |
-| 94 | Pre-stage CC 2.1.170 adoption on skrabe's open PR pair — current on merge day | — | Done | agent | `/release-adoption` | Merge-day gate green vs merged mains; 2.1.170 record finalized |
-| 93 | Bug evidence: chronic duplicate-id carryover in prompts JSONs — deliver upstream | — | Done | agent | — | Evidence intent-ping on tf#7 |
-| 85 | Maintenance machine — Phase C: extract the defer-vs-lead improvement backlog | — | Done | agent | — | `docs/index/improvement-backlog.md`; leads #93–#96 spawned |
-| 84 | Maintenance machine — Phase B: synthesize the index into durable knowledge | — | Done | agent | — | CONTEXT/ADR 0007/CLAUDE/runbook updated |
-| 83 | Maintenance machine — Phase A: index both leaf repos | — | Done | agent | — | `docs/index/leaf-repos.md` |
-| 81 | Maintenance machine — epic | — | Done | human | — | All 3 phase children shipped |
-| 80 | Gate shells to skrabe's published `driver.mjs` instead of reconstructing the verdict | — | Done | agent | `/tdd` | `driver-verification.ts` sources signals from `driver.mjs` exit codes |
-| 77 | Add PreToolUse hook to gate typecheck before git commits | — | Done | agent | `/update-config` | `typecheck-guard.py` |
-| 76 | deepening: export `versionPassed` from integration-gate | — | Done | agent | `/improve-codebase-architecture` | De-duplicated the pass predicate |
-| 75 | staleness-review: Node + pnpm pins | — | Done | mixed | `/staleness-audit` | `.github/dependabot.yml`; `.nvmrc` 22→24 |
-| 62 | Orphan-validator false-clean: SYNTHETIC_POSITIONAL hides boot-crashing `_VAR_<n>` | W2 | Done | agent | `/tdd` | Removed the blanket `_VAR_<n>` exclusion |
-| 58 | Adopt CC 2.1.169 | W1 | Done | agent | `/release-adoption` | Gate green; record establishes `docs/records/` |
-| 53 | Onboard to the staleness-review loop | — | Done | mixed | `/staleness-audit` | `staleness-review.yml` (caveat → dividedby/skills#179) |
-| 52 | Onboard to the architecture-review loop | — | Done | mixed | `/improve-codebase-architecture` | `improve-codebase-architecture.yml` |
-| 51 | Onboard as an apply-agent-research Consumer loop | — | Done | mixed | `/apply-agent-research` | `apply-agent-research.yml` |
-| 47 | Partial-identifierMap wrong-capture binding boots clean | W2 | Done | mixed | `/triage` | Resolved at the patcher altitude |
-| 46 | Authoring-drift pre-check validates vs the leaf's OWN identifierMap | W1 | Done | mixed | `/triage` | Closed as overtaken (skrabe `38daf92`) |
-| 45 | Swap tweakcc-fixed#4 detector to the identifierMap-union check | W1 | Done | mixed | `/tdd` | Merged by skrabe (tf#4) |
-| 43 | Orphan report producer (relocated to control plane) | W1 | Done | agent | `/release-adoption` | Ported to `src/orphan-report-producer.ts`, wired into #80 |
-| 42 | cli.ts hasCredentials() false-negative on stored OAuth | W1 | Done | agent | `/tdd` | Stored-OAuth probe seam |
-| 41 | orphanVariables double-sourced / not trustworthy | W2 | Done | mixed | `/triage` | Closed as superseded-by-#31 |
-| 31 | Gate consumes the patcher orphan report (consumer half) | W1 | Done | agent | `/tdd` | `orphan-report.ts` parser + Four-zeros authority |
-| 30 | Re-scope orphan check to authoring-drift pre-check | — | Done | agent | — | Foundation refined by #45/#46 |
-| 27 | Orphan validator: align identifierMap source with applied overrides | — | Done | agent | — | — |
-| 26 | Leaf finding: lobotomized breaks CC 2.1.168 (evidence) | W1 | Done | mixed | — | Named-prompt realign delivered → lcc#7 merged |
-| 23 | RealAdoptionEnvironment Restore drill (HITL) | — | Done | human | — | — |
-| 22 | RealAdoptionEnvironment adopt path — real --apply / boot-verify (HITL) | — | Done | human | — | — |
-| 21 | listMatrix() seam — environment supplies the Support matrix | — | Done | agent | — | — |
-| 20 | PRD: RealAdoptionEnvironment — shell-out adapter behind gate seam (HITL) | — | Done | human | — | — |
-| 13 | Parse apply/boot/validator output into a Four-zeros verdict | — | Done | agent | — | — |
-| 12 | Adoption-history reporting over Adoption records | — | Done | agent | — | — |
-| 11 | Roadmap: Behavioral A/B benchmark (stock vs lobotomized) | — | Done | mixed | `/to-prd` `/to-issues` | Epic delivered end-to-end → #134 → #135–#139 + #152 |
-| 10 | GitHub-hosted CI running the gate on the fork PR branch | — | Done | human | — | Harness guards landed (ADR 0006) |
-| 9 | Rebuild the release-adoption skill (ex-/showtime) | — | Done | agent | — | — |
-| 8 | Roadmap: leaf test broadening (tweakcc-fixed + lobotomized) | — | Done | human | `/tdd` | tf#6 merged (helper units kept, golden snapshot dropped) |
-| 7 | TB4: real adoption-environment adapter (HITL) | — | Done | agent | — | — |
-| 6 | TB5: propose-only release-detector run-book | — | Done | agent | — | — |
-| 5 | TB3: Restore-drill bracketing the gate | — | Done | agent | — | — |
-| 4 | TB2: Support-matrix iteration — every version must pass | — | Done | agent | — | — |
-| 3 | TB1: walking-skeleton integration gate → Four-zeros verdict | — | Done | agent | — | — |
-| 2 | PRD: release-adoption control plane | — | Done | mixed | — | — |
+- **W1** — 2.1.169 adoption + 2.1.168 orphan/boot correctness — wholly closed
+  (#26 #31 #42 #43 #45 #46 #58).
+- **W2** — verdict-signal trust (triage decisions) — wholly closed (#41 #47 #62).
+- **Cross-cutting `—`** — the maintenance-machine epic (#81 #83–#85 #93–#96), the
+  Behavioral A/B tree (#11 #134–#139 #152), loop-onboarding (#51–#53), fallow
+  hygiene (#102 #103 #125–#128 #166–#168), CI/gate + control-plane substrate (#2–#13
+  #20–#23 #27 #30 #75–#77 #80 #107 #114 #148 #151 #154 #156 #159), and the owned-sibling
+  `@dividedby/bench` work (bench#1 #2 #3 #8) — all closed.
 
 </details>
 
