@@ -58,10 +58,17 @@ describe('RealVariantRunner', () => {
     expect(without(calls[0]!.args)).toEqual(without(calls[1]!.args));
   });
 
-  it('surfaces an install/version mismatch rather than silently mispairing', async () => {
-    // A non-zero exit (e.g. the pinned install is wrong/broken) must throw, not mispair.
-    const runner = makeRunner([], () => ({ status: 1, stdout: '', stderr: 'version mismatch' }));
-    await expect(runner.run('f1', 'p', 'stock')).rejects.toThrow(/mismatch|exit|failed/i);
+  it('surfaces a non-zero arm exit — with the child stderr — rather than silently mispairing', async () => {
+    // A non-zero exit (a wrong/broken install, a bad flag) must throw, not mispair. The child's
+    // captured stderr is included so the real cause is diagnosable (#180), not a generic label.
+    const runner = makeRunner([], () => ({ status: 1, stdout: '', stderr: 'SyntaxError: Invalid or unexpected token' }));
+    const err = await runner.run('f1', 'p', 'stock').then(
+      () => undefined,
+      (e: unknown) => e as Error,
+    );
+    expect(err).toBeInstanceOf(Error);
+    expect(err!.message).toMatch(/exited 1/);
+    expect(err!.message).toContain('SyntaxError: Invalid or unexpected token');
   });
 
   it('surfaces an unparseable CLI reply rather than returning an empty output', async () => {

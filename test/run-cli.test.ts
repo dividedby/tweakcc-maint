@@ -16,12 +16,16 @@ function fakeSpawn(record: SpawnCall[], result = { status: 0, stdout: '{}', stde
   };
 }
 
+const BENCH_ARGS = ['-p', 'the prompt', '--model', 'opus', '--effort', 'high', '--output-format', 'json'];
+
 /** The bench-shaped invocation: RealVariantRunner has already prepended the variant's cli.js. */
 function invocation(): CliInvocation {
-  return {
-    args: ['/installs/stock/cli.js', '-p', 'the prompt', '--model', 'opus', '--effort', 'high', '--output-format', 'json'],
-    cwd: '/tmp/work',
-  };
+  return { args: ['/installs/stock/cli.js', ...BENCH_ARGS], cwd: '/tmp/work' };
+}
+
+/** A native-binary install (e.g. `.../stock/2.1.172`) — the live lineage on this box (#180). */
+function nativeInvocation(): CliInvocation {
+  return { args: ['/installs/stock/2.1.172', ...BENCH_ARGS], cwd: '/tmp/work' };
 }
 
 describe('makeRunCli — prod node-spawn wrapper', () => {
@@ -45,6 +49,19 @@ describe('makeRunCli — prod node-spawn wrapper', () => {
       'json',
     ]);
     // cwd is the run's workDir, threaded through unchanged.
+    expect(calls[0]!.options.cwd).toBe('/tmp/work');
+  });
+
+  it('execs a native-binary install directly, not under `node` (#180)', () => {
+    const calls: SpawnCall[] = [];
+    const runCli = makeRunCli({ spawn: fakeSpawn(calls) });
+
+    runCli(nativeInvocation());
+
+    expect(calls).toHaveLength(1);
+    // `node <native-binary>` exits 1 parsing the executable as JS — exec the binary directly.
+    expect(calls[0]!.command).toBe('/installs/stock/2.1.172');
+    expect(calls[0]!.args).toEqual(BENCH_ARGS);
     expect(calls[0]!.options.cwd).toBe('/tmp/work');
   });
 

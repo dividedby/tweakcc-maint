@@ -31,6 +31,22 @@ export interface RealVariantRunnerOptions {
   runCli: (invocation: CliInvocation) => CliResult;
 }
 
+/**
+ * Surface the child CLI's captured stderr/stdout (bench `executeRun` fills `raw` when the reply
+ * doesn't parse — the non-zero-exit case) so a real arm failure is diagnosable instead of being
+ * mislabeled. Trimmed and capped; empty when nothing was captured. (#180: a generic
+ * "install/version mismatch" message that discarded the child stderr masked a `node`-vs-native
+ * launcher bug.)
+ */
+function formatChildOutput(raw: RunResult['raw']): string {
+  const parts: string[] = [];
+  const stderr = raw?.stderr?.trim();
+  const stdout = raw?.stdout?.trim();
+  if (stderr) parts.push(`stderr: ${stderr.slice(0, 2000)}`);
+  if (stdout) parts.push(`stdout: ${stdout.slice(0, 2000)}`);
+  return parts.length > 0 ? ` Child output — ${parts.join(' | ')}` : '';
+}
+
 export class RealVariantRunner implements VariantRunner {
   constructor(private readonly opts: RealVariantRunnerOptions) {}
 
@@ -57,14 +73,14 @@ export class RealVariantRunner implements VariantRunner {
     if (result.exitCode !== 0) {
       throw new Error(
         `RealVariantRunner: ${variant} arm exited ${result.exitCode} for fixture "${fixtureId}" ` +
-          `(${cliPath}) — install/version mismatch, refusing to mispair.`,
+          `(${cliPath}) — refusing to mispair.${formatChildOutput(result.raw)}`,
       );
     }
     const text = (result.result as { result?: unknown } | null)?.result;
     if (typeof text !== 'string') {
       throw new Error(
         `RealVariantRunner: ${variant} arm produced no parseable result for fixture "${fixtureId}" ` +
-          `(${cliPath}) — refusing to mispair an empty output.`,
+          `(${cliPath}) — refusing to mispair an empty output.${formatChildOutput(result.raw)}`,
       );
     }
     return { variant, output: text };

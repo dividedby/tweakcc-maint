@@ -1,14 +1,19 @@
 /**
- * run-cli — the production `runCli` node-spawn wrapper the {@link RealVariantRunner}
+ * run-cli — the production `runCli` spawn wrapper the {@link RealVariantRunner}
  * injects through the {@link VariantRunner} seam (#176; design doc → Seams). It spawns the
- * adopted Claude Code install HEADLESSLY by running its `cli.js` under `node`:
+ * adopted Claude Code install HEADLESSLY, dispatching the launcher off the resolved install
+ * file the provisioner copied (#178): the fork ships in two lineages and the live install can
+ * be EITHER —
  *
- *   node <cliPath> -p --output-format json --model <M> --effort <E> …
+ *   - npm `cli.js`        → `node <cliPath> -p --output-format json --model <M> --effort <E> …`
+ *   - native binary       → `<cliPath> -p …` directly (a Mach-O/ELF the provisioner copied;
+ *                            `node <native-binary>` exits 1 parsing it as JS — #180).
  *
  * The bench `executeRun` already built `[-p, prompt, --model, M, --effort, E, --output-format,
- * json]` and RealVariantRunner prepended the variant's `cliPath`; this wrapper just spawns
- * `node` with the whole argv. Holding model/effort/prompt constant across both arms is the
- * caller's job — the ONLY variable here is which `cli.js` runs (ADR 0002).
+ * json]` and RealVariantRunner prepended the variant's `cliPath`; this wrapper picks the
+ * launcher by `cliPath`'s extension (`.js`/`.mjs`/`.cjs` → `node`, else exec the binary).
+ * Holding model/effort/prompt constant across both arms is the caller's job — the ONLY
+ * variable here is which install runs (ADR 0002).
  *
  * It mirrors {@link runSync}'s sync shell-out boundary (`spawnSync`, the same 64 MiB capture
  * cap) so a multi-line reply is not silently truncated at spawnSync's 1 MiB default.
@@ -31,6 +36,20 @@ export const RUN_CLI_MAX_BUFFER = 64 * 1024 * 1024;
 
 /** The credential env vars the run authenticates with — re-asserted explicitly under R4. */
 const CREDENTIAL_ENV_VARS = ['CLAUDE_CODE_OAUTH_TOKEN', 'ANTHROPIC_API_KEY'] as const;
+
+/** JS entrypoint extensions that must be launched via `node`; anything else is run directly. */
+const JS_ENTRYPOINT_EXTENSIONS = ['.js', '.mjs', '.cjs'] as const;
+
+/**
+ * Pick the spawn `command` + `args` for the install at `args[0]` (the cliPath RealVariantRunner
+ * prepended). An npm `cli.js` lineage runs under `node`; a native-binary lineage is executed
+ * directly — `node <native-binary>` exits 1 parsing the executable as JS (#180).
+ */
+function dispatchLauncher(args: string[]): { command: string; args: string[] } {
+  const cliPath = args[0] ?? '';
+  const isJsEntrypoint = JS_ENTRYPOINT_EXTENSIONS.some((ext) => cliPath.endsWith(ext));
+  return isJsEntrypoint ? { command: 'node', args } : { command: cliPath, args: args.slice(1) };
+}
 
 /** The `spawnSync` subset this wrapper uses — a seam so the contract is unit-tested with no subprocess. */
 export type SpawnSeam = (
@@ -73,7 +92,8 @@ export function makeRunCli(options: MakeRunCliOptions = {}): (invocation: CliInv
   }
 
   return (invocation: CliInvocation): CliResult => {
-    const r = spawn('node', invocation.args, {
+    const { command, args } = dispatchLauncher(invocation.args);
+    const r = spawn(command, args, {
       cwd: invocation.cwd,
       env,
       encoding: 'utf8',
