@@ -39,20 +39,20 @@ no other guidance is needed. Follow it top to bottom:
 
 ## Burn-down (2026-06-10)
 Reconciled against live `gh` across **both** repos (`/roadmap`).
-**78 issues — 76 closed (97%), 2 open.**
+**83 issues — 76 closed (92%), 7 open.**
 **Closed (cumulative): 76.** ← integer total of all closed issues ever, including
 those whose rows are pruned from collapsed waves; bumped, never recomputed from the
 table (pruned rows are gone), so the count survives wave pruning.
 
 | Bucket | Count | Issues |
 |---|---|---|
-| **Ready (agent)** — loop-eligible | 0 | — (all W3 agent slices #176–#179 landed) |
-| **Ready (human / HITL)**          | 0 | — (#180 #192 closed — W3 wholly done) |
-| **Blocked / deferred**            | 1 | bench#7 (time-gated: rotate NPM_TOKEN ~2026-09-08) |
-| **Tracking** (epic / PRD parents) | 0 | — (#102 closed — all of #166–#168 landed) |
+| **Ready (agent)** — loop-eligible | 2 | #197 (detector CLI), #198 (in-gate strings-file extraction) — both unblocked |
+| **Ready (human / HITL)**          | 0 | — |
+| **Blocked / deferred**            | 3 | #199 (dep #197), #200 (deps #199 #198), bench#7 (time-gated: rotate NPM_TOKEN ~2026-09-08) |
+| **Tracking** (epic / PRD parents) | 1 | #196 (Auto-adopt pipeline PRD) |
 | **Meta** (idea-inbox / onboarding)| 1 | #99 (Idea Inbox) |
 
-Open by wave: W1 0 · W2 0 · W3 0 · unscoped 2 (#99 bench#7).
+Open by wave: W1 0 · W2 0 · W3 0 · W4 5 (#196 #197 #198 #199 #200) · unscoped 2 (#99 bench#7).
 
 ## Priority waves
 | Wave | Theme | Issues | Gate to enter |
@@ -60,50 +60,43 @@ Open by wave: W1 0 · W2 0 · W3 0 · unscoped 2 (#99 bench#7).
 | **W1** | 2.1.169 adoption + 2.1.168 orphan/boot correctness | — (wholly closed) | done |
 | **W2** | Verdict-signal trust (triage decisions) | — (wholly closed) | done |
 | **W3** | Behavioral A/B benchmark runnable (provisioning) | — (wholly closed) | done |
+| **W4** | Auto-adopt pipeline (detect → propose → auto-gate) | #196–#200 | open (#197 #198 next; #199 #200 dep-gated) |
 | **—**  | Cross-cutting / ongoing (incl. all `bench#NN` work) | #99 bench#7 | n/a |
 
 ## Master census (active waves inline)
 
-Open waves and the active backlog stay inline below — now just the standing
-cross-cutting/meta rows (#99, bench#7), as every numbered wave is wholly closed.
-W3 is collapsed into its own `<details>` with rows retained (first collapse, no
-newer wave to trigger a prune); the older W1/W2 + cross-cutting set is already
-pruned to one-line summaries in the second `<details>`. On first collapse rows are
-retained; once a *newer numbered* wave is active they prune to a one-line summary
-and the cumulative count above is bumped — ADR 0023.
+Open waves and the active backlog stay inline below — W4 (the active numbered wave)
+plus the standing cross-cutting/meta rows (#99, bench#7). W4 going active *prunes*
+the previously-retained W3 rows to a one-line summary in the collapsed block below
+(ADR 0023): a wholly-closed wave keeps full rows only until a newer numbered wave is
+active, then prunes; the cumulative closed-count integer above is carried (W3's 7
+closed issues are already counted in it). The older W1/W2 + cross-cutting set was
+pruned the same way.
 
 | # | Issue | Wave | Status | Owner | Skill(s) | Deps | Notes |
 | - | ----- | ---- | ------ | ----- | -------- | ---- | ----- |
+| 196 | 💡 Auto-adopt pipeline — detect new CC version → propose → auto-gate (PRD) | W4 | Tracking | human | — | — | PRD parent for the **detect → propose → auto-gate** spine (#197–#200). HITL back-half (realign/patch authoring, Behavioral A/B, leaf PRs) explicitly out of scope (ADR 0002; cockpit rule) |
+| 197 | Auto-adopt slice 1: `ReleaseDetector` CLI entry + proposal marker + all-fake wiring test | W4 | Next | agent | `/tdd` | — | Thin CLI mirroring `cli.ts`/`behavioral-ab-cli.ts`; wires real npm source + `gh` publisher; propose-only; proposal body carries a machine-readable `cc_version` marker; all-fake wiring test (no real network/`gh`) |
+| 198 | Auto-adopt slice 3: in-gate pristine strings-file extraction (`prompts-<version>.json`) | W4 | Next | agent | `/tdd` | — | Extract from the freshly-installed pristine native binary into `prompt-data-cache`, **ephemeral** never committed (cockpit); fix `@babel/parser` availability; thin `(binaryPath,version)→path` wrapper + unit test, live path verified by a gate dispatch. Independent of the detector — the #180 linchpin gap generalized |
+| 199 | Auto-adopt slice 2: daily-cron workflow runs the detector → opens proposal | W4 | Blocked | agent | `/tdd` | 197 | Thin cron workflow invoking the slice-1 CLI with an issue-scoped token; logic stays in `tsx` (mirrors `integration-gate.yml`); no `claude -p` so no cost-ledger wiring; dedupe one proposal per version |
+| 200 | Auto-adopt slice 4: auto-chain labeled proposal → gate dispatch + Adoption-record write-back | W4 | Blocked | agent | `/tdd` | 199, 198 | Labeled proposal auto-dispatches `integration-gate.yml` for its `cc_version` (no human step); gate posts the Adoption record + pass/fail back as a comment (additive, no auto-close); one run per proposal; reuse existing `total_cost_usd` surfacing |
 | 99 | 💡 Idea Inbox | — | Tracking | human | — | — | **Standing Meta row — exempt from burn-down as pickable work.** Canonical intake for unstructured ideas across **both** repos (ADR 0009); a drained idea is filed in tweakcc-maint or `dividedby/bench` and registered as a census row here. First idea actioned → #102 |
 | bench#7 | Rotate NPM_TOKEN before it expires (~2026-09-08) | — | Blocked | human | — | — | `dividedby/bench`. Time-gated ops: rotate the `@dividedby/bench-core` publish token before ~2026-09-08 |
 
 <details>
-<summary>Closed wave W3 — Behavioral A/B benchmark runnable (provisioning) — 7 issues Done (rows retained; not yet pruned — no newer wave is active, ADR 0023)</summary>
+<summary>Closed waves W1 + W2 + W3 + cross-cutting — 70 issues Done (pruned to one-line wave summaries)</summary>
 
-| # | Issue | Wave | Status | Owner | Skill(s) | Deps | Notes |
-| - | ----- | ---- | ------ | ----- | -------- | ---- | ----- |
-| 175 | Behavioral A/B provisioning: spike — discovery-redirect, `--effort`, native-install (R1/R2/R3) | W3 | Done | human | — | — | Read-only spike: can `tweakcc-fixed` discovery be steered to a copy via `HOME`+`TWEAKCC_CONFIG_DIR` alone (R1); does adopted CLI accept `--effort` (R2); native-install fallback + v1 scope (R3). Output: a decision note unblocking #178/#176. EVIDENCE not gate (ADR 0002) |
-| 176 | Behavioral A/B provisioning: prod `runCli` node-spawn wrapper + unit test | W3 | Done | agent | `/tdd` | — | `node <cliPath> -p --output-format json --model --effort …` constant across arms (ADR 0002); mirror `leaf-shell.ts` maxBuffer; keep credential env explicit under sandboxed HOME (R4) |
-| 177 | Behavioral A/B provisioning: `workDir` stager helper + unit test | W3 | Done | agent | `/tdd` | — | Fresh isolated per-(fixture,variant) scratch dir under a removable work root; teardown removes it (R5) |
-| 178 | Behavioral A/B provisioning: `provisionVariants()` producer + contract test | W3 | Done | agent | `/tdd` | _175_ | copy-then-apply in sandbox HOME+config; stock=pristine copy, lobotomized=`--apply`-patched copy w/ backup in sandbox not `~/.tweakcc`; live install READ-only so Restore drill stays byte-clean. Contract test w/ fake patcher/copy seam. **Pin `TWEAKCC_CC_INSTALLATION_PATH` to the copy** (HOME+CONFIG_DIR alone don't redirect — #175 note); native-binary copy-then-redirect is v1 scope |
-| 179 | Behavioral A/B provisioning: `src/behavioral-ab-cli.ts` entry point + all-fake wiring test | W3 | Done | agent | `/tdd` | _176_, _177_, _178_ | mirrors `cli.ts`/`pairing-coherence-cli.ts`; minimal `AdoptionRecord`, prints `BehavioralVerdict`, ALWAYS exits 0, `finally` cleanup (evidence not gate, ADR 0002). All-fake doubles, no real claude |
-| 180 | Behavioral A/B provisioning: one HITL live run — capture first real `BehavioralVerdict` | W3 | Done | human | — | _179_ | First **non-degenerate** `BehavioralVerdict` captured (opus-4-8/high): lobo differs from stock — terse-directness Δ0.50, fewer-unsolicited-offers Δ0.083; `degenerate: false`, guardrail passed; live install byte-clean after. Unblocked by producing `prompts-2.1.172.json` via **pristine** extraction (npm ships no `cli.js`; extracted from `native-binary.backup` → `promptExtractor.js`). NEVER added to CI (local-first, ADR 0002) |
-| 192 | Behavioral A/B: lobo arm not actually lobotomized in sandbox — degenerate stock-vs-stock verdict | W3 | Done | human | — | _179_, _180_ | `provisionVariants()` now seeds the sandbox config before `--apply`: the tracked leaf's `system-prompts-<model>` + `system-reminders` symlinked read-only, prompt-data-cache copied in; refuses an unmapped model up front, refuses a skipped `--apply` (`applySkippedSystemPrompts`), and flags a byte-identical run (`BehavioralVerdict.degenerate`). Backup isolation (#178) preserved |
-
-</details>
-
-<details>
-<summary>Closed waves W1 + W2 + cross-cutting — 63 issues Done (pruned to one-line wave summaries)</summary>
-
-Pruned to a one-line summary per wave (ADR 0023): W3 is now an active *newer
-numbered* wave, so the retained full rows are pruned and the Burn-down **Closed
-(cumulative)** integer below carries the all-time total. The detailed rows are not
-lost — every closed issue persists on GitHub, and every old census row persists in
-git history; this `<details>` is an index, not the archive.
+Pruned to a one-line summary per wave (ADR 0023): W4 is now the active *newer
+numbered* wave, so W3's previously-retained rows are pruned here and the Burn-down
+**Closed (cumulative)** integer above carries the all-time total. The detailed rows
+are not lost — every closed issue persists on GitHub, and every old census row
+persists in git history; this `<details>` is an index, not the archive.
 
 - **W1** — 2.1.169 adoption + 2.1.168 orphan/boot correctness — wholly closed
   (#26 #31 #42 #43 #45 #46 #58).
 - **W2** — verdict-signal trust (triage decisions) — wholly closed (#41 #47 #62).
+- **W3** — Behavioral A/B benchmark runnable (provisioning) — wholly closed
+  (#175–#180 #192).
 - **Cross-cutting `—`** — the maintenance-machine epic (#81 #83–#85 #93–#96), the
   Behavioral A/B tree (#11 #134–#139 #152), loop-onboarding (#51–#53), fallow
   hygiene (#102 #103 #125–#128 #166–#168), CI/gate + control-plane substrate (#2–#13
