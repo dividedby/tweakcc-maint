@@ -80,6 +80,30 @@ export interface OverrideFile {
 // is not interpolated into the binary).
 const FRONTMATTER = /^\s*<!--[\s\S]*?-->\n?/;
 
+// A markdown fenced code block: an opening fence line of ``` or ~~~ (3+ of the char, with an
+// optional info string), its body, and a matching-or-longer closing fence of the same char.
+// `${...}` inside such a fence is DOCUMENTATION — it injects into a double-quoted JS string in
+// the patched cli.js, where `${...}` is inert (JS interpolates only in backtick template
+// literals), so it never binds a slot and never ReferenceErrors (boot-verify passes — the
+// runtime authority, ADR 0005). The 'm' flag anchors fences to line starts; '[^\S\n]*' allows
+// the leading indentation CommonMark permits (up to 3 spaces, kept loose here).
+const FENCED_BLOCK = /^[^\S\n]*(`{3,}|~{3,})[^\n]*\n[\s\S]*?^[^\S\n]*\1[^\S\n]*$/gm;
+
+/**
+ * Blank the interior of every fenced code block, preserving the source length/offsets so the
+ * escape lookbehind in {@link extractLeadingIdentifiers} stays correct. Replacing each fenced
+ * span with same-length whitespace removes its `${...}` from the scan without shifting any
+ * surviving offset.
+ *
+ * NB this fence-awareness fix is scoped to the fence case (the confirmed CC 2.1.172 false
+ * orphans). The deeper latent gap — that `${...}` is also inert in any quote-delimited (vs
+ * backtick) string in the patched binary, fenced or not — is NOT handled here; that broader
+ * quote-vs-backtick delimiter mechanic stays a separate, unaddressed concern.
+ */
+function blankFencedBlocks(body: string): string {
+  return body.replace(FENCED_BLOCK, (block) => block.replace(/[^\n]/g, ' '));
+}
+
 /**
  * Extract the leading identifier of every unescaped `${...}` interpolation in a body. The
  * leading identifier is the first `[A-Z][A-Z0-9_]+` token immediately inside the braces,
@@ -87,9 +111,11 @@ const FRONTMATTER = /^\s*<!--[\s\S]*?-->\n?/;
  * `(`, `.`, etc. — the name that must resolve in runtime scope for the expression to
  * evaluate. Returned in source order (the caller dedupes). Escaped `\${...}` is skipped via
  * the lookbehind; a lowercase-led interpolation (legitimate inline JS, never a slot) is
- * ignored.
+ * ignored. `${...}` inside a markdown fenced code block is documentation, inert in the patched
+ * binary, and skipped (see {@link blankFencedBlocks}).
  */
 export function extractLeadingIdentifiers(body: string): string[] {
+  body = blankFencedBlocks(body);
   const out: string[] = [];
   const open = /(?<!\\)\$\{/g;
   let m: RegExpExecArray | null;

@@ -51,6 +51,22 @@ describe('extractLeadingIdentifiers — covers the expression class, not just ba
       'SECOND_VAR',
     ]);
   });
+
+  it('does NOT flag a ${NAME} inside a ``` fenced code block (documentation, inert)', () => {
+    // A `${...}` written as documentation inside a markdown code fence injects into a
+    // double-quoted JS string in the patched cli.js, where `${...}` is INERT (JS interpolates
+    // only in backtick template literals) — it never binds a slot and never ReferenceErrors
+    // (boot-verify passes, the runtime authority — ADR 0005). The real fable-5 false orphans
+    // at CC 2.1.172: ${VERSION} in a ```sh install snippet.
+    const body =
+      'Real ${OUTSIDE_FENCE} here.\n\n```sh\ncurl ".../v${VERSION}/ant_${VERSION}.tar.gz"\n```\n\nback to prose.';
+    expect(extractLeadingIdentifiers(body)).toEqual(['OUTSIDE_FENCE']);
+  });
+
+  it('does NOT flag a ${NAME} inside a ~~~ fenced code block', () => {
+    const body = 'prose ${OUTSIDE}\n~~~\n{ "k": "${FENCED_SECRET}" }\n~~~\n';
+    expect(extractLeadingIdentifiers(body)).toEqual(['OUTSIDE']);
+  });
 });
 
 describe('buildKnownSlots — union and per-prompt slot model from the published prompts JSON', () => {
@@ -159,5 +175,43 @@ describe('buildOrphanReport — the emitted JSON contract over override files', 
     const content = '<!--\nvariables:\n  - ${MENTIONED_IN_PROSE}\n-->\n${IS_TRUTHY_FN()}';
     const report = buildOrphanReport([{ path: '/x/agent-usage-notes.md', content }], data);
     expect(report.prompts['agent-usage-notes']).toEqual(['IS_TRUTHY_FN']);
+  });
+
+  it('does NOT report ${...} that appears only inside markdown code fences (the CC 2.1.172 false orphans)', () => {
+    // The real fable-5 shapes that produced 4 FALSE orphans — VERSION, GITHUB_TOKEN,
+    // DATADOG_API_KEY, DATADOG_APP_KEY — all live inside fenced docs (a ```sh install snippet
+    // and a fenced example .mcp.json). They inject into a double-quoted JS string where
+    // `${...}` is inert, never bind a slot, never ReferenceError; boot-verify passes them
+    // (ADR 0005). A genuine leading-${SLOT} orphan OUTSIDE a fence still reports.
+    const cliDoc = [
+      '# Anthropic CLI',
+      '',
+      '```sh',
+      '# Linux / WSL',
+      'curl -fsSL ".../releases/download/v${VERSION}/ant_${VERSION}_$(uname).tar.gz"',
+      '```',
+      '',
+      'Some prose with a real ${IS_TRUTHY_FN()} orphan outside the fence.',
+    ].join('\n');
+    const mcpDoc = [
+      '## Example: Fully Configured `.mcp.json`',
+      '',
+      '```json',
+      '{',
+      '  "github": { "headers": { "Authorization": "Bearer ${GITHUB_TOKEN}" } },',
+      '  "datadog": { "headers": { "DD-API-KEY": "${DATADOG_API_KEY}", "DD-APPLICATION-KEY": "${DATADOG_APP_KEY}" } }',
+      '}',
+      '```',
+    ].join('\n');
+    const report = buildOrphanReport(
+      [
+        { path: '/x/data-anthropic-cli.md', content: cliDoc },
+        { path: '/x/skill-cowork-plugin-authoring-mcp-discovery.md', content: mcpDoc },
+      ],
+      data,
+    );
+    // The fenced VERSION/GITHUB_TOKEN/DATADOG_* are gone; only the genuine out-of-fence
+    // orphan survives.
+    expect(report.prompts).toEqual({ 'data-anthropic-cli': ['IS_TRUTHY_FN'] });
   });
 });
