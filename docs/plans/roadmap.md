@@ -46,9 +46,9 @@ table (pruned rows are gone), so the count survives wave pruning.
 
 | Bucket | Count | Issues |
 |---|---|---|
-| **Ready (agent)** — loop-eligible | 2 | #197 (detector CLI), #198 (in-gate strings-file extraction) — both unblocked |
+| **Ready (agent)** — loop-eligible | 1 | #198 (in-gate strings-file extraction) — unblocked (#197 has a PR open) |
 | **Ready (human / HITL)**          | 0 | — |
-| **Blocked / deferred**            | 3 | #199 (dep #197), #200 (deps #199 #198), bench#7 (time-gated: rotate NPM_TOKEN ~2026-09-08) |
+| **Blocked / deferred**            | 3 | #199 (dep #197 — PR open), #200 (deps #199 #198), bench#7 (time-gated: rotate NPM_TOKEN ~2026-09-08) |
 | **Tracking** (epic / PRD parents) | 1 | #196 (Auto-adopt pipeline PRD) |
 | **Meta** (idea-inbox / onboarding)| 1 | #99 (Idea Inbox) |
 
@@ -76,7 +76,7 @@ pruned the same way.
 | # | Issue | Wave | Status | Owner | Skill(s) | Deps | Notes |
 | - | ----- | ---- | ------ | ----- | -------- | ---- | ----- |
 | 196 | 💡 Auto-adopt pipeline — detect new CC version → propose → auto-gate (PRD) | W4 | Tracking | human | — | — | PRD parent for the **detect → propose → auto-gate** spine (#197–#200). HITL back-half (realign/patch authoring, Behavioral A/B, leaf PRs) explicitly out of scope (ADR 0002; cockpit rule) |
-| 197 | Auto-adopt slice 1: `ReleaseDetector` CLI entry + proposal marker + all-fake wiring test | W4 | Next | agent | `/tdd` | — | Thin CLI mirroring `cli.ts`/`behavioral-ab-cli.ts`; wires real npm source + `gh` publisher; propose-only; proposal body carries a machine-readable `cc_version` marker; all-fake wiring test (no real network/`gh`) |
+| 197 | Auto-adopt slice 1: `ReleaseDetector` CLI entry + proposal marker + all-fake wiring test | W4 | PR open | agent | `/tdd` | — | Thin CLI mirroring `cli.ts`/`behavioral-ab-cli.ts`; wires real npm source + `gh` publisher; propose-only; proposal body carries a machine-readable `cc_version` marker; all-fake wiring test (no real network/`gh`). **PR open:** `src/release-detector-cli.ts` + `formatProposal`/`PROPOSAL_LABEL`/`ccVersionMarker` (issue-publisher) + `RealNpmReleaseSource`/`RealIssuePublisher`. Unblocks #199 |
 | 198 | Auto-adopt slice 3: in-gate pristine strings-file extraction (`prompts-<version>.json`) | W4 | Next | agent | `/tdd` | — | Extract from the freshly-installed pristine native binary into `prompt-data-cache`, **ephemeral** never committed (cockpit); fix `@babel/parser` availability; thin `(binaryPath,version)→path` wrapper + unit test, live path verified by a gate dispatch. Independent of the detector — the #180 linchpin gap generalized |
 | 199 | Auto-adopt slice 2: daily-cron workflow runs the detector → opens proposal | W4 | Blocked | agent | `/tdd` | 197 | Thin cron workflow invoking the slice-1 CLI with an issue-scoped token; logic stays in `tsx` (mirrors `integration-gate.yml`); no `claude -p` so no cost-ledger wiring; dedupe one proposal per version |
 | 200 | Auto-adopt slice 4: auto-chain labeled proposal → gate dispatch + Adoption-record write-back | W4 | Blocked | agent | `/tdd` | 199, 198 | Labeled proposal auto-dispatches `integration-gate.yml` for its `cc_version` (no human step); gate posts the Adoption record + pass/fail back as a comment (additive, no auto-close); one run per proposal; reuse existing `total_cost_usd` surfacing |
