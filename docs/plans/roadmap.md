@@ -50,21 +50,21 @@ no other guidance is needed. Follow it top to bottom:
 
 ## Burn-down (2026-06-11)
 Reconciled against live `gh` across **both** repos (`/roadmap`).
-**89 issues — 83 closed (93%), 6 open.**
-**Closed (cumulative): 83.** ← integer total of all closed issues ever, including
+**89 issues — 84 closed (94%), 5 open.**
+**Closed (cumulative): 84.** ← integer total of all closed issues ever, including
 those whose rows are pruned from collapsed waves; bumped, never recomputed from the
 table (pruned rows are gone), so the count survives wave pruning.
 
 | Bucket | Count | Issues |
 |---|---|---|
-| **Ready (agent)** — loop-eligible | 2 | #210 #216 |
+| **Ready (agent)** — loop-eligible | 1 | #210 |
 | **Ready (human / HITL)**          | 1 | #207 (lobotomized realign — #211 unblocked it; human to re-scope vs skrabe's HEAD, redo from pristine) |
 | **In review (PR open)**           | 0 | — |
 | **Blocked / deferred**            | 1 | bench#7 (rotate NPM_TOKEN ~2026-09-08) |
 | **Tracking** (epic / PRD parents) | 1 | #196 (Auto-adopt pipeline PRD) |
 | **Meta** (idea-inbox / onboarding)| 1 | #99 (Idea Inbox) |
 
-Open by wave: W4 1 (#196) · W5 2 (#210 #216) · cross-cutting 3 (#99 #207 bench#7).
+Open by wave: W4 1 (#196) · W5 1 (#210) · cross-cutting 3 (#99 #207 bench#7).
 
 ## Priority waves
 | Wave | Theme | Issues | Gate to enter |
@@ -100,7 +100,7 @@ pruned the same way.
 | 213 | Auto-attach pristine realign anchor-candidate diff to adopt proposals | W5 | Done | agent | `/tdd` | _211_, _212_ | **Phase 1.** Merged: `src/anchor-candidate-diff.ts` — pure `buildAnchorCandidateDiff(prior,next,overrides)` over two PRISTINE prompts JSONs → per-override candidate (moved/unchanged/`zeroMatch`, channel-classified `Could not find` named-prompt vs `failed to find` inline-blob); `renderAnchorCandidateDiff` markdown + `postAnchorCandidateDiff` via the cockpit-safe additive `ProposalCommenter` seam (comment-only). A candidate that matches zero against pristine is surfaced as `zeroMatch` (no phantom text) — the lcc#9 mode impossible by construction. Reuses the Phase 0 extractor+guard. Unblocks #216 |
 | 214 | Stand up Behavioral A/B prove-value run on `@dividedby/bench-core` for adoptions | W5 | Done | agent | `/tdd` | — | **Phase 2 — primary strategy weight (verification/evidence layer).** Vanilla-vs-fork prove-value per adopted version on `@dividedby/bench-core` (ADR 0003): `src/prove-value-result.ts` distills the `BehavioralVerdict` into a version-keyed machine-readable `ProveValueResult` (per-axis lobotomized−stock delta + significance, guardrail outcome, degenerate flag, `provesValue` evidence summary — NOT a gate) + a leaf-PR markdown renderer #215 reuses; `src/prove-value-artifact.ts` persists it as `prove-value-<ver>.json` (injected fs seam) alongside the Adoption record; `behavioral-ab-cli` keys the run to `BEHAVIORAL_AB_CC_VERSION` and emits the artifact. No NEW `claude -p` invocation (artifact distillation is pure+fs) → no new cost-ledger wiring. `bench#NN`-adjacent but built from sessions here |
 | 215 | Standardize Adoption record + prove-value as leaf-PR evidence body | W5 | Done | agent | `/tdd` | _214_ | **Phase 2.** Done: `src/leaf-pr-evidence.ts` — pure `renderLeafPrEvidence({ccVersion, record, proveValue, provenance})` composes one standard leaf-PR evidence body from three halves: the Adoption record's per-version Four-zeros mapped onto the bar (four zeros spelled out + `auditMisbinds=0`/not-run/breached), the #214 prove-value result (reuses `renderProveValueResult` verbatim — evidence, not the bar), and the pristine `npm pack` provenance (#211/#213). Throws on version mismatch across the halves. A producer that *prepares* a body — opens no leaf PR. Convention documented in the release-adoption SKILL "Prepare verified PRs" step |
-| 216 | Bake the alignment preflight into automation: snapshot skrabe's current state on each proposal | W5 | Next | agent | `/tdd` | _212_, _213_ | Automation counterpart of the CLAUDE.md **Alignment preflight** rule (landed PR #218): snapshot leaf `main` HEAD + open/recently-closed PRs + his comments + his `tweakcc-fixed` npm version on each proposal; suppress a change already on his HEAD before it becomes a leaf PR |
+| 216 | Bake the alignment preflight into automation: snapshot skrabe's current state on each proposal | W5 | Done | agent | `/tdd` | _212_, _213_ | Automation counterpart of the CLAUDE.md **Alignment preflight** rule (#218). Done: `src/alignment-snapshot.ts` — `gatherAlignmentSnapshot` reads skrabe's CURRENT state behind injected seams (new read-only `LeafStateSource` for leaf `main` HEAD + recent subjects + open/recently-closed PRs + his review comments; reuses `NpmReleaseSource` for his `tweakcc-fixed` npm version) and compares it to our **Support matrix** (`aheadOfMatrix`); `renderAlignmentSnapshot`/`postAlignmentSnapshot` surface it as an **additive** proposal comment via the cockpit-safe `ProposalCommenter` seam (comment-only). `screenCandidatesAgainstHead` is the #213 precheck: a moved candidate whose proposed text his HEAD already carries is flagged `redundant` — suppressed BEFORE it becomes a leaf PR (the lcc#9/tweakcc-fixed#8 stale-premise mode, prevented in code). `RealLeafStateSource` (`gh`/`gh api`, read-only) ships the prod adapter; all-fake wiring test. No `claude -p` → no cost-ledger |
 | 207 | Realign lobotomized overrides to CC 2.1.172 (gate `driver-check` fails — opus-4-8 inline anchors stale) | — | Backlog | human | `release-adoption` | _211_ | HITL Release-adoption realignment (ADR 0002; PRD #196 back-half, out-of-loop). **#211 (Phase 0 pristine extraction) merged — unblocked.** **Draft PR lcc#9 closed by skrabe 2026-06-11 as contaminated** — anchors diagnosed against an already-patched install matched **zero** vs a fresh pristine extract (the override-body text + apply-time-spliced `uJq`/`B6T(` names were the tell; the MEMORY pristine-vs-`--apply` trap). skrabe had already realigned 2.1.172 himself (lcc `origin/main` eb3d6ad) and is on 2.1.173. **Blocked on #211 (Phase 0 pristine extraction);** human to re-scope against his current HEAD — redo only genuinely-uncovered opus-4-8 anchors from a pristine extract, if any remain |
 | 99 | 💡 Idea Inbox | — | Tracking | human | — | — | **Standing Meta row — exempt from burn-down as pickable work.** Canonical intake for unstructured ideas across **both** repos (ADR 0009); a drained idea is filed in tweakcc-maint or `dividedby/bench` and registered as a census row here. First idea actioned → #102 |
 | bench#7 | Rotate NPM_TOKEN before it expires (~2026-09-08) | — | Blocked | human | — | — | `dividedby/bench`. Time-gated ops: rotate the `@dividedby/bench-core` publish token before ~2026-09-08 |
