@@ -39,20 +39,20 @@ no other guidance is needed. Follow it top to bottom:
 
 ## Burn-down (2026-06-10)
 Reconciled against live `gh` across **both** repos (`/roadmap`).
-**77 issues — 69 closed (90%), 8 open.**
-**Closed (cumulative): 69.** ← integer total of all closed issues ever, including
+**77 issues — 71 closed (92%), 6 open.**
+**Closed (cumulative): 71.** ← integer total of all closed issues ever, including
 those whose rows are pruned from collapsed waves; bumped, never recomputed from the
 table (pruned rows are gone), so the count survives wave pruning.
 
 | Bucket | Count | Issues |
 |---|---|---|
-| **Ready (agent)** — loop-eligible | 2 | #176 #177 (provisioning leaves with no blockers) |
+| **Ready (agent)** — loop-eligible | 0 | — (#176 #177 merged; #178 #179 blocked on the #175 spike chain) |
 | **Ready (human / HITL)**          | 1 | #175 (provisioning spike) |
 | **Blocked / deferred**            | 4 | #178 #179 #180 (provisioning chain); bench#7 (time-gated: rotate NPM_TOKEN ~2026-09-08) |
 | **Tracking** (epic / PRD parents) | 0 | — (#102 closed — all of #166–#168 landed) |
 | **Meta** (idea-inbox / onboarding)| 1 | #99 (Idea Inbox) |
 
-Open by wave: W1 0 · W2 0 · W3 6 (#175–#180) · unscoped 2 (#99 bench#7).
+Open by wave: W1 0 · W2 0 · W3 4 (#175 #178 #179 #180) · unscoped 2 (#99 bench#7).
 
 ## Priority waves
 | Wave | Theme | Issues | Gate to enter |
@@ -75,7 +75,7 @@ prune to a one-line summary and the cumulative count above is bumped — ADR 002
 | 176 | Behavioral A/B provisioning: prod `runCli` node-spawn wrapper + unit test | W3 | Done | agent | `/tdd` | — | `node <cliPath> -p --output-format json --model --effort …` constant across arms (ADR 0002); mirror `leaf-shell.ts` maxBuffer; keep credential env explicit under sandboxed HOME (R4) |
 | 177 | Behavioral A/B provisioning: `workDir` stager helper + unit test | W3 | Done | agent | `/tdd` | — | Fresh isolated per-(fixture,variant) scratch dir under a removable work root; teardown removes it (R5) |
 | 178 | Behavioral A/B provisioning: `provisionVariants()` producer + contract test | W3 | Blocked | agent | `/tdd` | 175 | copy-then-apply in sandbox HOME+config; stock=pristine copy, lobotomized=`--apply`-patched copy w/ backup in sandbox not `~/.tweakcc`; live install READ-only so Restore drill stays byte-clean. Contract test w/ fake patcher/copy seam |
-| 179 | Behavioral A/B provisioning: `src/behavioral-ab-cli.ts` entry point + all-fake wiring test | W3 | Blocked | agent | `/tdd` | 176, 177, 178 | mirrors `cli.ts`/`pairing-coherence-cli.ts`; minimal `AdoptionRecord`, prints `BehavioralVerdict`, ALWAYS exits 0, `finally` cleanup (evidence not gate, ADR 0002). All-fake doubles, no real claude |
+| 179 | Behavioral A/B provisioning: `src/behavioral-ab-cli.ts` entry point + all-fake wiring test | W3 | Blocked | agent | `/tdd` | _176_, _177_, 178 | mirrors `cli.ts`/`pairing-coherence-cli.ts`; minimal `AdoptionRecord`, prints `BehavioralVerdict`, ALWAYS exits 0, `finally` cleanup (evidence not gate, ADR 0002). All-fake doubles, no real claude |
 | 180 | Behavioral A/B provisioning: one HITL live run — capture first real `BehavioralVerdict` | W3 | Blocked | human | — | 179 | One real local run (~8 arms + ~14 Opus judge calls), real budget, captures first real verdict + any provisioning quirks; NEVER added to CI (local-first, ADR 0002) |
 | 99 | 💡 Idea Inbox | — | Tracking | human | — | — | **Standing Meta row — exempt from burn-down as pickable work.** Canonical intake for unstructured ideas across **both** repos (ADR 0009); a drained idea is filed in tweakcc-maint or `dividedby/bench` and registered as a census row here. First idea actioned → #102 |
 | bench#7 | Rotate NPM_TOKEN before it expires (~2026-09-08) | — | Blocked | human | — | — | `dividedby/bench`. Time-gated ops: rotate the `@dividedby/bench-core` publish token before ~2026-09-08 |
