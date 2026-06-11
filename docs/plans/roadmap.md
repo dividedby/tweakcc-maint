@@ -50,8 +50,8 @@ no other guidance is needed. Follow it top to bottom:
 
 ## Burn-down (2026-06-11)
 Reconciled against live `gh` across **both** repos (`/roadmap`).
-**91 issues — 87 closed (96%), 4 open.**
-**Closed (cumulative): 87.** ← integer total of all closed issues ever, including
+**91 issues — 88 closed (97%), 3 open.**
+**Closed (cumulative): 88.** ← integer total of all closed issues ever, including
 those whose rows are pruned from collapsed waves; bumped, never recomputed from the
 table (pruned rows are gone), so the count survives wave pruning.
 
@@ -61,10 +61,10 @@ table (pruned rows are gone), so the count survives wave pruning.
 | **Ready (human / HITL)**          | 1 | #230 (tweakcc-fixed apply-ordering — verified draft PR skrabe/tweakcc-fixed#9 prepared (driver-check 2→0); awaiting skrabe's decision) |
 | **In review (PR open)**           | 0 | — |
 | **Blocked / deferred**            | 1 | bench#7 (rotate NPM_TOKEN ~2026-09-08) |
-| **Tracking** (epic / PRD parents) | 1 | #196 (Auto-adopt pipeline PRD) |
+| **Tracking** (epic / PRD parents) | 0 | — (W4 PRD parent #196 closed/Done) |
 | **Meta** (idea-inbox / onboarding)| 1 | #99 (Idea Inbox) |
 
-Open by wave: W4 1 (#196) · W5 0 (wholly closed — collapsed) · cross-cutting 3 (#99 #230 bench#7).
+Open by wave: W4 0 (wholly closed — pruned) · W5 0 (wholly closed — collapsed) · cross-cutting 3 (#99 #230 bench#7).
 
 ## Priority waves
 | Wave | Theme | Issues | Gate to enter |
@@ -72,30 +72,25 @@ Open by wave: W4 1 (#196) · W5 0 (wholly closed — collapsed) · cross-cutting
 | **W1** | 2.1.169 adoption + 2.1.168 orphan/boot correctness | — (wholly closed) | done |
 | **W2** | Verdict-signal trust (triage decisions) | — (wholly closed) | done |
 | **W3** | Behavioral A/B benchmark runnable (provisioning) | — (wholly closed) | done |
-| **W4** | Auto-adopt pipeline (detect → propose → auto-gate) | #196–#200 | open (#197–#200 spine merged; only #196 PRD-parent open) |
+| **W4** | Auto-adopt pipeline (detect → propose → auto-gate) | #196–#200 | wholly closed (pruned below) |
 | **W5** | Get ahead of the release curve — prove/benchmark, don't race (verification & evidence layer) | #210–#216 | wholly closed (collapsed below; no newer wave, so rows retained) |
 | **—**  | Cross-cutting / ongoing (incl. all `bench#NN` work) | #99 #207 bench#7 | n/a |
 
 ## Master census (active waves inline)
 
-Open waves and the active backlog stay inline below — W4 (PRD parent #196 still
-open; its Done spine #197–#200 stays inline until the wave wholly closes) plus the
-standing cross-cutting/meta rows (#99, #207, bench#7). **W5 (#210–#216) is now
-wholly closed and collapsed** into its own `<details>` below (ADR 0023): a
-wholly-closed wave keeps full rows until a *newer numbered* wave is active, then
-prunes to a one-liner — W5 is the newest wave, so its rows are retained, not pruned.
-W4 going active earlier *pruned* the previously-retained W3 rows to a one-line
-summary in the older collapsed block; the cumulative closed-count integer above is
-carried (W3's 7 closed issues are already counted in it). The older W1/W2 +
-cross-cutting set was pruned the same way.
+The active backlog stays inline below — the active leaf finding (#230) with its
+explanatory closed-context rows (#207, #228) and the standing cross-cutting/meta
+rows (#99, bench#7). **W5 (#210–#216) is wholly closed and collapsed** into its own
+`<details>` below (ADR 0023) with **full rows retained**: a wholly-closed wave keeps
+full rows until a *newer numbered* wave is active, then prunes to a one-liner — W5 is
+the newest wave, so its rows are retained, not pruned. **W4 (#196–#200) is now wholly
+closed too** (its PRD parent #196 closed); because W5 is newer, W4 *prunes* to a
+one-line wave summary in the older collapsed block below, alongside W1–W3 +
+cross-cutting. The cumulative closed-count integer above is carried across every
+prune (W4's 5 closed issues are already counted in it).
 
 | # | Issue | Wave | Status | Owner | Skill(s) | Deps | Notes |
 | - | ----- | ---- | ------ | ----- | -------- | ---- | ----- |
-| 196 | 💡 Auto-adopt pipeline — detect new CC version → propose → auto-gate (PRD) | W4 | Tracking | human | — | — | PRD parent for the **detect → propose → auto-gate** spine (#197–#200). HITL back-half (realign/patch authoring, Behavioral A/B, leaf PRs) explicitly out of scope (ADR 0002; cockpit rule) |
-| 197 | Auto-adopt slice 1: `ReleaseDetector` CLI entry + proposal marker + all-fake wiring test | W4 | Done | agent | `/tdd` | — | Merged (#202). Thin CLI mirroring `cli.ts`/`behavioral-ab-cli.ts`; `src/release-detector-cli.ts` + `formatProposal`/`PROPOSAL_LABEL`/`ccVersionMarker` (issue-publisher) + `RealNpmReleaseSource`/`RealIssuePublisher`; propose-only; machine-readable `cc_version` marker; all-fake wiring test. Unblocked #199 |
-| 198 | Auto-adopt slice 3: in-gate pristine strings-file extraction (`prompts-<version>.json`) | W4 | Done | agent | `/tdd` | — | Merged (#203). `src/strings-file-extractor.ts`: thin `extractStringsFile(binaryPath,version,outDir,adapter)→path` wrapper (version-mismatch throw) + unit test; real adapter wires the leaf `extractClaudeJsFromNativeInstallation → promptExtractor`; `@babel/parser` dep added + put on the child `NODE_PATH`; output **ephemeral**, `prompts-*.json`/`prompt-data-cache/` gitignored (cockpit). Live native-parse path gate-dispatch-verified. Independent of the detector — the #180 linchpin gap generalized |
-| 199 | Auto-adopt slice 2: daily-cron workflow runs the detector → opens proposal | W4 | Done | agent | `/tdd` | _197_ | Merged (#204). `.github/workflows/release-detector.yml`: thin daily-cron (07:00 UTC) + `workflow_dispatch` adapter that only runs `src/release-detector-cli.ts` (no business logic in YAML, mirrors `integration-gate.yml`→`cli.ts`); issue-scoped token (`permissions: issues:write`, `contents:read`), `gh` auth via `GH_TOKEN`; no `claude -p` so no cost-ledger wiring; dedupe one proposal per version is the entry point's job. Verified by real dispatch, not a unit test. Unblocks #200 |
-| 200 | Auto-adopt slice 4: auto-chain labeled proposal → gate dispatch + Adoption-record write-back | W4 | Done | agent | `/tdd` | _198, 199_ | `.github/workflows/proposal-chain.yml` (thin `issues:labeled` envelope) + `src/proposal-chain-cli.ts` (parse marker → `gh workflow run integration-gate.yml` w/ `cc_version`+`proposal_issue`; once-per-proposal dispatch-marker guard) + `src/proposal-marker.ts` (pure `cc_version` parser) + `src/adoption-writeback.ts` (pure formatter + additive `ProposalCommenter` seam) + `src/writeback-cli.ts`; gate gains a `proposal_issue` input + in-gate write-back step (additive comment, no auto-close; missing record → FAIL not silent pass) reusing existing `total_cost_usd` surfacing. 4 all-fake unit suites; dispatch chain gate-dispatch-verified. Last W4 slice |
 | 207 | Realign lobotomized overrides to CC 2.1.172 (gate `driver-check` fails — opus-4-8 inline anchors stale) | — | Done | human | `release-adoption` | _211_ | Closed (covered / premise-resolved). The opus-4-8 anchor realign is verified done: all 6 flagged anchors match pristine **2.1.173** exactly once; skrabe realigned 2.1.172/2.1.173 and closed lcc#8/#9. Gate run 27369708739 (after the #228 extractor fix unblocked the gate) reached a real four-zeros verdict — all clean **except** `driver-check`, which diagnosis traced to a **distinct** `tweakcc-fixed` named-prompt apply-ordering bug (now **#230**), NOT this issue's lobotomized opus-4-8 premise (disproven as the cause) |
 | 230 | tweakcc-fixed apply-ordering collisions block driver-check at 2.1.173 (budget-exceeded + task-tools-reminder shadowed) | — | Backlog | human | `release-adoption` | _228_ | Leaf finding for skrabe's `tweakcc-fixed` (cockpit: prove/suggest, don't impose). `driver-check` `"Could not find": 2` — built-in reminder overrides (`edited_text_file`, `TASK_LIST_REMINDER_INJECTION`) shadow named prompts via an intra-`--apply` splice; both target prompts match pristine exactly once (no drift) and his own curated `prompts-2.1.173.json` carries them (refutes a gate fault). Alignment preflight UNCOVERED on his HEAD `origin/main` `3c29532`. **Verified draft PR prepared: skrabe/tweakcc-fixed#9** — extends his own `shadows:` mechanism to reach built-in TS `ReminderInjection`s (adds `shadows?: string[]` + unions the registry into `loadShadowSet`), declares the 2 collisions; verified `"Could not find"` 2→0 + four-zeros greens at pristine 2.1.173, install left stock. Framed as a suggestion (his interface, his call). Draft PR is the only channel — skrabe's repos have Issues disabled. Awaiting his decision |
 | 228 | Pristine strings-file extractor breaks on all current CC versions (npm tarball no longer ships `package/cli.js`) | — | Done | agent | `/tdd` | — | Gate-blocking. `extractPristineStringsFile` sourced cli.js via `npm pack`→`tar package/cli.js`, but CC's npm package is now a thin launcher with no `cli.js` (2.1.170/172/173) → gate failed closed at *Seed the PRISTINE strings file*. Fix: source from the freshly-installed **native binary** (pristine — read BEFORE the gate's first `--apply`), the same source the real adapter already parses. `extractPristineStringsFile(binaryPath, version, outDir, adapter)` now takes the binary path + delegates to `extractStringsFile` (npm-pack/tar block deleted; cli.js-sourcing behind the existing adapter seam → new unit test, no live registry). `pristine-extract-cli.ts` resolves `~/.local/bin/claude` (`CC_NATIVE_BINARY` override); workflow step reworded. #211's patched-source guard unchanged — still rejects an `--apply`-sourced candidate against the native-install reference |
@@ -118,19 +113,22 @@ cross-cutting set was pruned the same way.
 </details>
 
 <details>
-<summary>Closed waves W1 + W2 + W3 + cross-cutting — 70 issues Done (pruned to one-line wave summaries)</summary>
+<summary>Closed waves W1 + W2 + W3 + W4 + cross-cutting — 75 issues Done (pruned to one-line wave summaries)</summary>
 
-Pruned to a one-line summary per wave (ADR 0023): W4 is now the active *newer
-numbered* wave, so W3's previously-retained rows are pruned here and the Burn-down
-**Closed (cumulative)** integer above carries the all-time total. The detailed rows
-are not lost — every closed issue persists on GitHub, and every old census row
-persists in git history; this `<details>` is an index, not the archive.
+Pruned to a one-line summary per wave (ADR 0023): W5 is the newest wholly-closed
+wave (full rows retained above), so every *older* closed wave — W1–W4 + cross-cutting
+— is pruned here and the Burn-down **Closed (cumulative)** integer above carries the
+all-time total. The detailed rows are not lost — every closed issue persists on
+GitHub, and every old census row persists in git history; this `<details>` is an
+index, not the archive.
 
 - **W1** — 2.1.169 adoption + 2.1.168 orphan/boot correctness — wholly closed
   (#26 #31 #42 #43 #45 #46 #58).
 - **W2** — verdict-signal trust (triage decisions) — wholly closed (#41 #47 #62).
 - **W3** — Behavioral A/B benchmark runnable (provisioning) — wholly closed
   (#175–#180 #192).
+- **W4** — auto-adopt pipeline (detect → propose → auto-gate) — wholly closed
+  (#196–#200).
 - **Cross-cutting `—`** — the maintenance-machine epic (#81 #83–#85 #93–#96), the
   Behavioral A/B tree (#11 #134–#139 #152), loop-onboarding (#51–#53), fallow
   hygiene (#102 #103 #125–#128 #166–#168), CI/gate + control-plane substrate (#2–#13
