@@ -39,35 +39,46 @@ no other guidance is needed. Follow it top to bottom:
 
 ## Burn-down (2026-06-10)
 Reconciled against live `gh` across **both** repos (`/roadmap`).
-**78 issues — 74 closed (95%), 4 open.**
-**Closed (cumulative): 74.** ← integer total of all closed issues ever, including
+**78 issues — 76 closed (97%), 2 open.**
+**Closed (cumulative): 76.** ← integer total of all closed issues ever, including
 those whose rows are pruned from collapsed waves; bumped, never recomputed from the
 table (pruned rows are gone), so the count survives wave pruning.
 
 | Bucket | Count | Issues |
 |---|---|---|
 | **Ready (agent)** — loop-eligible | 0 | — (all W3 agent slices #176–#179 landed) |
-| **Ready (human / HITL)**          | 2 | #180 (live run — first verdict captured but degenerate; held open pending non-degenerate run), #192 (sandbox lobo-override seeding — needs design) |
+| **Ready (human / HITL)**          | 0 | — (#180 #192 closed — W3 wholly done) |
 | **Blocked / deferred**            | 1 | bench#7 (time-gated: rotate NPM_TOKEN ~2026-09-08) |
 | **Tracking** (epic / PRD parents) | 0 | — (#102 closed — all of #166–#168 landed) |
 | **Meta** (idea-inbox / onboarding)| 1 | #99 (Idea Inbox) |
 
-Open by wave: W1 0 · W2 0 · W3 2 (#180 #192) · unscoped 2 (#99 bench#7).
+Open by wave: W1 0 · W2 0 · W3 0 · unscoped 2 (#99 bench#7).
 
 ## Priority waves
 | Wave | Theme | Issues | Gate to enter |
 | ---- | ----- | ------ | ------------- |
 | **W1** | 2.1.169 adoption + 2.1.168 orphan/boot correctness | — (wholly closed) | done |
 | **W2** | Verdict-signal trust (triage decisions) | — (wholly closed) | done |
-| **W3** | Behavioral A/B benchmark runnable (provisioning) | #175–#180, #192 | open (#180 #192) |
+| **W3** | Behavioral A/B benchmark runnable (provisioning) | — (wholly closed) | done |
 | **—**  | Cross-cutting / ongoing (incl. all `bench#NN` work) | #99 bench#7 | n/a |
 
 ## Master census (active waves inline)
 
-Open waves and the active backlog stay inline below. The wholly-closed waves W1/W2
-and the large closed cross-cutting set are collapsed into the `<details>` block at
-the end (rows retained on first collapse; once a *newer numbered* wave is active they
-prune to a one-line summary and the cumulative count above is bumped — ADR 0023).
+Open waves and the active backlog stay inline below — now just the standing
+cross-cutting/meta rows (#99, bench#7), as every numbered wave is wholly closed.
+W3 is collapsed into its own `<details>` with rows retained (first collapse, no
+newer wave to trigger a prune); the older W1/W2 + cross-cutting set is already
+pruned to one-line summaries in the second `<details>`. On first collapse rows are
+retained; once a *newer numbered* wave is active they prune to a one-line summary
+and the cumulative count above is bumped — ADR 0023.
+
+| # | Issue | Wave | Status | Owner | Skill(s) | Deps | Notes |
+| - | ----- | ---- | ------ | ----- | -------- | ---- | ----- |
+| 99 | 💡 Idea Inbox | — | Tracking | human | — | — | **Standing Meta row — exempt from burn-down as pickable work.** Canonical intake for unstructured ideas across **both** repos (ADR 0009); a drained idea is filed in tweakcc-maint or `dividedby/bench` and registered as a census row here. First idea actioned → #102 |
+| bench#7 | Rotate NPM_TOKEN before it expires (~2026-09-08) | — | Blocked | human | — | — | `dividedby/bench`. Time-gated ops: rotate the `@dividedby/bench-core` publish token before ~2026-09-08 |
+
+<details>
+<summary>Closed wave W3 — Behavioral A/B benchmark runnable (provisioning) — 7 issues Done (rows retained; not yet pruned — no newer wave is active, ADR 0023)</summary>
 
 | # | Issue | Wave | Status | Owner | Skill(s) | Deps | Notes |
 | - | ----- | ---- | ------ | ----- | -------- | ---- | ----- |
@@ -76,10 +87,10 @@ prune to a one-line summary and the cumulative count above is bumped — ADR 002
 | 177 | Behavioral A/B provisioning: `workDir` stager helper + unit test | W3 | Done | agent | `/tdd` | — | Fresh isolated per-(fixture,variant) scratch dir under a removable work root; teardown removes it (R5) |
 | 178 | Behavioral A/B provisioning: `provisionVariants()` producer + contract test | W3 | Done | agent | `/tdd` | _175_ | copy-then-apply in sandbox HOME+config; stock=pristine copy, lobotomized=`--apply`-patched copy w/ backup in sandbox not `~/.tweakcc`; live install READ-only so Restore drill stays byte-clean. Contract test w/ fake patcher/copy seam. **Pin `TWEAKCC_CC_INSTALLATION_PATH` to the copy** (HOME+CONFIG_DIR alone don't redirect — #175 note); native-binary copy-then-redirect is v1 scope |
 | 179 | Behavioral A/B provisioning: `src/behavioral-ab-cli.ts` entry point + all-fake wiring test | W3 | Done | agent | `/tdd` | _176_, _177_, _178_ | mirrors `cli.ts`/`pairing-coherence-cli.ts`; minimal `AdoptionRecord`, prints `BehavioralVerdict`, ALWAYS exits 0, `finally` cleanup (evidence not gate, ADR 0002). All-fake doubles, no real claude |
-| 180 | Behavioral A/B provisioning: one HITL live run — capture first real `BehavioralVerdict` | W3 | Next | human | — | _179_ | One real local run (~8 arms + ~14 Opus judge calls), real budget, captures first real verdict + any provisioning quirks; NEVER added to CI (local-first, ADR 0002). First run surfaced two quirks: a native-binary launcher bug (`node <native-binary>` exits 1 — fixed in PR) and a **degenerate** verdict (lobo arm not actually lobotomized → stock-vs-stock, tracked #192). HELD OPEN until a non-degenerate verdict is captured |
-| 192 | Behavioral A/B: lobo arm not actually lobotomized in sandbox — degenerate stock-vs-stock verdict | W3 | Done | human | — | _179_, _180_ | `provisionVariants()` now seeds the sandbox config before `--apply`: the tracked leaf's `system-prompts-<model>` + `system-reminders` symlinked read-only, prompt-data-cache copied in; refuses an unmapped model up front, refuses a skipped `--apply` (`applySkippedSystemPrompts`), and flags a byte-identical run (`BehavioralVerdict.degenerate`). Backup isolation (#178) preserved. Re-run for a non-degenerate verdict tracked on #180 |
-| 99 | 💡 Idea Inbox | — | Tracking | human | — | — | **Standing Meta row — exempt from burn-down as pickable work.** Canonical intake for unstructured ideas across **both** repos (ADR 0009); a drained idea is filed in tweakcc-maint or `dividedby/bench` and registered as a census row here. First idea actioned → #102 |
-| bench#7 | Rotate NPM_TOKEN before it expires (~2026-09-08) | — | Blocked | human | — | — | `dividedby/bench`. Time-gated ops: rotate the `@dividedby/bench-core` publish token before ~2026-09-08 |
+| 180 | Behavioral A/B provisioning: one HITL live run — capture first real `BehavioralVerdict` | W3 | Done | human | — | _179_ | First **non-degenerate** `BehavioralVerdict` captured (opus-4-8/high): lobo differs from stock — terse-directness Δ0.50, fewer-unsolicited-offers Δ0.083; `degenerate: false`, guardrail passed; live install byte-clean after. Unblocked by producing `prompts-2.1.172.json` via **pristine** extraction (npm ships no `cli.js`; extracted from `native-binary.backup` → `promptExtractor.js`). NEVER added to CI (local-first, ADR 0002) |
+| 192 | Behavioral A/B: lobo arm not actually lobotomized in sandbox — degenerate stock-vs-stock verdict | W3 | Done | human | — | _179_, _180_ | `provisionVariants()` now seeds the sandbox config before `--apply`: the tracked leaf's `system-prompts-<model>` + `system-reminders` symlinked read-only, prompt-data-cache copied in; refuses an unmapped model up front, refuses a skipped `--apply` (`applySkippedSystemPrompts`), and flags a byte-identical run (`BehavioralVerdict.degenerate`). Backup isolation (#178) preserved |
+
+</details>
 
 <details>
 <summary>Closed waves W1 + W2 + cross-cutting — 63 issues Done (pruned to one-line wave summaries)</summary>
