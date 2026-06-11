@@ -13,9 +13,19 @@ on:
         description: "Claude Code version to adopt-test (e.g. 2.1.169)"
         required: true
         type: string
+      proposal_issue:
+        # Set by the auto-adopt chain (proposal-chain.yml, #200) to the proposal
+        # issue number, so the gate posts the Adoption record back as an ADDITIVE
+        # comment on it. Left empty for a manual gate run → no write-back.
+        description: "Proposal issue to write the Adoption record back to (auto-chain only)"
+        required: false
+        type: string
 
+# `issues: write` is only exercised by the write-back step, and only when
+# proposal_issue is set (the auto-chain path); a manual run leaves it unused.
 permissions:
   contents: read
+  issues: write
 
 jobs:
   gate:
@@ -127,6 +137,21 @@ jobs:
             echo "num_turns=0"
             echo "::notice::No agent stream captured (no successful Boot-verify model call this run)."
           fi
+
+      # Auto-adopt write-back (#200): when the gate was dispatched by the chain
+      # (proposal_issue set), post the Adoption record + pass/fail back onto the
+      # proposal as an ADDITIVE comment — never a body rewrite, never an auto-close
+      # (cockpit rule). Logic lives in src/writeback-cli.ts; this is a thin envelope.
+      # `if: always()` so a RED gate still reports its verdict; a missing record
+      # reads as a FAIL (writeback-cli), never a silent pass.
+      - name: Write the Adoption record back to the proposal
+        if: always() && inputs.proposal_issue != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE_NUMBER: ${{ inputs.proposal_issue }}
+          CC_VERSION: ${{ inputs.cc_version }}
+          ADOPTION_RECORD_PATH: ${{ github.workspace }}/adoption-record.json
+        run: pnpm tsx src/writeback-cli.ts
 
       - name: Upload Adoption record + agent stream (PR evidence)
         if: always()
