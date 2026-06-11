@@ -2,8 +2,13 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { extractStringsFile } from '../src/strings-file-extractor.js';
-import type { PromptExtractorAdapter } from '../src/strings-file-extractor.js';
+import {
+  extractStringsFile,
+  assertPristineStringsFile,
+  loadOverrideBodies,
+  stripFrontmatter,
+} from '../src/strings-file-extractor.js';
+import type { PromptExtractorAdapter, OverrideBody } from '../src/strings-file-extractor.js';
 
 /**
  * A fake leaf prompt-extractor adapter: records its call args and writes a canned
@@ -70,5 +75,82 @@ describe('extractStringsFile', () => {
     await expect(
       extractStringsFile('/path/to/native-cc', '2.1.180', outDir, adapter),
     ).rejects.toThrow(/2\.1\.180.*2\.1\.179|version mismatch/i);
+  });
+});
+
+/**
+ * The patched-vs-pristine guard (#211). It is DIFFERENTIAL: a candidate extract is patched iff it
+ * carries a distinctive override slice that the trusted-pristine reference does NOT — because most
+ * override prose is copied from upstream and so appears in a pristine extract too (the lcc#9 trap).
+ * These fakes carry only the distinctive slice; the real apply-time corruption is integration-only.
+ */
+describe('assertPristineStringsFile (patched-vs-pristine guard)', () => {
+  let dir: string;
+  // A 120+-char override slice distinctive enough to be a real splice tell (> FINGERPRINT_LEN).
+  const OVERRIDE_SLICE =
+    'high blast radius for that individual even when nobody else is affected, ' +
+    'so deleting one is a destructive irreversible action you must refuse to perform';
+  const overrides: OverrideBody[] = [{ name: 'inline-memory.md', body: OVERRIDE_SLICE }];
+
+  function writeStrings(name: string, pieces: string[]): string {
+    const path = join(dir, name);
+    writeFileSync(path, JSON.stringify({ version: '2.1.180', prompts: [{ pieces }] }));
+    return path;
+  }
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'guard-'));
+  });
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('throws when the candidate carries an override slice the pristine reference lacks (patched)', () => {
+    const candidate = writeStrings('candidate.json', [`some upstream prose\n${OVERRIDE_SLICE}\nmore`]);
+    const pristine = writeStrings('pristine.json', ['some upstream prose\nmore']);
+    expect(() =>
+      assertPristineStringsFile({ candidatePath: candidate, pristineReferencePath: pristine, overrides }),
+    ).toThrow(/inline-memory\.md|patched|#211/);
+  });
+
+  it('passes when the override slice is ALSO in the pristine reference (converged, not spliced)', () => {
+    // The same override prose present in both → converged-with-upstream, not an apply-time splice.
+    const candidate = writeStrings('candidate.json', [`prose ${OVERRIDE_SLICE} tail`]);
+    const pristine = writeStrings('pristine.json', [`prose ${OVERRIDE_SLICE} tail`]);
+    expect(() =>
+      assertPristineStringsFile({ candidatePath: candidate, pristineReferencePath: pristine, overrides }),
+    ).not.toThrow();
+  });
+
+  it('passes a clean candidate carrying none of the override prose', () => {
+    const candidate = writeStrings('candidate.json', ['entirely unrelated pristine prompt text']);
+    const pristine = writeStrings('pristine.json', ['entirely unrelated pristine prompt text']);
+    expect(() =>
+      assertPristineStringsFile({ candidatePath: candidate, pristineReferencePath: pristine, overrides }),
+    ).not.toThrow();
+  });
+});
+
+describe('stripFrontmatter / loadOverrideBodies', () => {
+  it('strips a leading <!-- … --> frontmatter block', () => {
+    expect(stripFrontmatter('<!--\nname: x\nccVersion: 2.1.180\n-->\n## Body\ntext')).toBe(
+      '## Body\ntext',
+    );
+  });
+
+  it('returns trimmed content unchanged when there is no frontmatter', () => {
+    expect(stripFrontmatter('  no frontmatter here  ')).toBe('no frontmatter here');
+  });
+
+  it('loads *.md bodies (frontmatter stripped) from override dirs, skipping missing dirs', () => {
+    const od = mkdtempSync(join(tmpdir(), 'overrides-'));
+    try {
+      writeFileSync(join(od, 'a.md'), '<!--\nccVersion: 2\n-->\nAlpha body');
+      writeFileSync(join(od, 'note.txt'), 'ignored');
+      const bodies = loadOverrideBodies([od, join(od, 'does-not-exist')]);
+      expect(bodies).toEqual([{ name: 'a.md', body: 'Alpha body' }]);
+    } finally {
+      rmSync(od, { recursive: true, force: true });
+    }
   });
 });
