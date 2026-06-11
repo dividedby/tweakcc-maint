@@ -46,13 +46,13 @@ table (pruned rows are gone), so the count survives wave pruning.
 
 | Bucket | Count | Issues |
 |---|---|---|
-| **Ready (agent)** — loop-eligible | 1 | #178 (`provisionVariants()` — #175 spike closed, dep satisfied) |
-| **Ready (human / HITL)**          | 0 | — (#175 spike closed; #180 live run still blocked on #179) |
-| **Blocked / deferred**            | 3 | #179 #180 (provisioning chain); bench#7 (time-gated: rotate NPM_TOKEN ~2026-09-08) |
+| **Ready (agent)** — loop-eligible | 1 | #179 (`behavioral-ab-cli.ts` — #178 landed, deps #176/#177/#178 satisfied) |
+| **Ready (human / HITL)**          | 0 | — (#180 live run still blocked on #179) |
+| **Blocked / deferred**            | 2 | #180 (blocked on #179); bench#7 (time-gated: rotate NPM_TOKEN ~2026-09-08) |
 | **Tracking** (epic / PRD parents) | 0 | — (#102 closed — all of #166–#168 landed) |
 | **Meta** (idea-inbox / onboarding)| 1 | #99 (Idea Inbox) |
 
-Open by wave: W1 0 · W2 0 · W3 3 (#178 #179 #180) · unscoped 2 (#99 bench#7).
+Open by wave: W1 0 · W2 0 · W3 2 (#179 #180) · unscoped 2 (#99 bench#7).
 
 ## Priority waves
 | Wave | Theme | Issues | Gate to enter |
@@ -74,8 +74,8 @@ prune to a one-line summary and the cumulative count above is bumped — ADR 002
 | 175 | Behavioral A/B provisioning: spike — discovery-redirect, `--effort`, native-install (R1/R2/R3) | W3 | Done | human | — | — | Read-only spike: can `tweakcc-fixed` discovery be steered to a copy via `HOME`+`TWEAKCC_CONFIG_DIR` alone (R1); does adopted CLI accept `--effort` (R2); native-install fallback + v1 scope (R3). Output: a decision note unblocking #178/#176. EVIDENCE not gate (ADR 0002) |
 | 176 | Behavioral A/B provisioning: prod `runCli` node-spawn wrapper + unit test | W3 | Done | agent | `/tdd` | — | `node <cliPath> -p --output-format json --model --effort …` constant across arms (ADR 0002); mirror `leaf-shell.ts` maxBuffer; keep credential env explicit under sandboxed HOME (R4) |
 | 177 | Behavioral A/B provisioning: `workDir` stager helper + unit test | W3 | Done | agent | `/tdd` | — | Fresh isolated per-(fixture,variant) scratch dir under a removable work root; teardown removes it (R5) |
-| 178 | Behavioral A/B provisioning: `provisionVariants()` producer + contract test | W3 | Next | agent | `/tdd` | _175_ | copy-then-apply in sandbox HOME+config; stock=pristine copy, lobotomized=`--apply`-patched copy w/ backup in sandbox not `~/.tweakcc`; live install READ-only so Restore drill stays byte-clean. Contract test w/ fake patcher/copy seam. **Pin `TWEAKCC_CC_INSTALLATION_PATH` to the copy** (HOME+CONFIG_DIR alone don't redirect — #175 note); native-binary copy-then-redirect is v1 scope |
-| 179 | Behavioral A/B provisioning: `src/behavioral-ab-cli.ts` entry point + all-fake wiring test | W3 | Blocked | agent | `/tdd` | _176_, _177_, 178 | mirrors `cli.ts`/`pairing-coherence-cli.ts`; minimal `AdoptionRecord`, prints `BehavioralVerdict`, ALWAYS exits 0, `finally` cleanup (evidence not gate, ADR 0002). All-fake doubles, no real claude |
+| 178 | Behavioral A/B provisioning: `provisionVariants()` producer + contract test | W3 | Done | agent | `/tdd` | _175_ | copy-then-apply in sandbox HOME+config; stock=pristine copy, lobotomized=`--apply`-patched copy w/ backup in sandbox not `~/.tweakcc`; live install READ-only so Restore drill stays byte-clean. Contract test w/ fake patcher/copy seam. **Pin `TWEAKCC_CC_INSTALLATION_PATH` to the copy** (HOME+CONFIG_DIR alone don't redirect — #175 note); native-binary copy-then-redirect is v1 scope |
+| 179 | Behavioral A/B provisioning: `src/behavioral-ab-cli.ts` entry point + all-fake wiring test | W3 | Next | agent | `/tdd` | _176_, _177_, _178_ | mirrors `cli.ts`/`pairing-coherence-cli.ts`; minimal `AdoptionRecord`, prints `BehavioralVerdict`, ALWAYS exits 0, `finally` cleanup (evidence not gate, ADR 0002). All-fake doubles, no real claude |
 | 180 | Behavioral A/B provisioning: one HITL live run — capture first real `BehavioralVerdict` | W3 | Blocked | human | — | 179 | One real local run (~8 arms + ~14 Opus judge calls), real budget, captures first real verdict + any provisioning quirks; NEVER added to CI (local-first, ADR 0002) |
 | 99 | 💡 Idea Inbox | — | Tracking | human | — | — | **Standing Meta row — exempt from burn-down as pickable work.** Canonical intake for unstructured ideas across **both** repos (ADR 0009); a drained idea is filed in tweakcc-maint or `dividedby/bench` and registered as a census row here. First idea actioned → #102 |
 | bench#7 | Rotate NPM_TOKEN before it expires (~2026-09-08) | — | Blocked | human | — | — | `dividedby/bench`. Time-gated ops: rotate the `@dividedby/bench-core` publish token before ~2026-09-08 |
