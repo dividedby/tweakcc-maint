@@ -66,6 +66,12 @@ export interface BehavioralVerdict {
   guardrail: GuardrailOutcome;
   /** Fixture ids where the lobotomized arm failed a check the stock arm passed. */
   guardrailRegressions: string[];
+  /**
+   * True when both arms produced byte-identical output on EVERY fixture (the lobotomization had
+   * no effect). Evidence the run is untrustworthy — e.g. a stock-vs-stock provisioning slip
+   * (#192) — not a gate.
+   */
+  degenerate: boolean;
 }
 
 export interface BenchmarkRun {
@@ -107,6 +113,8 @@ export async function runBenchmark(run: BenchmarkRun): Promise<BehavioralVerdict
   const guardrailRegressions: string[] = [];
   // Per-arm count of (fixture × persona) scores folded into the trivial mean.
   let personaScoreCount = 0;
+  // Degenerate-run backstop: do the two arms produce byte-identical output on every fixture? (#192)
+  let allIdentical = true;
 
   for (const fixture of fixtures) {
     const outputs = {} as Record<Variant, string>;
@@ -114,6 +122,7 @@ export async function runBenchmark(run: BenchmarkRun): Promise<BehavioralVerdict
       const out = await runner.run(fixture.id, fixture.prompt, variant);
       outputs[variant] = out.output;
     }
+    if (outputs.stock !== outputs.lobotomized) allIdentical = false;
 
     // Correctness guardrail: a regression is lobotomized failing where stock passed.
     const stockPassed = await correctnessCheck(fixture.id, outputs.stock);
@@ -168,6 +177,7 @@ export async function runBenchmark(run: BenchmarkRun): Promise<BehavioralVerdict
     aggregation: aggregate(judgeScores),
     guardrail: guardrailRegressions.length === 0 ? 'passed' : 'failed',
     guardrailRegressions,
+    degenerate: n > 0 && allIdentical,
   };
 }
 
