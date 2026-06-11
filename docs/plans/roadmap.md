@@ -39,20 +39,21 @@ no other guidance is needed. Follow it top to bottom:
 
 ## Burn-down (2026-06-10)
 Reconciled against live `gh` across **both** repos (`/roadmap`).
-**83 issues — 76 closed (92%), 7 open.**
-**Closed (cumulative): 76.** ← integer total of all closed issues ever, including
+**83 issues — 77 closed (93%), 6 open.**
+**Closed (cumulative): 77.** ← integer total of all closed issues ever, including
 those whose rows are pruned from collapsed waves; bumped, never recomputed from the
 table (pruned rows are gone), so the count survives wave pruning.
 
 | Bucket | Count | Issues |
 |---|---|---|
-| **Ready (agent)** — loop-eligible | 1 | #198 (in-gate strings-file extraction) — unblocked (#197 has a PR open) |
+| **Ready (agent)** — loop-eligible | 1 | #199 (dep #197 closed) — unblocked |
 | **Ready (human / HITL)**          | 0 | — |
-| **Blocked / deferred**            | 3 | #199 (dep #197 — PR open), #200 (deps #199 #198), bench#7 (time-gated: rotate NPM_TOKEN ~2026-09-08) |
+| **In review (PR open)**           | 1 | #198 (in-gate strings-file extraction) |
+| **Blocked / deferred**            | 2 | #200 (dep #199; #198 PR open), bench#7 (time-gated: rotate NPM_TOKEN ~2026-09-08) |
 | **Tracking** (epic / PRD parents) | 1 | #196 (Auto-adopt pipeline PRD) |
 | **Meta** (idea-inbox / onboarding)| 1 | #99 (Idea Inbox) |
 
-Open by wave: W1 0 · W2 0 · W3 0 · W4 5 (#196 #197 #198 #199 #200) · unscoped 2 (#99 bench#7).
+Open by wave: W1 0 · W2 0 · W3 0 · W4 4 (#196 #198 #199 #200) · unscoped 2 (#99 bench#7).
 
 ## Priority waves
 | Wave | Theme | Issues | Gate to enter |
@@ -60,7 +61,7 @@ Open by wave: W1 0 · W2 0 · W3 0 · W4 5 (#196 #197 #198 #199 #200) · unscope
 | **W1** | 2.1.169 adoption + 2.1.168 orphan/boot correctness | — (wholly closed) | done |
 | **W2** | Verdict-signal trust (triage decisions) | — (wholly closed) | done |
 | **W3** | Behavioral A/B benchmark runnable (provisioning) | — (wholly closed) | done |
-| **W4** | Auto-adopt pipeline (detect → propose → auto-gate) | #196–#200 | open (#197 #198 next; #199 #200 dep-gated) |
+| **W4** | Auto-adopt pipeline (detect → propose → auto-gate) | #196–#200 | open (#197 done; #198 PR open; #199 next; #200 dep-gated) |
 | **—**  | Cross-cutting / ongoing (incl. all `bench#NN` work) | #99 bench#7 | n/a |
 
 ## Master census (active waves inline)
@@ -76,10 +77,10 @@ pruned the same way.
 | # | Issue | Wave | Status | Owner | Skill(s) | Deps | Notes |
 | - | ----- | ---- | ------ | ----- | -------- | ---- | ----- |
 | 196 | 💡 Auto-adopt pipeline — detect new CC version → propose → auto-gate (PRD) | W4 | Tracking | human | — | — | PRD parent for the **detect → propose → auto-gate** spine (#197–#200). HITL back-half (realign/patch authoring, Behavioral A/B, leaf PRs) explicitly out of scope (ADR 0002; cockpit rule) |
-| 197 | Auto-adopt slice 1: `ReleaseDetector` CLI entry + proposal marker + all-fake wiring test | W4 | PR open | agent | `/tdd` | — | Thin CLI mirroring `cli.ts`/`behavioral-ab-cli.ts`; wires real npm source + `gh` publisher; propose-only; proposal body carries a machine-readable `cc_version` marker; all-fake wiring test (no real network/`gh`). **PR open:** `src/release-detector-cli.ts` + `formatProposal`/`PROPOSAL_LABEL`/`ccVersionMarker` (issue-publisher) + `RealNpmReleaseSource`/`RealIssuePublisher`. Unblocks #199 |
-| 198 | Auto-adopt slice 3: in-gate pristine strings-file extraction (`prompts-<version>.json`) | W4 | Next | agent | `/tdd` | — | Extract from the freshly-installed pristine native binary into `prompt-data-cache`, **ephemeral** never committed (cockpit); fix `@babel/parser` availability; thin `(binaryPath,version)→path` wrapper + unit test, live path verified by a gate dispatch. Independent of the detector — the #180 linchpin gap generalized |
-| 199 | Auto-adopt slice 2: daily-cron workflow runs the detector → opens proposal | W4 | Blocked | agent | `/tdd` | 197 | Thin cron workflow invoking the slice-1 CLI with an issue-scoped token; logic stays in `tsx` (mirrors `integration-gate.yml`); no `claude -p` so no cost-ledger wiring; dedupe one proposal per version |
-| 200 | Auto-adopt slice 4: auto-chain labeled proposal → gate dispatch + Adoption-record write-back | W4 | Blocked | agent | `/tdd` | 199, 198 | Labeled proposal auto-dispatches `integration-gate.yml` for its `cc_version` (no human step); gate posts the Adoption record + pass/fail back as a comment (additive, no auto-close); one run per proposal; reuse existing `total_cost_usd` surfacing |
+| 197 | Auto-adopt slice 1: `ReleaseDetector` CLI entry + proposal marker + all-fake wiring test | W4 | Done | agent | `/tdd` | — | Merged (#202). Thin CLI mirroring `cli.ts`/`behavioral-ab-cli.ts`; `src/release-detector-cli.ts` + `formatProposal`/`PROPOSAL_LABEL`/`ccVersionMarker` (issue-publisher) + `RealNpmReleaseSource`/`RealIssuePublisher`; propose-only; machine-readable `cc_version` marker; all-fake wiring test. Unblocked #199 |
+| 198 | Auto-adopt slice 3: in-gate pristine strings-file extraction (`prompts-<version>.json`) | W4 | PR open | agent | `/tdd` | — | `src/strings-file-extractor.ts`: thin `extractStringsFile(binaryPath,version,outDir,adapter)→path` wrapper (version-mismatch throw) + unit test; real adapter wires the leaf `extractClaudeJsFromNativeInstallation → promptExtractor`; `@babel/parser` dep added + put on the child `NODE_PATH`; output **ephemeral**, `prompts-*.json`/`prompt-data-cache/` gitignored (cockpit). Live native-parse path gate-dispatch-verified. Independent of the detector — the #180 linchpin gap generalized |
+| 199 | Auto-adopt slice 2: daily-cron workflow runs the detector → opens proposal | W4 | Next | agent | `/tdd` | _197_ | Thin cron workflow invoking the slice-1 CLI with an issue-scoped token; logic stays in `tsx` (mirrors `integration-gate.yml`); no `claude -p` so no cost-ledger wiring; dedupe one proposal per version |
+| 200 | Auto-adopt slice 4: auto-chain labeled proposal → gate dispatch + Adoption-record write-back | W4 | Blocked | agent | `/tdd` | 199, 198 | Labeled proposal auto-dispatches `integration-gate.yml` for its `cc_version` (no human step); gate posts the Adoption record + pass/fail back as a comment (additive, no auto-close); one run per proposal; reuse existing `total_cost_usd` surfacing. Dep #198 PR open; gated on #199 |
 | 99 | 💡 Idea Inbox | — | Tracking | human | — | — | **Standing Meta row — exempt from burn-down as pickable work.** Canonical intake for unstructured ideas across **both** repos (ADR 0009); a drained idea is filed in tweakcc-maint or `dividedby/bench` and registered as a census row here. First idea actioned → #102 |
 | bench#7 | Rotate NPM_TOKEN before it expires (~2026-09-08) | — | Blocked | human | — | — | `dividedby/bench`. Time-gated ops: rotate the `@dividedby/bench-core` publish token before ~2026-09-08 |
 
