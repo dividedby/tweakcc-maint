@@ -39,8 +39,8 @@ no other guidance is needed. Follow it top to bottom:
 
 ## Burn-down (2026-06-10)
 Reconciled against live `gh` across **both** repos (`/roadmap`).
-**77 issues — 72 closed (94%), 5 open.**
-**Closed (cumulative): 72.** ← integer total of all closed issues ever, including
+**77 issues — 73 closed (95%), 4 open.**
+**Closed (cumulative): 73.** ← integer total of all closed issues ever, including
 those whose rows are pruned from collapsed waves; bumped, never recomputed from the
 table (pruned rows are gone), so the count survives wave pruning.
 
