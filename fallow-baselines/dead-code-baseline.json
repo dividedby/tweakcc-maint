@@ -1,10 +1,6 @@
 {
   "unused_files": [],
-  "unused_exports": [
-    "src/orphan-report-producer.ts:promptIdOf",
-    "src/orphan-report-producer.ts:readOverrideFiles",
-    "src/orphan-report-producer.ts:loadPromptsData"
-  ],
+  "unused_exports": [],
   "unused_types": [],
   "private_type_leaks": [],
   "unused_dependencies": [],
