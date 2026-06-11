@@ -112,7 +112,7 @@ async function main(): Promise<void> {
     panel: new RealJudgePanel(),
     correctnessJudge: new RealCorrectnessJudge(),
     runCli: makeRunCli(),
-    model: process.env.BEHAVIORAL_AB_MODEL ?? 'claude-opus-4-1',
+    model: process.env.BEHAVIORAL_AB_MODEL ?? 'claude-opus-4-8',
     effort: process.env.BEHAVIORAL_AB_EFFORT ?? 'high',
     log: (line) => console.log(line),
     exit: (code) => process.exit(code),
