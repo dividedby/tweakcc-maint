@@ -39,26 +39,27 @@ no other guidance is needed. Follow it top to bottom:
 
 ## Burn-down (2026-06-10)
 Reconciled against live `gh` across **both** repos (`/roadmap`).
-**71 issues — 69 closed (97%), 2 open.**
+**77 issues — 69 closed (90%), 8 open.**
 **Closed (cumulative): 69.** ← integer total of all closed issues ever, including
 those whose rows are pruned from collapsed waves; bumped, never recomputed from the
 table (pruned rows are gone), so the count survives wave pruning.
 
 | Bucket | Count | Issues |
 |---|---|---|
-| **Ready (agent)** — loop-eligible | 0 | — |
-| **Ready (human / HITL)**          | 0 | — |
-| **Blocked / deferred**            | 1 | bench#7 (time-gated: rotate NPM_TOKEN ~2026-09-08) |
+| **Ready (agent)** — loop-eligible | 2 | #176 #177 (provisioning leaves with no blockers) |
+| **Ready (human / HITL)**          | 1 | #175 (provisioning spike) |
+| **Blocked / deferred**            | 4 | #178 #179 #180 (provisioning chain); bench#7 (time-gated: rotate NPM_TOKEN ~2026-09-08) |
 | **Tracking** (epic / PRD parents) | 0 | — (#102 closed — all of #166–#168 landed) |
 | **Meta** (idea-inbox / onboarding)| 1 | #99 (Idea Inbox) |
 
-Open by wave: W1 0 · W2 0 · unscoped 2 (#99 bench#7).
+Open by wave: W1 0 · W2 0 · W3 6 (#175–#180) · unscoped 2 (#99 bench#7).
 
 ## Priority waves
 | Wave | Theme | Issues | Gate to enter |
 | ---- | ----- | ------ | ------------- |
 | **W1** | 2.1.169 adoption + 2.1.168 orphan/boot correctness | — (wholly closed) | done |
 | **W2** | Verdict-signal trust (triage decisions) | — (wholly closed) | done |
+| **W3** | Behavioral A/B benchmark runnable (provisioning) | #175–#180 | done |
 | **—**  | Cross-cutting / ongoing (incl. all `bench#NN` work) | #99 bench#7 | n/a |
 
 ## Master census (active waves inline)
@@ -74,6 +75,12 @@ prune to a one-line summary and the cumulative count above is bumped — ADR 002
 | 166 | fallow P1: resolve 5 dead exports in the A/B tree | — | Done | agent | `/tdd` | — | 4 de-export internal helpers (orphan-report-producer, persona-prompts) + delete 1 dead re-export (stub-judge `BEHAVIORAL_AXES`). Gate-covered mechanical (ADR 0004 no-build, ADR 0007 untouched). From #102 P1 |
 | 167 | fallow P2: suppress 3 port-fake DI false positives | — | Done | agent | `/tdd` | — | Suppressed `VariantRunner`/`Rng` adapter members via `.fallowrc.json` `usedClassMembers` rules (#127 convention) — fallow can't see through the port (ADR-0004 seam). 3→0 unused class members, no deletions, no stale suppressions. From #102 P2 |
 | 168 | fallow P1 follow-up: regenerate committed fallow-baselines after dead-code cleanup | — | Done | agent | `/tdd` | ~~#166~~ ~~#167~~ | Regenerated `fallow-baselines/` via `--save-baseline` to the post-cleanup floor: dead-code baseline now 0 unused exports + 0 unused class members; health baseline captures the 1 inherited `ab-driver.ts` moderate-complexity finding. Audit verdict `pass`, 0 introduced. Report-only CI stays non-gating (ADR 0004 / #103). From #102 sequencing |
+| 175 | Behavioral A/B provisioning: spike — discovery-redirect, `--effort`, native-install (R1/R2/R3) | W3 | Next | human | — | — | Read-only spike: can `tweakcc-fixed` discovery be steered to a copy via `HOME`+`TWEAKCC_CONFIG_DIR` alone (R1); does adopted CLI accept `--effort` (R2); native-install fallback + v1 scope (R3). Output: a decision note unblocking #178/#176. EVIDENCE not gate (ADR 0002) |
+| 176 | Behavioral A/B provisioning: prod `runCli` node-spawn wrapper + unit test | W3 | Next | agent | `/tdd` | — | `node <cliPath> -p --output-format json --model --effort …` constant across arms (ADR 0002); mirror `leaf-shell.ts` maxBuffer; keep credential env explicit under sandboxed HOME (R4) |
+| 177 | Behavioral A/B provisioning: `workDir` stager helper + unit test | W3 | Next | agent | `/tdd` | — | Fresh isolated per-(fixture,variant) scratch dir under a removable work root; teardown removes it (R5) |
+| 178 | Behavioral A/B provisioning: `provisionVariants()` producer + contract test | W3 | Blocked | agent | `/tdd` | 175 | copy-then-apply in sandbox HOME+config; stock=pristine copy, lobotomized=`--apply`-patched copy w/ backup in sandbox not `~/.tweakcc`; live install READ-only so Restore drill stays byte-clean. Contract test w/ fake patcher/copy seam |
+| 179 | Behavioral A/B provisioning: `src/behavioral-ab-cli.ts` entry point + all-fake wiring test | W3 | Blocked | agent | `/tdd` | 176, 177, 178 | mirrors `cli.ts`/`pairing-coherence-cli.ts`; minimal `AdoptionRecord`, prints `BehavioralVerdict`, ALWAYS exits 0, `finally` cleanup (evidence not gate, ADR 0002). All-fake doubles, no real claude |
+| 180 | Behavioral A/B provisioning: one HITL live run — capture first real `BehavioralVerdict` | W3 | Blocked | human | — | 179 | One real local run (~8 arms + ~14 Opus judge calls), real budget, captures first real verdict + any provisioning quirks; NEVER added to CI (local-first, ADR 0002) |
 | 99 | 💡 Idea Inbox | — | Tracking | human | — | — | **Standing Meta row — exempt from burn-down as pickable work.** Canonical intake for unstructured ideas across **both** repos (ADR 0009); a drained idea is filed in tweakcc-maint or `dividedby/bench` and registered as a census row here. First idea actioned → #102 |
 | bench#7 | Rotate NPM_TOKEN before it expires (~2026-09-08) | — | Blocked | human | — | — | `dividedby/bench`. Time-gated ops: rotate the `@dividedby/bench-core` publish token before ~2026-09-08 |
 
