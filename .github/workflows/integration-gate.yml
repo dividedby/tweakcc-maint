@@ -104,12 +104,14 @@ jobs:
           echo "${HOME}/.local/bin" >> "${GITHUB_PATH}"
           "${HOME}/.local/bin/claude" --version
 
-      # Seed the strings file from a PRISTINE npm-pack extract, NOT the --apply cache (#211).
-      # This writes prompts-<version>.json into tweakcc-fixed/data/prompts — the first source
-      # resolveStringsFilePath prefers — so the gate's driver + orphan checks read a pristine
+      # Seed the strings file from the freshly-installed native binary, NOT the --apply cache (#211,
+      # #228). This step runs BEFORE the gate's first --apply, so the native binary is pristine
+      # (never patched). It writes prompts-<version>.json into tweakcc-fixed/data/prompts — the first
+      # source resolveStringsFilePath prefers — so the gate's driver + orphan checks read a pristine
       # identifierMap rather than one sourced from a patched tree (the lcc#9 / 2.1.172
       # contamination). The patched-vs-pristine guard runs inside this step and fails closed.
-      - name: Seed the PRISTINE strings file (npm pack, never --apply)
+      # CC_NATIVE_BINARY defaults to ~/.local/bin/claude (where the install step above puts it).
+      - name: Seed the PRISTINE strings file (native binary, never --apply)
         env:
           CC_VERSION: ${{ inputs.cc_version }}
         run: pnpm tsx src/pristine-extract-cli.ts

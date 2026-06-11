@@ -18,9 +18,8 @@
  * `@babel/parser` and native parsing) is integration-verified by a real gate dispatch.
  */
 
-import { execFileSync, spawnSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import {
-  existsSync,
   readFileSync,
   writeFileSync,
   mkdtempSync,
@@ -90,7 +89,7 @@ export interface OverrideBody {
 export interface PristineGuardInputs {
   /** Path to the strings file under suspicion (e.g. a suspected-patched cache file). */
   candidatePath: string;
-  /** Path to a trusted-pristine `prompts-<version>.json` to diff against (e.g. the npm-pack extract). */
+  /** Path to a trusted-pristine `prompts-<version>.json` to diff against (e.g. the native-install extract). */
   pristineReferencePath: string;
   /** The leaf's override bodies — the fingerprint corpus. */
   overrides: readonly OverrideBody[];
@@ -119,8 +118,8 @@ function stringsBodyText(stringsFilePath: string): string {
 
 /**
  * Reject a strings file sourced from an already-`--apply`-ed (patched) tree. Provenance is the
- * primary defense — {@link extractPristineStringsFile} sources its cli.js from `npm pack`, a tree
- * that has never been patched — but this content guard fails closed if a caller hands a
+ * primary defense — {@link extractPristineStringsFile} sources its cli.js from the freshly-installed
+ * native binary, a tree that has never been patched — but this content guard fails closed if a caller hands a
  * contaminated extract anyway (the lcc#9 / 2.1.172 failure mode: anchor evidence derived from a
  * local `--apply` against an installed/backed-up tree).
  *
@@ -154,8 +153,8 @@ export function assertPristineStringsFile(inputs: PristineGuardInputs): void {
         throw new Error(
           `strings-file extraction: ${stringsFileName(version_of(inputs.candidatePath))} carries the ` +
             `spliced override body of ${override.name} (text absent from the pristine reference) — ` +
-            `its source tree was already \`--apply\`-ed (patched), not pristine. Extract from a fresh ` +
-            `\`npm pack\` (or trust the CI gate runner), never from an installed/backed-up tree (#211).`,
+            `its source tree was already \`--apply\`-ed (patched), not pristine. Extract from the ` +
+            `freshly-installed native binary (or trust the CI gate runner), never from a backed-up/patched tree (#211).`,
         );
       }
     }
@@ -172,51 +171,29 @@ function version_of(stringsFilePath: string): string {
 }
 
 /**
- * Produce a PRISTINE `prompts-<version>.json` into `outDir`, sourcing the binary from a fresh
- * `npm pack @anthropic-ai/claude-code@<version>` rather than the installed (possibly patched)
- * tree (#211). Provenance is the guarantee: `npm pack` returns the published tarball, which has
- * never been `--apply`-ed. Asserts internal-version match (via {@link extractStringsFile}).
+ * Produce a PRISTINE `prompts-<version>.json` into `outDir`, sourcing cli.js from the
+ * freshly-installed native binary at `binaryPath` rather than the leaf's `--apply`/`--restore`
+ * cache (a possibly-patched tree) (#211). Provenance is the guarantee: the native binary is read
+ * BEFORE the gate's first `--apply` (a strictly later step), so it has never been patched. The npm
+ * tarball is no longer a source — the published package is now a thin launcher with no readable
+ * `cli.js` (#228); the native install is the only source, and is what the real adapter
+ * ({@link realPromptExtractorAdapter}) already parses via the leaf's
+ * `extractClaudeJsFromNativeInstallation`. Asserts internal-version match (via {@link extractStringsFile}).
  *
  * This is the trusted-pristine reference {@link assertPristineStringsFile} diffs a SUSPECT
  * extract against — so it runs no differential guard on itself (nothing to diff against).
  *
- * The `npm pack` shell-out + tarball extract mirror the leaf's own `fetchNpmSource`
- * (tweakcc-fixed src/nativeInstallation.ts). Integration-verified by a real gate dispatch; the
- * unit tests drive the seam ({@link extractStringsFile}) and the guard directly with fakes.
+ * The cli.js-sourcing is behind the {@link PromptExtractorAdapter} seam, so the wrapper's
+ * contract (binary path → output, version-match throw) is unit-tested with a fake; the real
+ * native parse is integration-verified by a real gate dispatch.
  */
 export async function extractPristineStringsFile(
+  binaryPath: string,
   version: string,
   outDir: string,
   adapter: PromptExtractorAdapter,
 ): Promise<string> {
-  const packDir = mkdtempSync(join(tmpdir(), 'tweakcc-pack-'));
-  try {
-    execFileSync('npm', ['pack', `@anthropic-ai/claude-code@${version}`, '--pack-destination', packDir], {
-      stdio: 'pipe',
-      timeout: 60_000,
-      cwd: packDir,
-    });
-    const tgz = readdirSync(packDir).find((f) => f.endsWith('.tgz'));
-    if (tgz === undefined) {
-      throw new Error(`strings-file extraction: \`npm pack\` produced no .tgz for ${version}`);
-    }
-    execFileSync('tar', ['xzf', join(packDir, tgz), 'package/cli.js'], {
-      stdio: 'pipe',
-      timeout: 60_000,
-      cwd: packDir,
-    });
-    const cliPath = join(packDir, 'package', 'cli.js');
-    if (!existsSync(cliPath)) {
-      throw new Error(
-        `strings-file extraction: cli.js not found in the npm tarball for ${version} ` +
-          `(the published package may no longer ship a readable cli.js).`,
-      );
-    }
-
-    return await extractStringsFile(cliPath, version, outDir, adapter);
-  } finally {
-    rmSync(packDir, { recursive: true, force: true });
-  }
+  return await extractStringsFile(binaryPath, version, outDir, adapter);
 }
 
 /**

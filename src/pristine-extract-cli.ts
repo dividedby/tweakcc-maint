@@ -6,7 +6,8 @@
  * cache, and `resolveStringsFilePath` (orphan-validator.ts) reads from that cache — a PATCHED
  * tree. Two consecutive realign drafts (lcc#9 + the 2.1.172 false 14-anchor set) were closed by
  * skrabe as contaminated diagnoses sourced from exactly this path. This entry replaces that
- * source: it runs `extractPristineStringsFile` (a fresh `npm pack`, never `--apply`-ed) and
+ * source: it runs `extractPristineStringsFile` against the freshly-installed native binary (read
+ * before the gate's first `--apply`, so never `--apply`-ed) and
  * writes the result into the leaf's `data/prompts/` — the highest-priority candidate
  * `resolveStringsFilePath` already prefers (its "repo-local, locally-extracted same-day JSON is
  * authoritative" tier) — so the driver + orphan checks downstream consume the pristine file
@@ -65,11 +66,17 @@ async function main(): Promise<void> {
     process.env.TWEAKCC_FIXED_DIR ?? join(homedir(), 'repos', 'tweakcc-fixed');
   const lobotomizedDir =
     process.env.LOBOTOMIZED_DIR ?? join(homedir(), 'repos', 'lobotomized-claude-code');
+  // The freshly-installed native binary the leaf's extractClaudeJsFromNativeInstallation parses —
+  // pristine here because the gate seeds the strings file BEFORE its first --apply. Defaults to the
+  // gate's native install (~/.local/bin/claude); CC_NATIVE_BINARY overrides for a non-default path.
+  const nativeBinary =
+    process.env.CC_NATIVE_BINARY ?? join(homedir(), '.local', 'bin', 'claude');
 
   // resolveStringsFilePath prefers tweakcc-fixed/data/prompts first — write the pristine extract
   // there so the gate's driver + orphan checks read it ahead of the --apply cache.
   const outDir = join(tweakccFixedDir, 'data', 'prompts');
   const pristinePath = await extractPristineStringsFile(
+    nativeBinary,
     version,
     outDir,
     realPromptExtractorAdapter(tweakccFixedDir),
