@@ -1,4 +1,4 @@
-# Release detector on a daily cron (Auto-adopt slice 2, #199).
+# Release detector on a few-hourly cron (Auto-adopt slice 2, #199; cadence #212).
 #
 # Thin cron adapter: it carries NO business logic — it only runs the slice-1
 # entry point (`src/release-detector-cli.ts`, #197), exactly as integration-gate.yml
@@ -10,8 +10,12 @@ name: release-detector
 
 on:
   schedule:
-    # 07:00 UTC daily — a new CC release is detected and proposed within ~a day.
-    - cron: "0 7 * * *"
+    # Every 4h at :00 — a new CC `latest` is detected and proposed within ~4h of
+    # publish, getting us earlier in the release cycle (#212). Cheap: the path is
+    # npm-compare only (no `claude -p`), and the entry point's per-version dedup
+    # (issue-publisher.ts PROPOSAL_LABEL/ccVersionMarker) keeps the higher cadence
+    # from opening duplicate proposals across runs.
+    - cron: "0 */4 * * *"
   workflow_dispatch: {}
 
 # Issue-scoped token: the entry point's sole outward action is opening one proposal
