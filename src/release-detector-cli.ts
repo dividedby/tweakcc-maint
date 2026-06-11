@@ -24,7 +24,7 @@
 import { run } from './release-detector.js';
 import { RealNpmReleaseSource } from './real-npm-release-source.js';
 import { RealIssuePublisher } from './real-issue-publisher.js';
-import { RealAdoptionEnvironment, defaultLeafConfig } from './real-adoption-environment.js';
+import { supportMatrix } from './support-matrix.js';
 import { runSync } from './leaf-shell.js';
 import { argv } from 'node:process';
 import { realpathSync } from 'node:fs';
@@ -73,21 +73,23 @@ export async function runReleaseDetectorCli(deps: ReleaseDetectorCliDeps): Promi
 }
 
 /**
- * List the versions of already-open adoption proposals, so the detector dedups
- * to one proposal per version. Reads open issues carrying {@link PROPOSAL_LABEL}
- * and parses the version out of each `adopt CC X.Y.Z` title. A `gh` failure
- * yields an empty list — worst case re-proposes once, never crashes the run.
+ * List the CC versions carried by `adopt CC X.Y.Z` proposals in `repo` at the given
+ * issue state, parsed from each title. `state: 'open'` is the one-proposal-per-version
+ * dedup source; `state: 'all'` (open+closed) feeds the install-free Support matrix
+ * (support-matrix.ts) so an already-adopted version is never re-proposed. The title
+ * regex is the real filter — a fuzzy `adopt CC in:title` search match that has no
+ * `adopt CC <version>` substring (e.g. the auto-adopt PRD) yields no version and is
+ * dropped. A `gh` failure yields an empty list — worst case one extra proposal, never
+ * a crash.
  */
-function listOpenProposals(repo: string): string[] {
+function listProposalVersions(repo: string, state: 'open' | 'all'): string[] {
   const r = runSync('gh', [
     'issue',
     'list',
     '--repo',
     repo,
     '--state',
-    'open',
-    '--label',
-    'ready-for-agent',
+    state,
     '--search',
     'adopt CC in:title',
     '--json',
@@ -106,13 +108,15 @@ function listOpenProposals(repo: string): string[] {
 
 async function main(): Promise<void> {
   const repo = process.env.PROPOSAL_REPO ?? 'dividedby/tweakcc-maint';
-  const env = new RealAdoptionEnvironment(defaultLeafConfig());
 
+  // Install-free matrix: the adopted-version seed unioned with every adopt-CC proposal
+  // version (open+closed). The detector cron runner has no Claude Code, so the gate's
+  // installed-version-only matrix (real-adoption-environment.ts) cannot be used here (#199).
   await runReleaseDetectorCli({
     npm: new RealNpmReleaseSource(),
     publisher: new RealIssuePublisher(repo),
-    matrix: env.listMatrix(),
-    openProposals: listOpenProposals(repo),
+    matrix: supportMatrix(listProposalVersions(repo, 'all')),
+    openProposals: listProposalVersions(repo, 'open'),
     log: (line) => console.log(line),
     exit: (code) => process.exit(code),
   });
