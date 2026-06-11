@@ -17,3 +17,9 @@ secrets/
 
 # Editor workspace files
 *.code-workspace
+
+# Ephemeral in-gate strings-file extraction (#198): the gate produces
+# `prompts-<version>.json` into a prompt-data-cache for the run only — never
+# committed here or to a leaf (cockpit rule; the leaf's data/prompts stays skrabe's).
+prompts-*.json
+prompt-data-cache/
