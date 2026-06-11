@@ -104,10 +104,21 @@ jobs:
           echo "${HOME}/.local/bin" >> "${GITHUB_PATH}"
           "${HOME}/.local/bin/claude" --version
 
+      # Seed the strings file from a PRISTINE npm-pack extract, NOT the --apply cache (#211).
+      # This writes prompts-<version>.json into tweakcc-fixed/data/prompts — the first source
+      # resolveStringsFilePath prefers — so the gate's driver + orphan checks read a pristine
+      # identifierMap rather than one sourced from a patched tree (the lcc#9 / 2.1.172
+      # contamination). The patched-vs-pristine guard runs inside this step and fails closed.
+      - name: Seed the PRISTINE strings file (npm pack, never --apply)
+        env:
+          CC_VERSION: ${{ inputs.cc_version }}
+        run: pnpm tsx src/pristine-extract-cli.ts
+
       # The Restore drill (#23) fails closed unless a stock backup exists before apply.
       # On an ephemeral runner the fresh install has none, so seed it the way the runbook
-      # prerequisites do: one --apply creates tweakcc-fixed's stock backup under ~/.tweakcc
-      # (and the prompt-data cache), then --restore returns CC to clean stock for the gate.
+      # prerequisites do: one --apply creates tweakcc-fixed's stock backup under ~/.tweakcc,
+      # then --restore returns CC to clean stock for the gate. The strings file is already
+      # seeded pristine above, so the --apply cache it also writes is no longer the gate's source.
       - name: Seed the stock backup (runbook prereq)
         run: |
           node "${TWEAKCC_FIXED_DIR}/dist/index.mjs" --apply
