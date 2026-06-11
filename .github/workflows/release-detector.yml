@@ -1,0 +1,49 @@
+# Release detector on a daily cron (Auto-adopt slice 2, #199).
+#
+# Thin cron adapter: it carries NO business logic — it only runs the slice-1
+# entry point (`src/release-detector-cli.ts`, #197), exactly as integration-gate.yml
+# keeps its logic in `src/cli.ts`. The entry point compares npm's latest CC release
+# against the Support matrix, dedups against already-open proposals, and (propose-only)
+# opens at most one "adopt CC X.Y.Z" issue. No `claude -p` runs here, so there is no
+# cost-ledger wiring to do (ADR 0006 / cost ledger).
+name: release-detector
+
+on:
+  schedule:
+    # 07:00 UTC daily — a new CC release is detected and proposed within ~a day.
+    - cron: "0 7 * * *"
+  workflow_dispatch: {}
+
+# Issue-scoped token: the entry point's sole outward action is opening one proposal
+# issue (it lists open proposals to dedup, then `gh issue create`). `contents: read`
+# is only for checkout. No other scope is granted.
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  detect:
+    runs-on: ubuntu-latest
+    env:
+      # The slice-1 CLI shells `gh` (list open proposals + create the proposal). In Actions
+      # `gh` authenticates from GH_TOKEN; bind it to the issue-scoped GITHUB_TOKEN above.
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout tweakcc-maint
+        uses: actions/checkout@v6
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 11.5.2  # exact pin; satisfies devEngines.packageManager (pnpm ^11.5.2)
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      # The whole job: run the slice-1 entry point. It detects → dedups → proposes
+      # (or no-ops). Logic stays in tsx, identically to a local `pnpm tsx` run.
+      - name: Run the release detector
+        run: pnpm tsx src/release-detector-cli.ts
