@@ -17,6 +17,15 @@ Infer the repo from `git remote -v` — `gh` does this automatically when run in
 
 Create a GitHub issue **in this repo** (`dividedby/tweakcc-maint`). This is the control plane's own backlog — distinct from the verified PRs the control plane prepares against the *leaf* repos (`tweakcc-fixed`, `lobotomized-claude-code`), which are owned by a separate maintainer (`skrabe`). See CONTEXT.md → "Control plane".
 
+## Label conventions
+
+When filing or triaging a new issue, apply:
+- A **state** label (`needs-triage` if unclear, or `ready-for-agent`/`ready-for-human` if the scope is known)
+- A **category** label (`bug`, `enhancement`, `chore`, or `epic`)
+- A **size** label (`size:S`, `size:M`, `size:L`, or `size:XL`) as a best-effort estimate
+
+See `docs/agents/labels.md` for the full label reference.
+
 ## When a skill says "fetch the relevant ticket"
 
 Run `gh issue view <number> --comments`.
