@@ -1,6 +1,10 @@
 # 0009 — One census tracks two repos: tweakcc-maint also tracks `dividedby/bench`
 
-Status: Accepted (2026-06-10)
+Status: Superseded (2026-06-12) — the roadmap/census system was decommissioned; the
+GitHub issue tracker is now the single source of record for both repos. The
+census doc, mirror workflow, and roadmap hooks described below no longer exist. The
+two-repo *tracking* decision still holds (both repos are steered from here); only the
+census-doc machinery is retired. Retained as a historical record.
 
 ## Context
 
@@ -11,9 +15,9 @@ Behavioral A/B bench primitives this repo depends on (`executeRun`,
 `normalize`/`groupByCell`, cost, the `JudgeBackend` panel backend) live there, and
 that repo's work is steered from sessions **here**.
 
-The roadmap pattern ([the `/roadmap` skill](../../docs/plans/roadmap.md),
-ADR 0020–0023) assumes a **single repo**: one census, one Idea Inbox, one read-only
-mirror, and a drift-nudge that enumerates *one* repo's `gh issue list`. Standing up a
+The roadmap pattern (the former `/roadmap` skill, ADR 0020–0023) assumed a **single
+repo**: one census, one Idea Inbox, one read-only mirror, and a drift-nudge that
+enumerated *one* repo's `gh issue list`. Standing up a
 second full roadmap stack inside `bench` would split the census of record across two
 docs and duplicate the intake/mirror machinery for a repo that is already managed
 from here.

@@ -2,14 +2,14 @@
 
 The canonical operating instructions for the repo's **Idea Inbox** (GitHub issue
 **#99**, label `idea-inbox`). The issue body is the human-facing scratchpad; this
-doc is the agent-facing drain protocol. The roadmap breadcrumb points here: `drain=docs/agents/idea-inbox.md`.
+doc is the agent-facing drain protocol.
 
 ## Two-target intake (ADR 0009)
 
-tweakcc-maint's roadmap is the single census of record for **two** repos —
+This repo's GitHub issue tracker is the single source of record for **two** repos —
 `dividedby/tweakcc-maint` and the owned sibling `dividedby/bench`. A drained idea is
-filed in **whichever repo owns the work**, then registered as a census row in
-`docs/plans/roadmap.md`. `bench` has no inbox of its own; #99 is it.
+filed in **whichever repo owns the work** as a tracked GitHub issue. `bench` has no
+inbox of its own; #99 is it.
 
 ## Draining the inbox
 

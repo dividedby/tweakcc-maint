@@ -78,7 +78,7 @@ probe of the real installed CC 2.1.170 binary:
 | D2 | Four-zeros verdict sourcing via `driver.mjs` exit codes | defer | — | ADR 0007 §2; #80 shipped | Already wired (`src/driver-verification.ts`) | — |
 | D3 | The Four-zeros bar definition | defer | — | ADR 0007 §3 | His SKILL.md §10 is normative; gate adds Boot-verify/Restore drill without redefining | — |
 | D4 | Mis-bind detection (slot resolution) | defer | — | ADR 0007 §4 | Only ever invoke `tools/auditMisbinds.mjs`; no parallel harness, no reimplementation | — |
-| D5 | Orphan-override / `UNKNOWN_N` reporting | defer | — | `driver.mjs report` (index §1.1); #43 reframe (roadmap) | Remaining surviving-placeholder ask routes as an extension request against his driver/audit output | — |
+| D5 | Orphan-override / `UNKNOWN_N` reporting | defer | — | `driver.mjs report` (index §1.1); #43 reframe | Remaining surviving-placeholder ask routes as an extension request against his driver/audit output | — |
 | D6 | The dup-id root-cause **fix** itself | defer-with-watch | bug discovery | He committed to root-causing the flip-flop (tf PR #6 review, index §1.3) | L1 delivers evidence; escalate to a prepared draft PR only if the class survives his next bump | (#93) |
 | D7 | `release-adoption` skill edit to shell to Showtime | defer (implementation of ADR 0007 §1) | — | ADR 0007 Consequences | Follow-up in `~/repos/skills`, outside this repo | — |
 | D8 | Historical lineage-mix / 2.1.154 stamp regressions | defer (no action) | — | R4 | None — record only; not in the Support matrix | — |
