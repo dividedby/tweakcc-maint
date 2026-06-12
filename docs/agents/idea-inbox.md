@@ -2,8 +2,7 @@
 
 The canonical operating instructions for the repo's **Idea Inbox** (GitHub issue
 **#99**, label `idea-inbox`). The issue body is the human-facing scratchpad; this
-doc is the agent-facing drain protocol (ADR 0024 — instructions live in the repo,
-not the issue body). The roadmap breadcrumb points here: `drain=docs/agents/idea-inbox.md`.
+doc is the agent-facing drain protocol. The roadmap breadcrumb points here: `drain=docs/agents/idea-inbox.md`.
 
 ## Two-target intake (ADR 0009)
 
@@ -33,8 +32,12 @@ The unchecked items under `## Ideas` in #99 are raw, un-actioned ideas. When ask
    work is filed in `dividedby/bench`; everything else in `dividedby/tweakcc-maint`.
    Then register it as a census row, qualifying a bench filing as `bench#NN` (a bare
    integer means tweakcc-maint).
-5. **Refine** — rewrite the resulting issue(s) with `/software-design`.
-6. **Maintain** — keep `## Ideas` sorted (un-actioned at the top); once an idea
+5. **Labels** — when filing issues, apply labels from `docs/agents/labels.md`: state
+   (`needs-triage` to start), category (`bug` / `enhancement` / `chore` / `epic`),
+   and a size estimate (`size:S` / `size:M` / `size:L` / `size:XL`). The compact
+   vocabulary reference is `docs/agents/triage-labels.md`.
+6. **Refine** — rewrite the resulting issue(s) with `/software-design`.
+7. **Maintain** — keep `## Ideas` sorted (un-actioned at the top); once an idea
    becomes an issue/PR, move it under **✅ Actioned**, check it, and append `→ #<num>`
    (or `→ bench#<num>` if it landed in bench). Prune `Actioned` to a rolling window
    (~8 most recent) — older items drop off; their record survives on the `→ #N` link.
