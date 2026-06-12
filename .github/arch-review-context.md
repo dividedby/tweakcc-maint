@@ -49,7 +49,7 @@ improve testability, or clarify the gate/verdict data flow are the target.
 
 **Fallback scope (only if `src/` is quiet):** the repo's meta-layer —
 `CLAUDE.md` + `CONTEXT.md`, `docs/adr/`, `docs/design/`, `docs/agents/`,
-`docs/plans/roadmap.md`, the `.claude/hooks/` guards (+ their self-tests), and
+the `.claude/hooks/` guards (+ their self-tests), and
 the workflow files under `.github/workflows/`. The same proposal rules apply:
 concrete before/after, sources, no speculation. You may propose edits to the
 workflow envelope or this Repo-context file — a human reviews before merge.
@@ -86,13 +86,12 @@ proposal that violates one is out of scope, not an improvement:
   (npm release source, adoption environment, issue publisher) has a real
   implementation behind a fake used in tests. Preserve the seam; don't propose
   collapsing a fake into the real adapter or testing against live leaves.
-- **The `.claude/hooks/` guards are load-bearing** (`git-guard`, `secret-guard`,
-  `roadmap-guard`; [ADR 0006](../docs/adr/0006-github-hosted-ci-runs-the-integration-gate.md)).
+- **The `.claude/hooks/` guards are load-bearing** (`git-guard`, `secret-guard`;
+  [ADR 0006](../docs/adr/0006-github-hosted-ci-runs-the-integration-gate.md)).
   Each ships a framework-free self-test. Don't propose weakening a guard or
   dropping its self-test.
-- **The roadmap is the execution source of record** (`docs/plans/roadmap.md`),
-  self-updated per PR and enforced by `roadmap-guard.py`. A proposal is filed as
-  a `gh` issue, never a commit or PR.
+- **The GitHub issue tracker is the execution source of record.** A proposal is
+  filed as a `gh` issue, never a commit or PR.
 - **pnpm + ESM only.** Don't introduce `npm`/`yarn`, CommonJS, or a committed
   non-pnpm lockfile.
 
