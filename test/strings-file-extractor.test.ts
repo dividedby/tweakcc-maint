@@ -4,7 +4,6 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   extractStringsFile,
-  extractPristineStringsFile,
   assertPristineStringsFile,
   loadOverrideBodies,
   stripFrontmatter,
@@ -129,43 +128,6 @@ describe('assertPristineStringsFile (patched-vs-pristine guard)', () => {
     expect(() =>
       assertPristineStringsFile({ candidatePath: candidate, pristineReferencePath: pristine, overrides }),
     ).not.toThrow();
-  });
-});
-
-describe('extractPristineStringsFile', () => {
-  let outDir: string;
-
-  beforeEach(() => {
-    outDir = mkdtempSync(join(tmpdir(), 'pristine-extractor-'));
-  });
-  afterEach(() => {
-    rmSync(outDir, { recursive: true, force: true });
-  });
-
-  it('hands the pristine native binary path straight to the adapter (no npm pack)', async () => {
-    const adapter = fakeAdapter();
-    const out = await extractPristineStringsFile(
-      '/home/runner/.local/bin/claude',
-      '2.1.173',
-      outDir,
-      adapter,
-    );
-
-    expect(out).toBe(join(outDir, 'prompts-2.1.173.json'));
-    expect(adapter.calls).toEqual([
-      {
-        binaryPath: '/home/runner/.local/bin/claude',
-        version: '2.1.173',
-        outputPath: join(outDir, 'prompts-2.1.173.json'),
-      },
-    ]);
-  });
-
-  it('throws on internal-version mismatch (the version-match assert)', async () => {
-    const adapter = fakeAdapter('2.1.172');
-    await expect(
-      extractPristineStringsFile('/path/to/native-cc', '2.1.173', outDir, adapter),
-    ).rejects.toThrow(/2\.1\.173.*2\.1\.172|version mismatch/i);
   });
 });
 

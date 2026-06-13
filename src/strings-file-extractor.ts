@@ -118,7 +118,7 @@ function stringsBodyText(stringsFilePath: string): string {
 
 /**
  * Reject a strings file sourced from an already-`--apply`-ed (patched) tree. Provenance is the
- * primary defense — {@link extractPristineStringsFile} sources its cli.js from the freshly-installed
+ * primary defense — {@link extractStringsFile} sources its cli.js from the freshly-installed
  * native binary, a tree that has never been patched — but this content guard fails closed if a caller hands a
  * contaminated extract anyway (the lcc#9 / 2.1.172 failure mode: anchor evidence derived from a
  * local `--apply` against an installed/backed-up tree).
@@ -168,32 +168,6 @@ function version_of(stringsFilePath: string): string {
   } catch {
     return basename(stringsFilePath);
   }
-}
-
-/**
- * Produce a PRISTINE `prompts-<version>.json` into `outDir`, sourcing cli.js from the
- * freshly-installed native binary at `binaryPath` rather than the leaf's `--apply`/`--restore`
- * cache (a possibly-patched tree) (#211). Provenance is the guarantee: the native binary is read
- * BEFORE the gate's first `--apply` (a strictly later step), so it has never been patched. The npm
- * tarball is no longer a source — the published package is now a thin launcher with no readable
- * `cli.js` (#228); the native install is the only source, and is what the real adapter
- * ({@link realPromptExtractorAdapter}) already parses via the leaf's
- * `extractClaudeJsFromNativeInstallation`. Asserts internal-version match (via {@link extractStringsFile}).
- *
- * This is the trusted-pristine reference {@link assertPristineStringsFile} diffs a SUSPECT
- * extract against — so it runs no differential guard on itself (nothing to diff against).
- *
- * The cli.js-sourcing is behind the {@link PromptExtractorAdapter} seam, so the wrapper's
- * contract (binary path → output, version-match throw) is unit-tested with a fake; the real
- * native parse is integration-verified by a real gate dispatch.
- */
-export async function extractPristineStringsFile(
-  binaryPath: string,
-  version: string,
-  outDir: string,
-  adapter: PromptExtractorAdapter,
-): Promise<string> {
-  return await extractStringsFile(binaryPath, version, outDir, adapter);
 }
 
 /**

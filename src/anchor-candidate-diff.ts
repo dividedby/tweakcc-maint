@@ -13,7 +13,7 @@
  * Strictly mechanical (issue Scope): every byte emitted comes from the two
  * pristine `prompts-<version>.json` extracts handed in — NEVER from a
  * patched/applied tree. The inputs are produced by the Phase 0
- * {@link extractPristineStringsFile} (npm-pack provenance) and screened by
+ * {@link extractStringsFile} (npm-pack provenance) and screened by
  * {@link assertPristineStringsFile} (the differential patched-source guard) — so a
  * candidate that would have matched zero against pristine (the lcc#9 / 2.1.172
  * contamination failure, #211) is impossible by construction: a missing prompt id

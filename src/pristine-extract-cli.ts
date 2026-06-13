@@ -6,7 +6,7 @@
  * cache, and `resolveStringsFilePath` (orphan-validator.ts) reads from that cache — a PATCHED
  * tree. Two consecutive realign drafts (lcc#9 + the 2.1.172 false 14-anchor set) were closed by
  * skrabe as contaminated diagnoses sourced from exactly this path. This entry replaces that
- * source: it runs `extractPristineStringsFile` against the freshly-installed native binary (read
+ * source: it runs `extractStringsFile` against the freshly-installed native binary (read
  * before the gate's first `--apply`, so never `--apply`-ed) and
  * writes the result into the leaf's `data/prompts/` — the highest-priority candidate
  * `resolveStringsFilePath` already prefers (its "repo-local, locally-extracted same-day JSON is
@@ -19,7 +19,7 @@
  * text the pristine does not, the run fails HERE (loudly) rather than letting a contaminated
  * source reach a leaf PR.
  *
- * Transport only: the logic lives behind `extractPristineStringsFile` + `assertPristineStringsFile`.
+ * Transport only: the logic lives behind `extractStringsFile` + `assertPristineStringsFile`.
  * The real native-binary parse (`realPromptExtractorAdapter`) is integration-verified by a gate
  * dispatch.
  */
@@ -31,7 +31,7 @@ import { join } from 'node:path';
 import { isEntryPoint } from './cli-entrypoint.js';
 import {
   assertPristineStringsFile,
-  extractPristineStringsFile,
+  extractStringsFile,
   loadOverrideBodies,
   realPromptExtractorAdapter,
   stringsFileName,
@@ -74,7 +74,7 @@ async function main(): Promise<void> {
   // resolveStringsFilePath prefers tweakcc-fixed/data/prompts first — write the pristine extract
   // there so the gate's driver + orphan checks read it ahead of the --apply cache.
   const outDir = join(tweakccFixedDir, 'data', 'prompts');
-  const pristinePath = await extractPristineStringsFile(
+  const pristinePath = await extractStringsFile(
     nativeBinary,
     version,
     outDir,
