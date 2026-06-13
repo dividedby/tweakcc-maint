@@ -11,51 +11,61 @@ needs doing.
 
 ## Phase 1 — Preflight alignment check
 
-### Step 0 — Parallel T0 scouts (fire all four in parallel)
+### Step 0 — Four parallel reads (run on the lead or a Bash-capable tier)
 
-Delegate to **four independent T0 scouts** simultaneously:
+Run these four reads **on the lead (or a Bash-capable tier) in parallel** — do NOT
+delegate to T0 scouts; `gearbox:scout` has no Bash and cannot shell out.
 
-**Scout A — latest CC version on npm:**
-```
-npm view @anthropic-ai/claude-code version
+**Read A — latest CC version on npm:**
+```bash
+# Run from a neutral dir (e.g. /tmp) — inside the repo, `devEngines` pnpm pin
+# causes EBADDEVENGINES and the command fails.
+cd /tmp && npm view @anthropic-ai/claude-code version
 ```
 Capture the version string (e.g. `2.1.177`). This is the candidate.
 
-**Scout B — skrabe/tweakcc-fixed leaf state:**
-Read his leaf current state:
-- `gh api repos/skrabe/tweakcc-fixed/commits?sha=main&per_page=10` → HEAD sha + recent commit subjects
-- `gh pr list --repo skrabe/tweakcc-fixed --state open --json number,title,headRefOid`
-- `gh pr list --repo skrabe/tweakcc-fixed --state closed --limit 10 --json number,title,headRefOid,state`
-- `npm view tweakcc-fixed version` → his published CLI version
-
-**Scout C — skrabe/lobotomized-claude-code leaf state:**
-- `gh api repos/skrabe/lobotomized-claude-code/commits?sha=main&per_page=10` → HEAD sha + recent commit subjects
-- `gh pr list --repo skrabe/lobotomized-claude-code --state open --json number,title,headRefOid`
-- `gh pr list --repo skrabe/lobotomized-claude-code --state closed --limit 10 --json number,title,headRefOid,state`
-
-**Scout D — adoption records on disk:**
+**Read B — skrabe/tweakcc-fixed leaf state:**
+```bash
+gh api repos/skrabe/tweakcc-fixed/commits?sha=main&per_page=10 --jq '.[].commit.message' 
+gh pr list --repo skrabe/tweakcc-fixed --state open --json number,title,headRefOid
+gh pr list --repo skrabe/tweakcc-fixed --state closed --limit 10 --json number,title,headRefOid,state
+cd /tmp && npm view tweakcc-fixed version   # also run from /tmp for the same reason
 ```
+
+**Read C — skrabe/lobotomized-claude-code leaf state:**
+```bash
+gh api repos/skrabe/lobotomized-claude-code/commits?sha=main&per_page=10 --jq '.[].commit.message'
+gh pr list --repo skrabe/lobotomized-claude-code --state open --json number,title,headRefOid
+gh pr list --repo skrabe/lobotomized-claude-code --state closed --limit 10 --json number,title,headRefOid,state
+```
+
+**Read D — adoption records on disk:**
+```bash
 ls docs/records/adoption-record-*.json 2>/dev/null
 ```
 For each file found, read `pass` from the JSON. Report which versions have a
 passing record.
 
-Wait for all four scouts to return before proceeding.
+Wait for all four reads to complete before proceeding.
+
+**On surprising or empty results:** do not accept them at face value — re-verify
+directly. An npm timeout, a gh auth flap, or an empty record list each has a
+distinct failure mode; confirm the cause before proceeding.
 
 ---
 
 ### Step 1 — Compose the Support-matrix status table
 
-From the scout results, compose the version × `skrabeAdopted` × `ourFlowComplete`
+From the Phase 1 reads, compose the version × `skrabeAdopted` × `ourFlowComplete`
 table per ADR 0010:
 
-- **`ourFlowComplete`** — derived from Scout D: a passing `adoption-record-<version>.json` exists.
-- **`skrabeAdopted`** — derived from Scout B: his published npm version matches,
+- **`ourFlowComplete`** — derived from Read D: a passing `adoption-record-<version>.json` exists.
+- **`skrabeAdopted`** — derived from Read B: his published npm version matches,
   OR a recent commit subject / open PR / merged closed PR on either leaf references
   the version. **Never persist this flag** (ADR 0010 invariant).
 
 Matrix versions to report: the current `SUPPORT_MATRIX_SEED` (in `src/support-matrix.ts`)
-plus the candidate version from Scout A.
+plus the candidate version from Read A.
 
 Print the table:
 
@@ -72,7 +82,7 @@ Version   ourFlowComplete   skrabeAdopted
 ### Step 2 — Decide the path
 
 **Clean exit — nothing to do** if any of:
-- Scout A returned an error or empty version → report "npm unavailable, cannot determine latest" and stop.
+- Read A returned an error or empty version → report "npm unavailable, cannot determine latest" and stop.
 - The candidate version is already in the matrix AND `ourFlowComplete=true` for it → report "already handled" and stop.
 - The candidate version is strictly older than every matrix entry → report "not newer than matrix" and stop.
 
@@ -117,12 +127,12 @@ The candidate version from Phase 1 is `<newVersion>`.
 
 ### Path B — Step 1: Pull skrabe's recent leaf commits for the version
 
-Delegate a T0 scout to confirm his adoption evidence at HEAD. Read from Scout B
-(already gathered in Phase 1 — re-use the same data; do not re-fetch):
+Confirm his adoption evidence at HEAD using the data already gathered in Phase 1 —
+re-use the same data; do not re-fetch:
 
 - The specific commit subject(s) that reference `<newVersion>` on
-  `skrabe/tweakcc-fixed` and `skrabe/lobotomized-claude-code`.
-- His published `tweakcc-fixed` npm version (already from Scout B).
+  `skrabe/tweakcc-fixed` and `skrabe/lobotomized-claude-code` (from Read B/C).
+- His published `tweakcc-fixed` npm version (from Read B).
 
 Print a brief confirmation:
 
@@ -159,8 +169,11 @@ gh run view <runId> --json status,conclusion,jobs
 attempt to patch skrabe's patcher. Path B failures are evidence for him (surface
 in the lcc PR intent ping if relevant), not things we fix unilaterally.
 
-The gate emits an `adoption-record-<newVersion>.json` on success. That record is
-what `supportMatrixStatus()` reads to set `ourFlowComplete=true` (ADR 0010).
+The gate emits `docs/records/adoption-record-<newVersion>.draft.json` on success —
+the `.draft.` suffix marks pre-merge evidence. The record is promoted to the
+suffix-less `adoption-record-<newVersion>.json` on merge day; that is what
+`supportMatrixStatus()` reads to set `ourFlowComplete=true`. Do **not** bump
+`SUPPORT_MATRIX_SEED` pre-merge (ADR 0010).
 
 Print the gate result:
 
@@ -188,17 +201,17 @@ genuine gaps worth surfacing.
 The `lobotomized-claude-code` leaf clone is at `~/repos/lobotomized-claude-code`
 (the tracked clone — MEMORY: runtime-vs-tracked-override-dirs).
 
-**Delegate to a T1 agent:**
-
 1. **Identify candidate prompt ids.** Use the diff between `<newVersion>` and the
-   previous matrix version from Scout D (or Phase 2 if it ran — the changed + new
+   previous matrix version from Read D (or Phase 2 if it ran — the changed + new
    ids). If a version-bump diff is unavailable, use ALL prompt ids in
-   `prompts-<newVersion>.json` as candidates.
+   `data/prompts/prompts-<newVersion>.json` as candidates.
 
-2. **Rank by Lobotomy potential** using `src/lobotomy-ranker.ts`
-   (`rankByLobotomyPotential`): extract each candidate's text from
-   `prompts-<newVersion>.json`, score on the four axes, apply inactive-penalty for
-   feature-gated slots.
+2. **Rank by Lobotomy potential** using `src/lobotomy-ranker-cli.ts` (landed in #265):
+   ```bash
+   pnpm tsx src/lobotomy-ranker-cli.ts ~/repos/tweakcc-fixed/data/prompts/prompts-<newVersion>.json
+   ```
+   The CLI emits one `{ promptId, totalScore, clearsBar, inactivePenalty, axes }` line per
+   candidate and a `{ anyClears, count }` summary. Re-verify directly on surprising/empty output.
 
 3. **Subtract his live lcc override set** using `src/gap-subtraction.ts`
    (`subtractActiveOverrides`): read his current override files from
@@ -362,15 +375,28 @@ Shell out to skrabe's Showtime pipeline in the configured `tweakcc-fixed` checko
 (`~/repos/tweakcc-fixed` by default, or the path in the session's adoption environment):
 
 ```bash
-# 1. Extract prompts for the new version
+# 1. Extract cli.js for the new version — writes it to /tmp (only cli.js, not the prompts JSON).
 node skills/showtime/driver.mjs extract
 
-# 2. Confirm prompts-<newVersion>.json was written
-ls prompts-<newVersion>.json
+# 2. Produce the named prompts JSON via seeded promptExtractor.
+#    driver.mjs extract does NOT write prompts-<newVersion>.json; you must seed it:
+#    a. Copy the previous version's prompts JSON as the seed file:
+cp data/prompts/prompts-<prevVersion>.json data/prompts/prompts-<newVersion>.json
+#    b. Run promptExtractor with the fresh cli.js to update the named prompts in place
+#       (promptExtractor reads/writes the JSON at the path it resolves for the version).
+node promptExtractor.js <newVersion>
 
-# 3. Run the version-bump report against the previous version
-node versionBumpReport.js <prevVersion> <newVersion>
+# 3. Confirm prompts-<newVersion>.json was written
+ls data/prompts/prompts-<newVersion>.json
+
+# 4. Run the version-bump report, pointing it at the fresh pristine cli.js from step 1.
+#    Use --cli to pass the freshly extracted cli.js (avoids stale-source drift).
+node versionBumpReport.js --cli /tmp/claude-code-<newVersion>.cjs <prevVersion> <newVersion>
 ```
+
+**Do NOT set `TWEAKCC_UPSTREAM_JSON`** — that variable pointed at the retired Piebald
+upstream JSON which no longer exists. Setting it misdirects the extractor. The seeded
+extraction above (copy prev → run promptExtractor) is the correct pipeline.
 
 Capture the full output of `versionBumpReport.js`. Assert zero blocking issues:
 - `Conflicts detected for 0` (zero orphan overrides)
@@ -383,8 +409,8 @@ Print a Phase 2 summary:
 
 ```
 Phase 2 — Extraction
-  prompts-<newVersion>.json: written
-  Version-bump report: <newVersion> vs <prevVersion>
+  data/prompts/prompts-<newVersion>.json: written (seeded from data/prompts/prompts-<prevVersion>.json + promptExtractor)
+  Version-bump report: <newVersion> vs <prevVersion>  (--cli /tmp/claude-code-<newVersion>.cjs)
     Changed prompt ids: <N>
     New prompt ids: <N>
     Removed prompt ids: <N>
@@ -415,17 +441,24 @@ The `lobotomized-claude-code` leaf clone is at `~/repos/lobotomized-claude-code`
 (the tracked clone, not `~/.tweakcc/system-prompts` which may hold runtime-written
 extras — MEMORY: runtime-vs-tracked-override-dirs).
 
-**Named-prompt drift check — delegate to a T1 agent:**
+**Named-prompt drift check — run the drift-triage CLI:**
 
-For each changed/new prompt id from Phase 2:
-1. For each of the three model-set dirs, check whether a file `<promptId>.md` exists.
-2. Classify each found file using the `classifyOverride` / `triagePromptIds` logic
-   in `src/drift-triage.ts`:
-   - **empty-stub**: body (non-frontmatter) is blank — skip, no drift to fix.
-   - **active**: body is non-blank — compare against the new pristine prompt text
-     from `prompts-<newVersion>.json` (the `pieces` array joined) to detect drift.
-3. A prompt id has **active+drifted** status when at least one model-set override
-   is active AND differs from the new pristine text.
+Use `src/drift-triage-cli.ts` (the Phase 3 transport, landed in #265):
+
+```bash
+# argv[2] = colon-separated override dirs; argv[3] = path to prompts-<newVersion>.json
+pnpm tsx src/drift-triage-cli.ts \
+  ~/repos/lobotomized-claude-code/system-prompts-fable-5:~/repos/lobotomized-claude-code/system-prompts-opus-4-7:~/repos/lobotomized-claude-code/system-prompts-opus-4-8 \
+  ~/repos/tweakcc-fixed/data/prompts/prompts-<newVersion>.json
+```
+
+The CLI emits newline-delimited JSON: one `{ promptId, hasActiveDrift, perModelSet }` line
+per id, then a `{ summary: { total, activeDrifted, stubOnly } }` line. Classification:
+- **empty-stub**: body (non-frontmatter) is blank — skip, no drift to fix.
+- **active+drifted**: body is non-blank AND differs from the new pristine text.
+
+On surprising or empty output from the CLI, re-verify directly — do not accept the
+result without confirming the override dir paths resolve and the prompts JSON exists.
 
 Print the Phase 3 report:
 
@@ -458,13 +491,21 @@ the Behavioral axes (CONTEXT.md → "Behavioral axis").
 This phase ranks **new** ids only (not changed ones — changed ids already have
 overrides evaluated in Phase 3). If there are zero new ids, skip to the gate.
 
-Use `src/lobotomy-ranker.ts` as the scoring substrate (`rankByLobotomyPotential`):
-- Extract each new prompt id's text from `prompts-<newVersion>.json`.
-- Score against the four axes: anti-sycophancy, anti-hedging, fewer-unsolicited-offers, terse-directness.
-- Apply an `inactive` penalty for prompt slots that are feature-gated or
-  conditionally triggered (read the prompt text for conditional guards such as
-  "only when the user has enabled…" or feature-flag references).
-- Sort descending by totalScore.
+Use `src/lobotomy-ranker-cli.ts` (the Phase 4 transport, landed in #265):
+
+```bash
+# argv[2] = path to prompts-<newVersion>.json
+pnpm tsx src/lobotomy-ranker-cli.ts ~/repos/tweakcc-fixed/data/prompts/prompts-<newVersion>.json
+```
+
+The CLI emits newline-delimited JSON: one `{ promptId, totalScore, clearsBar, inactivePenalty, axes }` line
+per candidate (sorted descending by totalScore), then a `{ anyClears, count }` summary line.
+The pure core (`rankByLobotomyPotential` in `src/lobotomy-ranker.ts`) scores each prompt against:
+- anti-sycophancy, anti-hedging, fewer-unsolicited-offers, terse-directness
+- inactive penalty for feature-gated / conditionally triggered slots
+
+On surprising or empty output, re-verify directly — confirm the prompts JSON path
+resolves and contains the expected new prompt ids before accepting the result.
 
 Print the Phase 4 report:
 
@@ -536,6 +577,14 @@ Gate — integration-gate.yml  cc_version=<newVersion>
     Boot-verify: pass
     auditMisbinds: 0
 ```
+
+**Adoption record persistence (ADR 0010):**
+The gate emits `docs/records/adoption-record-<newVersion>.draft.json` on success —
+the `.draft.` suffix marks pre-merge evidence. On merge day, the record is promoted
+to the suffix-less `adoption-record-<newVersion>.json`, which is what
+`supportMatrixStatus()` reads to set `ourFlowComplete=true`. Do **not** bump
+`SUPPORT_MATRIX_SEED` pre-merge — that constant stays the install-free version list
+and is only updated once the merge is complete (ADR 0010).
 
 ---
 
@@ -622,6 +671,11 @@ gh pr create \
   --body-file /tmp/adopt-<newVersion>-lcc-body.md
 ```
 
+**Stacked PR caveat:** `gh pr create --base <fork-branch>` fails for cross-fork stacked
+PRs. Both leaf PRs (tweakcc-fixed and lcc) must target `main`, not each other. When
+they are open simultaneously they will each show a union diff until the parent merges;
+that is expected, not an error.
+
 The lcc PR body includes the list of active+drifted override files and their
 proposed realignments; cite the Four-zeros gate run as evidence.
 
@@ -642,13 +696,16 @@ Adoption complete — <newVersion>
 
 ## Gearbox routing notes
 
-- Phase 1 scouts: T0 (haiku) — pure reads, no design decisions.
+- Phase 1 reads: run on the lead or a Bash-capable tier (T1+). T0 scouts have no
+  Bash and cannot run `npm view` or `gh` shell-outs.
 - Any task that pushes a fork branch or opens a PR on a skrabe leaf starts at T1
   minimum (see `.claude/routing.md`).
 - Phase 2 extraction + Phase 3 drift triage: T1 — shell-outs + file reads, no
-  design decisions; delegate as a single bounded task.
-- Phase 4 Lobotomy ranking: T1 — pure scoring over prompt text; uses
-  `src/lobotomy-ranker.ts` as the scoring substrate.
+  design decisions; delegate as a single bounded task. When delegating, re-verify
+  surprising or empty subagent results directly at the orchestrator level before
+  proceeding.
+- Phase 4 Lobotomy ranking: T1 — invoke `src/lobotomy-ranker-cli.ts` (the
+  deterministic CLI; no need to import the core by hand).
 - Gate dispatch + PR authoring: T2 minimum — involves CI watch loop and leaf PR
   authoring with an intent ping; do not delegate below T2.
 
@@ -669,3 +726,12 @@ Cockpit invariants apply throughout:
   `--body-file` (never heredocs — git-guard hook constraint).
 - ADR 0010: skrabe's state is live-checked, never cached. `skrabeAdopted` is
   derived at Phase 1 from the live snapshot and never persisted.
+- **Gate isolation:** when lobotomized-claude-code overrides are stale and would
+  break the gate, set `isolateOverrides: true` on `RealAdoptionEnvironment` (#263).
+  This repoints `~/.tweakcc/system-prompts` at a throwaway empty dir for the
+  duration of the run and restores it on both success and error — producing a clean
+  patcher+prompts Four-zeros record isolated from broken overrides. Do NOT do the
+  manual symlink dance by hand; the `isolateOverrides` capability handles it safely.
+- Both leaf PRs target `main` — `gh pr create --base <fork-branch>` fails for
+  cross-fork stacked PRs (stacked PRs show a union diff until the parent merges;
+  that is expected).
