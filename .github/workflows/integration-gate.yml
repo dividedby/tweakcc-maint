@@ -13,6 +13,29 @@ on:
         description: "Claude Code version to adopt-test (e.g. 2.1.169)"
         required: true
         type: string
+      # Fork-branch gating: supply these four inputs to clone an unmerged fork
+      # branch instead of skrabe's main. Leave all four empty for default behavior
+      # (clones skrabe/<repo>@main — byte-for-byte equivalent to the prior hardcoded clone).
+      tweakcc_fixed_repo:
+        description: "tweakcc-fixed repo to clone (owner/repo, default: skrabe/tweakcc-fixed)"
+        required: false
+        default: "skrabe/tweakcc-fixed"
+        type: string
+      tweakcc_fixed_ref:
+        description: "tweakcc-fixed ref/branch to clone (default: main)"
+        required: false
+        default: "main"
+        type: string
+      lobotomized_repo:
+        description: "lobotomized-claude-code repo to clone (owner/repo, default: skrabe/lobotomized-claude-code)"
+        required: false
+        default: "skrabe/lobotomized-claude-code"
+        type: string
+      lobotomized_ref:
+        description: "lobotomized-claude-code ref/branch to clone (default: main)"
+        required: false
+        default: "main"
+        type: string
       proposal_issue:
         # When set, the gate posts the Adoption record back as an ADDITIVE comment
         # on that proposal issue. Left empty for a plain manual gate run → no write-back.
@@ -71,8 +94,8 @@ jobs:
       # --- Leaf clones (read-only; the control plane never pushes to skrabe) ---
       - name: Clone leaf repos
         run: |
-          git clone --depth 1 https://github.com/skrabe/tweakcc-fixed "${TWEAKCC_FIXED_DIR}"
-          git clone --depth 1 https://github.com/skrabe/lobotomized-claude-code "${LOBOTOMIZED_DIR}"
+          git clone --depth 1 --branch "${{ inputs.tweakcc_fixed_ref }}" https://github.com/${{ inputs.tweakcc_fixed_repo }} "${TWEAKCC_FIXED_DIR}"
+          git clone --depth 1 --branch "${{ inputs.lobotomized_ref }}" https://github.com/${{ inputs.lobotomized_repo }} "${LOBOTOMIZED_DIR}"
 
       # Always install + build: the gate runs the leaf's dist/index.mjs, which needs its
       # runtime node_modules (ink, etc.) present. Caching only dist while gating the
