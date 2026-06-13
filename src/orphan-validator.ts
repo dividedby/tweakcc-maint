@@ -155,7 +155,7 @@ export function formatValidatorOutput(
 // ── fs / JSON wrappers (HITL-exercised) ──────────────────────────────────────────────
 
 /** Read every `*.md` override under the given directories (non-recursive). */
-function readOverrideFiles(dirs: string[]): OverrideFile[] {
+export function readOverrideFiles(dirs: string[]): OverrideFile[] {
   const files: OverrideFile[] = [];
   for (const dir of dirs) {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
