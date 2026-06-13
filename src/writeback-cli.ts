@@ -17,9 +17,7 @@
  */
 
 import { readFileSync } from 'node:fs';
-import { argv } from 'node:process';
-import { realpathSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { isEntryPoint } from './cli-entrypoint.js';
 import {
   postAdoptionRecord,
   RealProposalCommenter,
@@ -100,14 +98,4 @@ async function main(): Promise<void> {
 
 // Run only as the process entry point — never on import (the wiring test imports
 // runWriteBackCli and must NOT trigger a real `gh issue comment`).
-function isEntryPoint(): boolean {
-  const entry = argv[1];
-  if (entry === undefined) return false;
-  try {
-    return realpathSync(entry) === fileURLToPath(import.meta.url);
-  } catch {
-    return false;
-  }
-}
-
-if (isEntryPoint()) void main();
+if (isEntryPoint(import.meta.url)) void main();

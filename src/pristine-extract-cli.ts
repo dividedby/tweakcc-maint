@@ -27,9 +27,8 @@
 import { existsSync, readdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { argv } from 'node:process';
-import { realpathSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
+import { isEntryPoint } from './cli-entrypoint.js';
 import {
   assertPristineStringsFile,
   extractPristineStringsFile,
@@ -97,14 +96,4 @@ async function main(): Promise<void> {
   }
 }
 
-function isEntryPoint(): boolean {
-  const entry = argv[1];
-  if (entry === undefined) return false;
-  try {
-    return realpathSync(entry) === fileURLToPath(import.meta.url);
-  } catch {
-    return false;
-  }
-}
-
-if (isEntryPoint()) void main();
+if (isEntryPoint(import.meta.url)) void main();

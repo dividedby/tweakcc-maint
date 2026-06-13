@@ -27,10 +27,9 @@
 
 import { argv } from 'node:process';
 import { readdirSync, readFileSync } from 'node:fs';
-import { realpathSync } from 'node:fs';
 import { basename, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { triagePromptIds, summarizeTriage } from './drift-triage.js';
+import { isEntryPoint } from './cli-entrypoint.js';
 import type { NamedOverrideFile, PristinePrompt, PromptTriage } from './drift-triage.js';
 
 export interface DriftTriageCliDeps {
@@ -169,14 +168,4 @@ async function main(): Promise<void> {
 // Run only when invoked as the process entry point — never when imported (the transport
 // test imports runDriftTriageCli / runDriftTriageCliFromPaths and must NOT trigger a
 // real process.exit).
-function isEntryPoint(): boolean {
-  const entry = argv[1];
-  if (entry === undefined) return false;
-  try {
-    return realpathSync(entry) === fileURLToPath(import.meta.url);
-  } catch {
-    return false;
-  }
-}
-
-if (isEntryPoint()) void main();
+if (isEntryPoint(import.meta.url)) void main();

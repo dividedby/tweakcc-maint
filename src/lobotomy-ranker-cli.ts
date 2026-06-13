@@ -26,9 +26,8 @@
 
 import { argv } from 'node:process';
 import { readFileSync } from 'node:fs';
-import { realpathSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { rankByLobotomyPotential, anyClears } from './lobotomy-ranker.js';
+import { isEntryPoint } from './cli-entrypoint.js';
 import type { PromptCandidate, LobotomyRanking } from './lobotomy-ranker.js';
 
 export interface LobotomyRankerCliDeps {
@@ -135,14 +134,4 @@ async function main(): Promise<void> {
 // Run only when invoked as the process entry point — never when imported (the transport
 // test imports runLobotomyRankerCli / runLobotomyRankerCliFromPaths and must NOT trigger
 // a real process.exit).
-function isEntryPoint(): boolean {
-  const entry = argv[1];
-  if (entry === undefined) return false;
-  try {
-    return realpathSync(entry) === fileURLToPath(import.meta.url);
-  } catch {
-    return false;
-  }
-}
-
-if (isEntryPoint()) void main();
+if (isEntryPoint(import.meta.url)) void main();
