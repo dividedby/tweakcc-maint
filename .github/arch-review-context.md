@@ -37,12 +37,11 @@ control plane. Protect the thin-cockpit boundary over cleaner-looking design.
   behind a fake; the gate runs against either).
 - `src/orphan-validator.ts` + `src/orphan-report.ts` — the authoring-drift
   pre-check and the patcher orphan-report consumer (advisory only — see ADR 0005).
-- `src/release-detector.ts`, `src/npm-release-source.ts`,
-  `src/fake-npm-release-source.ts` — release detection behind a source seam.
-- `src/adoption-history.ts`, `src/issue-publisher.ts`,
-  `src/stub-issue-publisher.ts`, `src/leaf-shell.ts`, `src/cli.ts`,
-  `src/credentials-preflight.ts` — history reporting, issue publishing seam,
-  leaf shell-out, the CLI entry, and the credential preflight.
+- `src/npm-release-source.ts`, `src/fake-npm-release-source.ts` — the
+  `NpmReleaseSource` seam (his published-version read, behind a fake).
+- `src/adoption-history.ts`, `src/issue-publisher.ts`, `src/leaf-shell.ts`,
+  `src/cli.ts`, `src/credentials-preflight.ts` — history reporting, issue
+  publishing seam, leaf shell-out, the CLI entry, and the credential preflight.
 
 Look here first. Proposals that sharpen a seam (real/fake adapter pairs),
 improve testability, or clarify the gate/verdict data flow are the target.

@@ -14,10 +14,9 @@ on:
         required: true
         type: string
       proposal_issue:
-        # Set by the auto-adopt chain (proposal-chain.yml, #200) to the proposal
-        # issue number, so the gate posts the Adoption record back as an ADDITIVE
-        # comment on it. Left empty for a manual gate run → no write-back.
-        description: "Proposal issue to write the Adoption record back to (auto-chain only)"
+        # When set, the gate posts the Adoption record back as an ADDITIVE comment
+        # on that proposal issue. Left empty for a plain manual gate run → no write-back.
+        description: "Proposal issue to write the Adoption record back to (optional)"
         required: false
         type: string
 
@@ -151,12 +150,11 @@ jobs:
             echo "::notice::No agent stream captured (no successful Boot-verify model call this run)."
           fi
 
-      # Auto-adopt write-back (#200): when the gate was dispatched by the chain
-      # (proposal_issue set), post the Adoption record + pass/fail back onto the
-      # proposal as an ADDITIVE comment — never a body rewrite, never an auto-close
-      # (cockpit rule). Logic lives in src/writeback-cli.ts; this is a thin envelope.
-      # `if: always()` so a RED gate still reports its verdict; a missing record
-      # reads as a FAIL (writeback-cli), never a silent pass.
+      # Write-back: when proposal_issue is set, post the Adoption record + pass/fail
+      # back onto that proposal as an ADDITIVE comment — never a body rewrite, never
+      # an auto-close (cockpit rule). Logic lives in src/writeback-cli.ts; this is a
+      # thin envelope. `if: always()` so a RED gate still reports its verdict; a
+      # missing record reads as a FAIL (writeback-cli), never a silent pass.
       - name: Write the Adoption record back to the proposal
         if: always() && inputs.proposal_issue != ''
         env:
