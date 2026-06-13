@@ -87,7 +87,7 @@ GitHub Issues in `dividedby/tweakcc-maint` (the control plane's own backlog; ver
 
 ### Triage labels
 
-Canonical five-role vocabulary (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`). See `docs/agents/triage-labels.md`.
+Canonical five-role vocabulary (`needs-triage`, `ready-for-agent`, `ready-for-human`, `blocked`, `wontfix`). See `docs/agents/triage-labels.md`.
 
 ### Domain docs
 
