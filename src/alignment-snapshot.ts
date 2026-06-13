@@ -258,3 +258,86 @@ export async function postAlignmentSnapshot(
 ): Promise<void> {
   await commenter.comment({ issue, body: renderAlignmentSnapshot(snap) });
 }
+
+// ---------------------------------------------------------------------------
+// supportMatrixStatus — ADR 0010
+// ---------------------------------------------------------------------------
+
+/**
+ * The injected seam for reading adoption records from disk.
+ * Prod reads `docs/records/adoption-record-<version>.json`; tests inject a fake.
+ * Per ADR 0010 `ourFlowComplete` is derived from these records — no second boolean.
+ */
+export interface AdoptionRecordSource {
+  /**
+   * Returns true iff a PASSING adoption record for `ccVersion` exists on disk.
+   * "Passing" = the record file exists and `pass === true`.
+   */
+  hasPassingRecord(ccVersion: string): Promise<boolean>;
+}
+
+/** One row in the {@link SupportMatrixStatus} table: one CC version's state. */
+export interface MatrixRow {
+  /** The CC version. */
+  ccVersion: string;
+  /**
+   * True iff a passing `adoption-record-<version>.json` exists — derived from the
+   * on-disk artifact (ADR 0010: no second stored boolean).
+   */
+  ourFlowComplete: boolean;
+  /**
+   * True iff skrabe has adopted this version (his leaf HEAD / published npm carries
+   * it). Live-checked at composition time; never cached (ADR 0010).
+   */
+  skrabeAdopted: boolean;
+}
+
+/** The on-demand version × skrabeAdopted × ourFlowComplete report (ADR 0010). */
+export interface SupportMatrixStatus {
+  /** One row per version in the Support matrix, in seed order. */
+  rows: MatrixRow[];
+}
+
+/** What `supportMatrixStatus()` needs to compose the report. */
+export interface MatrixStatusSources {
+  /** The Support matrix versions to report on. */
+  matrixVersions: readonly string[];
+  /** Reads adoption records to derive `ourFlowComplete`. */
+  adoptionRecords: AdoptionRecordSource;
+  /**
+   * Gathered skrabe state (already live-checked by the caller — typically the
+   * result of {@link gatherAlignmentSnapshot}). Used to derive `skrabeAdopted`.
+   */
+  snap: AlignmentSnapshot;
+}
+
+/**
+ * Returns true iff skrabe's gathered state covers `ccVersion` — i.e. his published
+ * npm version matches, or a recent commit subject or open/closed PR title references
+ * the version string. PURE — no I/O.
+ */
+function skrabeCoversVersion(snap: AlignmentSnapshot, ccVersion: string): boolean {
+  if (snap.publishedCliVersion === ccVersion) return true;
+  for (const leaf of snap.leaves) {
+    if (leaf.recentSubjects.some((s) => s.includes(ccVersion))) return true;
+    if (leaf.openPrs.some((p) => p.title.includes(ccVersion))) return true;
+    if (leaf.recentlyClosedPrs.some((p) => p.title.includes(ccVersion) && p.merged === true)) return true;
+  }
+  return false;
+}
+
+/**
+ * Compose the Support-matrix status table on demand (ADR 0010): version ×
+ * `skrabeAdopted` × `ourFlowComplete`. `ourFlowComplete` is derived from adoption
+ * records; `skrabeAdopted` is derived from the injected live snapshot. Nothing is
+ * persisted — the report is a read, not a write.
+ */
+export async function supportMatrixStatus(sources: MatrixStatusSources): Promise<SupportMatrixStatus> {
+  const rows: MatrixRow[] = [];
+  for (const ccVersion of sources.matrixVersions) {
+    const ourFlowComplete = await sources.adoptionRecords.hasPassingRecord(ccVersion);
+    const skrabeAdopted = skrabeCoversVersion(sources.snap, ccVersion);
+    rows.push({ ccVersion, ourFlowComplete, skrabeAdopted });
+  }
+  return { rows };
+}

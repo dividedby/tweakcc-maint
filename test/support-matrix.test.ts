@@ -30,7 +30,8 @@ describe('supportMatrix (install-free composition)', () => {
   it('seed carries the current newest adopted version — guards against a spurious re-proposal', () => {
     // An empty/regressed seed would let the detector re-propose an already-adopted
     // version (the surprise-proposal mode the hybrid matrix exists to prevent).
+    // Reset to ['2.1.176'] per ADR 0010 (pre-baseline versions pruned).
     expect(SUPPORT_MATRIX_SEED.length).toBeGreaterThan(0);
-    expect(SUPPORT_MATRIX_SEED).toContain('2.1.173');
+    expect(SUPPORT_MATRIX_SEED).toContain('2.1.176');
   });
 });
