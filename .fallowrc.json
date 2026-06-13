@@ -2,7 +2,12 @@
   "$schema": "https://raw.githubusercontent.com/fallow-rs/fallow/main/schema.json",
   "entry": [
     "src/cli.ts",
-    "src/pairing-coherence-cli.ts"
+    "src/pairing-coherence-cli.ts",
+    "src/behavioral-ab-cli.ts",
+    "src/writeback-cli.ts",
+    "src/pristine-extract-cli.ts",
+    "src/drift-triage-cli.ts",
+    "src/lobotomy-ranker-cli.ts"
   ],
   "usedClassMembers": [
     {
