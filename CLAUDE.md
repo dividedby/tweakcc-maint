@@ -26,6 +26,7 @@ version-independent helper units; reject coverage redundant with a gate he
 already runs; root-cause a quirk rather than snapshot it (tweakcc-fixed#6;
 ADR 0007) — before proposing.
 
+<important if="you are preparing a PR or contribution targeting a leaf repo (tweakcc-fixed or lobotomized-claude-code)">
 When the PR carries code into `tweakcc-fixed`, follow his
 [`CONTRIBUTING.md`](https://github.com/skrabe/tweakcc-fixed/blob/main/CONTRIBUTING.md)
 for the mechanics we don't re-document here: branch prefix (`feature/` · `fix/` ·
@@ -46,6 +47,7 @@ A contribution ships only if it's still true against his HEAD **and** still not
 something he runs himself. We **consume** his `tweakcc-fixed` npm CLI; we publish no
 competing customizer (`tweakcc-maint` is `private`). Our published surface is only
 `@dividedby/bench-core`, kept for the prove-value bench.
+</important>
 
 ## Owned sibling: `bench` / `@dividedby/bench-core`
 We also **own** `github.com/dividedby/bench` (the `@dividedby/bench-core` public-npm
