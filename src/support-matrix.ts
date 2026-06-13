@@ -1,24 +1,14 @@
 /**
- * The fork's Support matrix — composed install-free for the Release detector.
+ * The fork's Support matrix — the install-free baseline of adopted CC versions.
  *
- * The detector dedups a candidate against the Support matrix (release-detector.ts →
- * {@link decide}: a version already in the matrix, or not strictly newer than every
- * matrix entry, is never proposed). The detector CRON runner installs no Claude Code,
- * so it cannot use the GATE's installed-version-only matrix
- * (real-adoption-environment.ts → `listMatrix` = `[claude --version]`, the #22 gate
- * split) — there `claude --version` is empty and throws (the #199 cron failure).
+ * Reset to `['2.1.176']` (ADR 0010): pre-baseline versions (≤ 2.1.173) leave the
+ * active matrix; their adoption records are retained as history but no longer
+ * assert the Four-zeros bar. 2.1.177 is the first `/adopt` target.
  *
- * Instead the matrix is built without a local install: this committed SEED of
- * already-adopted versions, UNIONed with the versions of every `adopt CC X.Y.Z`
- * proposal (open+closed, read via `gh` in release-detector-cli.ts).
- *
- * Maintenance: add to {@link SUPPORT_MATRIX_SEED} when a version is adopted OUTSIDE
- * the auto-adopt proposal flow (e.g. a hand-run release-adoption). A version adopted
- * THROUGH a proposal needs no SEED entry — it is picked up from the proposal title
- * automatically. The operative entry is the newest: it suppresses a spurious proposal
- * for the current latest.
+ * Maintenance: add here when a version is adopted outside the `/adopt` flow.
+ * The operative entry is the newest: it tells `aheadOfEvery` what "current" means.
  */
-export const SUPPORT_MATRIX_SEED: readonly string[] = ['2.1.169', '2.1.170', '2.1.172', '2.1.173'];
+export const SUPPORT_MATRIX_SEED: readonly string[] = ['2.1.176'];
 
 /**
  * The live Support matrix: the adopted-version {@link SUPPORT_MATRIX_SEED} unioned
