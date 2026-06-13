@@ -1,6 +1,7 @@
 node_modules/
 dist/
 *.log
+.claude/gearbox-log.jsonl
 .DS_Store
 /tmp/
 results/local/
