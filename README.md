@@ -16,7 +16,4 @@ its value:
 
 ## Status
 
-Greenfield. Scope and architecture are being designed via `/grill-with-docs` — see the handoff:
-`~/handoffs/tweakcc-maintenance-infra-grill-2026-06-07-1133.md`.
-
-Decisions land as ADRs under `docs/adr/` and the domain model in `CONTEXT.md` (created during the grill).
+Architecture decisions are recorded in `docs/adr/`; the domain model lives in `CONTEXT.md`.
