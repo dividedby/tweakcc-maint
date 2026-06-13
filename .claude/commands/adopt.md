@@ -95,10 +95,250 @@ Candidate: 2.1.177
 Path: Verify-and-improve pass  (skrabe has already shipped 2.1.177)
 ```
 
-**Phase 1 is complete for the Verify-and-improve pass (Path B).** Phase 2 onward
-only runs when Phase 1 chose **Full adoption (Path A)** — skrabe has NOT shipped
-the candidate version. If Path B was chosen, stop here; that path lands in slice
-3 (#244).
+**Phase 1 is complete for the Verify-and-improve pass (Path B).** Proceed to the
+section below that matches the chosen path.
+
+---
+
+## Verify-and-improve path (Path B) — prove + gap-diff + conditional lcc PR
+
+Only enter this section when Phase 1 concluded:
+```
+Path: Verify-and-improve pass  (skrabe has already shipped <version>)
+```
+
+The cockpit rule forbids racing him on the patcher bump: **this path opens NO
+`tweakcc-fixed` adoption PR in any case.** Do not open one. The patcher bump is
+his; Path B proves his state and adds only the Lobotomy overrides he lacks.
+
+The candidate version from Phase 1 is `<newVersion>`.
+
+---
+
+### Path B — Step 1: Pull skrabe's recent leaf commits for the version
+
+Delegate a T0 scout to confirm his adoption evidence at HEAD. Read from Scout B
+(already gathered in Phase 1 — re-use the same data; do not re-fetch):
+
+- The specific commit subject(s) that reference `<newVersion>` on
+  `skrabe/tweakcc-fixed` and `skrabe/lobotomized-claude-code`.
+- His published `tweakcc-fixed` npm version (already from Scout B).
+
+Print a brief confirmation:
+
+```
+Path B — skrabe's adoption evidence for <newVersion>
+  tweakcc-fixed:  <matching commit subject or "npm version match">  (HEAD: <sha>)
+  lcc:            <matching commit subject if any, else "—">         (HEAD: <sha>)
+```
+
+---
+
+### Path B — Gate: dispatch and watch (same mechanics as Path A)
+
+**Gate ALWAYS runs before any PR is opened, and ALWAYS runs in Path B** — this
+is what earns the adoption record and flips `ourFlowComplete` for `<newVersion>`
+in the Support-matrix status table. Without it, `ourFlowComplete` stays false
+regardless of what skrabe shipped.
+
+Dispatch the `integration-gate.yml` workflow for `<newVersion>`:
+
+```bash
+gh workflow run integration-gate.yml \
+  -f cc_version=<newVersion>
+```
+
+Then watch CI. Poll every 60 seconds until the run completes:
+
+```bash
+gh run list --workflow=integration-gate.yml --limit 5 --json databaseId,status,conclusion
+gh run view <runId> --json status,conclusion,jobs
+```
+
+**On gate failure:** read the failing job's log, diagnose, and report — do NOT
+attempt to patch skrabe's patcher. Path B failures are evidence for him (surface
+in the lcc PR intent ping if relevant), not things we fix unilaterally.
+
+The gate emits an `adoption-record-<newVersion>.json` on success. That record is
+what `supportMatrixStatus()` reads to set `ourFlowComplete=true` (ADR 0010).
+
+Print the gate result:
+
+```
+Gate — integration-gate.yml  cc_version=<newVersion>
+  Run: <runId>  conclusion=success  ✓
+  Four-zeros bar: PASS
+    Failed patches: 0
+    Missing system prompts: 0
+    Orphan variables: 0
+    Boot-verify: pass
+    auditMisbinds: 0
+```
+
+Do not open any PR until the gate is green.
+
+---
+
+### Path B — Phase 4: Gap-diff (rank + subtract his live lcc set)
+
+**Goal:** find prompt ids that both (a) clear the Lobotomy bar and (b) are NOT
+actively overridden by skrabe in `lobotomized-claude-code`. Only these are
+genuine gaps worth surfacing.
+
+The `lobotomized-claude-code` leaf clone is at `~/repos/lobotomized-claude-code`
+(the tracked clone — MEMORY: runtime-vs-tracked-override-dirs).
+
+**Delegate to a T1 agent:**
+
+1. **Identify candidate prompt ids.** Use the diff between `<newVersion>` and the
+   previous matrix version from Scout D (or Phase 2 if it ran — the changed + new
+   ids). If a version-bump diff is unavailable, use ALL prompt ids in
+   `prompts-<newVersion>.json` as candidates.
+
+2. **Rank by Lobotomy potential** using `src/lobotomy-ranker.ts`
+   (`rankByLobotomyPotential`): extract each candidate's text from
+   `prompts-<newVersion>.json`, score on the four axes, apply inactive-penalty for
+   feature-gated slots.
+
+3. **Subtract his live lcc override set** using `src/gap-subtraction.ts`
+   (`subtractActiveOverrides`): read his current override files from
+   `~/repos/lobotomized-claude-code` across all three model-set dirs
+   (`system-prompts-fable-5/`, `system-prompts-opus-4-7/`, `system-prompts-opus-4-8/`).
+   Pass the ranked list and his override files to `subtractActiveOverrides` — it
+   returns only the genuine gaps (bar cleared AND no active override). A prompt
+   he already overrides with any non-blank body is covered; remove it. A prompt
+   with an absent or empty-stub override is a genuine gap.
+
+Print the Phase 4 report:
+
+```
+Path B — Phase 4: Gap-diff  (new/changed prompt ids vs his live lcc set)
+  Candidates evaluated: <N>
+  Bar threshold: 2 (score ≥ 2 = worth overriding)
+  His live lcc overrides subtracted: <M> active overrides found
+
+  Ranked candidates that clear the bar:
+  1. <promptId>  score=<N>  clears-bar=true
+       anti-sycophancy: <score>  — <rationale>
+       anti-hedging: <score>  — <rationale>
+       fewer-unsolicited-offers: <score>  — <rationale>
+       terse-directness: <score>  — <rationale>
+       inactive-penalty: <0 or 2>
+       lcc override: <absent / empty-stub>  → genuine gap
+  ...
+
+  Genuine gaps (no active lcc override, clears bar): <K>
+  Already covered by his active overrides: <J>
+```
+
+If `K = 0`, print:
+
+```
+  Nothing to add — all high-value prompts already covered by his active lcc
+  overrides, or no candidates clear the bar for <newVersion>.
+```
+
+"Nothing to add" is a valid, expected output. Do not force overrides.
+
+---
+
+### Path B — PR: conditional lcc-only draft PR
+
+**No `tweakcc-fixed` PR is opened in Path B under any circumstances.**
+
+#### When K = 0 (nothing to add)
+
+```
+lcc PR: not needed — no genuine gaps for <newVersion>.
+  (Gate proved his state; adoption record written.)
+```
+
+Stop here. Print the final adoption summary (below) and exit.
+
+#### When K > 0 (genuine gaps exist)
+
+Open an **lcc-only** draft PR on skrabe's `lobotomized-claude-code` leaf, from
+our fork (`dividedby/lobotomized-claude-code`), per the cockpit rule.
+
+For each genuine gap, author a new override file (one per model-set dir that
+lacks an active override) with:
+- The frontmatter comment (name + ccVersion).
+- A body containing the Lobotomy-targeted replacement: strip the sycophantic,
+  hedging, and unsolicited-offer language the axis scores identified. Apply the
+  "terse and direct" intent (CONTEXT.md → "Lobotomy").
+
+```bash
+git checkout -b lcc-adopt/<newVersion>-gaps origin/main  # in the lcc clone
+# ... commit the new override files ...
+git push origin lcc-adopt/<newVersion>-gaps
+gh pr create \
+  -R skrabe/lobotomized-claude-code \
+  --head dividedby:lcc-adopt/<newVersion>-gaps \
+  --draft \
+  --title "add Lobotomy overrides for CC <newVersion> gaps" \
+  --body-file /tmp/adopt-<newVersion>-lcc-gaps-body.md
+```
+
+The lcc PR body (write to `/tmp/adopt-<newVersion>-lcc-gaps-body.md` with the
+Write tool, never a heredoc) must include the **intent ping** and the **gate
+record as evidence**:
+
+```markdown
+## Intent
+
+Path B gap-fill for CC <newVersion>: skrabe has already adopted this version;
+these are the prompt ids that clear the Lobotomy bar and have no active override
+in the current lcc HEAD.
+
+This is a prepared contribution — not a "please merge" request. Pull it when
+it fits your schedule and merge bar.
+
+**Cost to you:** review the new override bodies; the gate record is attached.
+
+**No patcher changes** — Path B opens no tweakcc-fixed PR.
+
+## Gate record
+
+- Gate run: <runId>  conclusion=success
+- Four-zeros bar: PASS (0 failed patches · 0 missing prompts · 0 orphans ·
+  boot-verify pass · auditMisbinds=0)
+- Gate dispatched: <ISO timestamp>
+
+## Genuine gaps addressed
+
+| Prompt id | Score | Top axis signal |
+|-----------|-------|-----------------|
+| <promptId> | <N> | <top-axis rationale> |
+...
+
+## Adoption record
+
+Stored at `docs/records/adoption-record-<newVersion>.json` on the control plane.
+```
+
+---
+
+### Path B — Final summary
+
+Print on completion:
+
+```
+Verify-and-improve pass complete — <newVersion>
+  Gate: PASS  run=<runId>  (adoption record written → ourFlowComplete=true)
+  Phase 4 gap-diff: <K> genuine gaps  /  <J> already covered  /  <L> below bar
+  tweakcc-fixed PR: none (Path B — cockpit rule forbids racing his patcher bump)
+  lcc PR: <PR URL and title>  (draft, intent ping attached)
+```
+
+or, when K = 0:
+
+```
+Verify-and-improve pass complete — <newVersion>
+  Gate: PASS  run=<runId>  (adoption record written → ourFlowComplete=true)
+  Phase 4 gap-diff: 0 genuine gaps — nothing to add
+  tweakcc-fixed PR: none (Path B)
+  lcc PR: none (no genuine gaps)
+```
 
 ---
 
