@@ -54,16 +54,8 @@ hand-written `core/index.d.ts` + the `core/index.mjs` barrel; `files:["core"]` i
 publish allowlist (no fixtures/results). Bump the dep pin here when it publishes.
 
 ## Build / test / run
-Stack: **TypeScript + vitest + pnpm + ESM, run via `tsx` (no build step)** — see
-`docs/adr/0004`. Design: `docs/design/release-adoption-substrate.md`.
-
-- Install: `pnpm install`
-- Test: `pnpm test` (vitest run; `pnpm test:watch` for watch mode)
-- Typecheck: `pnpm typecheck` (`tsc --noEmit` — there is no emit/build step)
-- Run a source file directly: `pnpm tsx <file.ts>`
-
-No `dist`/bundler: sources run directly via `tsx`, identically locally and in CI.
-`pnpm-workspace.yaml` allowlists esbuild's build script (vitest/tsx dependency).
+TypeScript + vitest + pnpm + ESM via `tsx`, no build step (`docs/adr/0004`).
+Commands + no-`dist` rationale: `docs/build-test-run.md`.
 
 ## Harness (project-scope guards)
 `.claude/settings.json` wires two PreToolUse Bash hooks that run under unattended
