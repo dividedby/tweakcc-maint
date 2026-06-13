@@ -42,6 +42,14 @@ on:
         description: "Proposal issue to write the Adoption record back to (optional)"
         required: false
         type: string
+      isolate_overrides:
+        # Isolate the lobotomized override surfaces so the record reflects only the
+        # patcher+prompts Four-zeros for the tweakcc-fixed branch under test; use when
+        # gating a tweakcc-fixed-only fork branch against possibly-stale lobotomized overrides.
+        description: "Isolate lobotomized override surfaces for a clean patcher+prompts Four-zeros record"
+        required: false
+        default: false
+        type: boolean
 
 # `issues: write` is only exercised by the write-back step, and only when
 # proposal_issue is set (the auto-chain path); a manual run leaves it unused.
@@ -150,6 +158,8 @@ jobs:
 
       # --- The gate: real apply -> Boot-verify -> Orphan check, bracketed by Restore drill ---
       - name: Run the Integration gate
+        env:
+          ISOLATE_OVERRIDES: ${{ inputs.isolate_overrides }}
         run: |
           # pipefail so the gate's non-zero exit (pass:false) fails the job — `tee`
           # alone would mask it and turn a red gate into a green run.

@@ -19,6 +19,7 @@
 import { runGate, recordToExitCode } from './integration-gate.js';
 import { RealAdoptionEnvironment, defaultLeafConfig } from './real-adoption-environment.js';
 import { detectCredentials, credentialMessage } from './credentials-preflight.js';
+import { isolateOverridesFromEnv } from './isolate-overrides-env.js';
 
 function main(): void {
   const message = credentialMessage(detectCredentials());
@@ -30,7 +31,10 @@ function main(): void {
       'reports a failed or\n    dirty restore, restore manually with `tweakcc-fixed --restore`.\n',
   );
 
-  const env = new RealAdoptionEnvironment(defaultLeafConfig());
+  const env = new RealAdoptionEnvironment({
+    ...defaultLeafConfig(),
+    isolateOverrides: isolateOverridesFromEnv(process.env),
+  });
   const matrix = env.listMatrix();
   console.error(`Running the gate over the installed Support matrix: ${matrix.join(', ')}\n`);
 
