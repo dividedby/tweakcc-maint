@@ -1,0 +1,26 @@
+{
+  "pass": true,
+  "versions": [
+    {
+      "ccVersion": "2.1.177",
+      "fourZeros": {
+        "pass": true,
+        "failedPatches": [],
+        "missingSystemPrompts": [],
+        "orphanVariables": [],
+        "orphanSource": "patcher-report",
+        "advisoryOrphans": [],
+        "bootVerifyPassed": true,
+        "misbinds": []
+      },
+      "restoreDrill": {
+        "pass": true,
+        "status": "pass",
+        "backupExists": true,
+        "restored": true,
+        "cleanStock": true
+      }
+    }
+  ],
+  "date": "2026-06-13T05:44:00.152Z"
+}
