@@ -42,8 +42,26 @@ export interface CapturedSignals {
    * wrong var (wrong content, no crash), invisible to the other three zeros. Absent when
    * the path that produced the signals did not run the audit (fake / hand-rolled
    * fallback) → not a hard input, mirroring the orphanReport fallback.
+   *
+   * Representation invariant (#262): `undefined` means not-asserted — either not-run
+   * (no override dirs) or the fake/hand-rolled path. NEVER `""` for an empty audit.
    */
   auditMisbinds?: string;
+  /**
+   * Why the mis-bind audit was not asserted (#262, ADR 0005 addendum). Set by the producer
+   * when the audit did not run (`'not-run'` — no override dirs) or SKIPPED itself
+   * (`'SKIPPED'` — no upstream reference dump). Absent when the audit produced output.
+   * The verdict preserves this in {@link FourZerosResult.auditNotRunReason} so the
+   * Adoption record can distinguish the two sub-states.
+   */
+  auditNotRunReason?: 'not-run' | 'SKIPPED';
+  /**
+   * Whether the caller explicitly requested override isolation (e.g. the ISOLATE_OVERRIDES
+   * capability, #263). When `true`, an empty override set is expected and no warning is
+   * raised. When absent/false and `auditNotRunReason` is `'not-run'`, the verdict sets
+   * {@link FourZerosResult.unexpectedEmptyOverrideDirs} to flag a possible path/config bug.
+   */
+  isolationExplicit?: boolean;
 }
 
 /** Where the verdict's hard orphan input came from (#31 source attribution). */
@@ -79,6 +97,21 @@ export interface FourZerosResult {
   auditMisbindsPassed?: boolean;
   /** The audit's mis-bind finding lines (`<id>: ${NAME} ours=slotX upstream=slotY`), deduped. */
   misbinds: string[];
+  /**
+   * Why the mis-bind audit was not asserted (#262). `'not-run'` when there were no override
+   * dirs to audit; `'SKIPPED'` when the audit ran but had no upstream reference dump.
+   * Absent when the audit ran and produced a definitive result (clean or with findings).
+   * Preserved in the Adoption record so the record shows *why* the fourth zero did not
+   * assert `0`, rather than collapsing both sub-states into a bare "not asserted."
+   */
+  auditNotRunReason?: 'not-run' | 'SKIPPED';
+  /**
+   * `true` when `auditNotRunReason` is `'not-run'` AND isolation was NOT explicitly
+   * requested (#262, AC 5). Surfaced as a warning in the Adoption record — never a hard
+   * fail — to flag a possible path/config bug that accidentally produced an empty override
+   * set. `false` (or absent) when isolation was explicit or the audit ran normally.
+   */
+  unexpectedEmptyOverrideDirs?: boolean;
 }
 
 // `patch: <name>: failed to find …` — anything after "failed to" counts as a failure.
@@ -128,8 +161,25 @@ export function evaluate(signals: CapturedSignals): FourZerosResult {
 
   // The mis-bind audit (skrabe's fourth zero, #80): a hard input only when it ran and
   // did not SKIP itself; like Boot-verify it must positively assert cleanliness.
+  // Representation invariant (#262): auditMisbinds is `undefined` (never `""`) when
+  // not-asserted — the pass condition is `!== false`, so undefined passes through.
   const auditMisbindsPassed = parseAuditMisbinds(signals.auditMisbinds);
   const misbinds = signals.auditMisbinds === undefined ? [] : extractMisbinds(signals.auditMisbinds);
+
+  // Derive the not-run reason (#262, AC 4): producer-set 'not-run' takes precedence;
+  // 'SKIPPED' is inferred from the parsed audit output when the signal was present but
+  // the audit skipped itself. Absent when the audit ran and produced a definitive verdict.
+  const auditNotRunReason: 'not-run' | 'SKIPPED' | undefined =
+    signals.auditNotRunReason === 'not-run'
+      ? 'not-run'
+      : signals.auditMisbinds !== undefined && auditMisbindsPassed === undefined
+        ? 'SKIPPED'
+        : undefined;
+
+  // Unexpected-empty warning (#262, AC 5): not-run without an explicit isolation request
+  // suggests a path/config bug; surfaced but never a hard fail.
+  const unexpectedEmptyOverrideDirs =
+    auditNotRunReason === 'not-run' && !signals.isolationExplicit;
 
   const pass =
     failedPatches.length === 0 &&
@@ -148,6 +198,8 @@ export function evaluate(signals: CapturedSignals): FourZerosResult {
     bootVerifyPassed,
     auditMisbindsPassed,
     misbinds,
+    auditNotRunReason,
+    unexpectedEmptyOverrideDirs,
   };
 }
 

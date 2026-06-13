@@ -72,11 +72,17 @@ export function driverSignals(
   report: ShellResult,
   audits: ShellResult[],
   orphanReport?: string,
-): Pick<CapturedSignals, 'apply' | 'orphanReport' | 'auditMisbinds'> {
+  isolationExplicit?: boolean,
+): Pick<CapturedSignals, 'apply' | 'orphanReport' | 'auditMisbinds' | 'auditNotRunReason' | 'isolationExplicit'> {
+  // Representation invariant (#262): no override dirs to audit → not-run, represented as
+  // `undefined` (never `""`). A non-empty audits array → join the per-dir outputs normally.
+  const notRun = audits.length === 0;
   return {
     apply: applySignal(check, report),
     orphanReport,
-    auditMisbinds: audits.map(combinedOutput).join('\n'),
+    auditMisbinds: notRun ? undefined : audits.map(combinedOutput).join('\n'),
+    auditNotRunReason: notRun ? 'not-run' : undefined,
+    isolationExplicit: notRun ? isolationExplicit : undefined,
   };
 }
 
