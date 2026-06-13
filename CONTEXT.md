@@ -46,6 +46,26 @@ _Avoid_: upgrade, sync, merge. skrabe's name for the leaf-altitude pipeline is
 never just the version-string edit (index §1.1, `tf@c5fabdf`). In control-plane
 docs say **Release adoption**; translate when reading leaf docs.
 
+**Full adoption**:
+The **Release adoption** branch taken when `skrabe` has *not* yet shipped the new
+CC version on the leaves: the control plane brings the version in itself —
+extract → triage → realign → rank → a verified adoption PR on `tweakcc-fixed`
+(plus a conditional `lobotomized-claude-code` PR), evidenced by a green
+**Four-zeros bar**. We fill a gap he has not filled, so the patcher version-bump
+PR is warranted. Contrast **Verify-and-improve pass**.
+_Avoid_: clean adoption, fresh bump, primary path.
+
+**Verify-and-improve pass**:
+The **Release adoption** branch taken when `skrabe` has *already* shipped the
+version (his leaf HEAD / published npm carries it): the control plane does **not**
+re-adopt — the cockpit rule forbids racing him on the patcher bump. Instead it
+*proves* his adopted state against our own **Integration gate** (a real
+**Four-zeros bar** run + **Adoption record**) and adds only the **Lobotomy**
+overrides he lacks (a conditional `lobotomized-claude-code` PR). No `tweakcc-fixed`
+adoption PR. The "prove/benchmark/suggest, don't race" posture made concrete.
+Contrast **Full adoption**.
+_Avoid_: catch-up, follow-on, audit pass.
+
 **Verification gate**:
 The deterministic pass/fail decision that a **Release adoption** is complete and
 not broken. Two altitudes ([ADR 0001](./docs/adr/0001-verification-gate-split-by-altitude.md)):
