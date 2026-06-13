@@ -17,6 +17,22 @@ the merged leaf mains) lands.
 
 ## Run-context notes
 
+- **2.1.177 — DRAFT / pre-merge (NOT a matrix member)** (2026-06-13, local run,
+  **overrides isolated**). Leaves: tweakcc-fixed PR **#11** (head `feat/adopt-2.1.177`,
+  prompts-2.1.177 + the `user-sent-new-message` anchor fix) **stacked on PR #10**
+  (`feat/adopt-2.1.176`, which also carries the `versionBumpReport`→`.cjs` tooling fix);
+  lobotomized **not** realigned (its `main` is 2.1.175-aligned). Green Four-zeros
+  (`failedPatches` / `missingSystemPrompts` / `orphanVariables` / `misbinds` all empty) +
+  Boot-verify + clean Restore drill (byte-identical clean stock). Overrides isolated
+  (empty system-prompts dir) — validates the **patcher + prompts** only; the lobotomized
+  overrides boot-crash against 2.1.177 (pre-existing #26 class), a separate leaf concern.
+  `auditMisbinds`: **SKIPPED** (no Piebald upstream dump on the box — Piebald is retired;
+  moot here since overrides are isolated), honored as non-failing per the driver's design.
+  The only real Four-zeros blocker was the `user-sent-new-message` anchor — stale across
+  2.1.175/176/177 (upstream hoisted the first sentence into a variable), identical to
+  skrabe's HEAD; fixed for 2.1.176/177 in #11 (2.1.175's different prose left out of scope).
+  Matrix entry awaits the suffix-less merge-day re-run against the merged leaf mains.
+
 - **2.1.170 — FINALIZED / MATRIX MEMBER** (2026-06-10, merge-day re-run against the
   **merged leaf mains**: tweakcc-fixed@`7d9b30b` × lobotomized@`f1db0de` — the merged
   mains that carry tf PR #7 / lcc PR #6, via detached worktrees) — the suffix-less record
