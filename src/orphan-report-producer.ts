@@ -44,8 +44,10 @@
  * standalone `.mjs`.
  */
 
-import { readdirSync, readFileSync } from 'node:fs';
-import { basename, join } from 'node:path';
+import { readFileSync } from 'node:fs';
+
+import type { OverrideFile } from './orphan-validator.js';
+import { promptIdOf, readOverrideFiles } from './orphan-validator.js';
 
 /** The relevant slice of a published `prompts-<version>.json`. */
 export interface PromptsData {
@@ -65,14 +67,6 @@ export interface KnownSlots {
 export interface OrphanReportPayload {
   version?: string;
   prompts: Record<string, string[]>;
-}
-
-/** One override file, content already read (mirrors orphan-validator's OverrideFile shape). */
-export interface OverrideFile {
-  /** Path to the override; its basename (minus `.md`) is the prompt id used for matching. */
-  path: string;
-  /** Full file content, including any leading `<!-- … -->` frontmatter block. */
-  content: string;
 }
 
 // The leading `<!-- … -->` HTML-comment frontmatter block lobotomized overrides use; the
@@ -160,11 +154,6 @@ export function survivingPlaceholders(body: string, id: string, known: KnownSlot
   return orphans;
 }
 
-/** The prompt id an override matches: its filename without the `.md` extension. */
-function promptIdOf(path: string): string {
-  return basename(path).replace(/\.md$/, '');
-}
-
 /**
  * Build the Orphan report payload over a set of override files against a published prompts
  * JSON's known-slot model. `inline-*` overrides remap minified idents positionally, not by
@@ -189,21 +178,7 @@ export function buildOrphanReport(
   return { version: promptsData.version, prompts };
 }
 
-// ── fs / JSON wrappers (mirrors orphan-validator's wrappers; HITL/gate-exercised) ──────────
-
-/** Read every `*.md` override under the given directories (non-recursive). */
-function readOverrideFiles(dirs: string[]): OverrideFile[] {
-  const files: OverrideFile[] = [];
-  for (const dir of dirs) {
-    for (const entry of readdirSync(dir, { withFileTypes: true })) {
-      if (entry.isFile() && entry.name.endsWith('.md')) {
-        const path = join(dir, entry.name);
-        files.push({ path, content: readFileSync(path, 'utf8') });
-      }
-    }
-  }
-  return files;
-}
+// ── fs / JSON wrappers (HITL/gate-exercised) ─────────────────────────────────────────────────
 
 /** Load a published `prompts-<version>.json` from disk into {@link PromptsData}. */
 function loadPromptsData(promptsJsonPath: string): PromptsData {
