@@ -129,7 +129,7 @@ export function runDriverVerification(
   ccVersion: string,
   promptsJson: string,
   overrideDirs: string[],
-): Pick<CapturedSignals, 'apply' | 'orphanReport' | 'auditMisbinds'> {
+): Pick<CapturedSignals, 'apply' | 'orphanReport' | 'auditMisbinds' | 'auditNotRunReason'> {
   const driver = driverPath(tweakccFixedDir);
   const env = { ...process.env, TWEAKCC_REPO: tweakccFixedDir };
   const check = runSync('node', [driver, 'check'], env);
