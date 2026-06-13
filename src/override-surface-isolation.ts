@@ -7,9 +7,11 @@
  * record when lobotomized-claude-code overrides are stale (the #26 class).
  *
  * The load-bearing invariant (ADR 0005 addendum; design doc):
- *   - Teardown ALWAYS restores the original symlink target — on success and on throw
- *     (the prior art: repointing the symlink at a tracked work clone polluted it with
- *     ~60 runtime-written files; isolation uses a throwaway dir to prevent exactly that).
+ *   - Teardown ALWAYS restores the original state — on success and on throw — for all
+ *     three possible states of `~/.tweakcc/system-prompts`:
+ *       1. Symlink → save target, repoint; teardown restores the symlink.
+ *       2. Real directory → rename aside; teardown renames back.
+ *       3. Absent → create empty dir; teardown removes it.
  *   - The throwaway dir is under os.tmpdir(), never inside a tracked clone.
  *
  * The empty override-scan surface (overrideDirs: []) feeds into the gate's driver
@@ -21,65 +23,182 @@
  * real fs mutations. The production seam wires `node:fs` + `node:os`.
  */
 
-import { readlinkSync, symlinkSync, mkdtempSync, rmSync, unlinkSync, existsSync } from 'node:fs';
+import {
+  lstatSync,
+  readlinkSync,
+  symlinkSync,
+  mkdtempSync,
+  mkdirSync,
+  renameSync,
+  rmSync,
+  unlinkSync,
+  existsSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 /**
  * The `node:fs` / `node:os` subset used for symlink manipulation and throwaway dir
  * management — injected so the module is testable with a fake seam.
+ *
+ * The `lstat`, `unlinkSync`, `rename`, and `mkdir` fields were added in the multi-state
+ * fix (#263 hardening). They are optional for backward compat with existing fakes that
+ * only exercise the symlink path; when absent, `setupIsolation` falls back to assuming
+ * the path is a symlink (the original behavior). The production seam always provides all
+ * fields.
  */
 export interface IsolationFsSeam {
+  /**
+   * Stat the path without following symlinks. Throws ENOENT when absent.
+   * Returns an object with `isSymbolicLink()`.
+   * Optional: when absent, `setupIsolation` assumes the path is a symlink.
+   */
+  lstat?: (path: string) => { isSymbolicLink: () => boolean };
   /** Read the current target of the `~/.tweakcc/system-prompts` symlink. */
   readlink: (path: string) => string;
-  /** Point the symlink at a new target (atomically replacing the old one). */
+  /** Point the symlink at a new target (replacing the old one if present). */
   symlinkSync: (target: string, path: string) => void;
+  /**
+   * Remove the symlink (used when restoring a real-dir or absent state).
+   * Optional: only needed when setup may find a non-symlink path.
+   */
+  unlinkSync?: (path: string) => void;
+  /**
+   * Rename (move) a path — used to move a real dir aside and back.
+   * Optional: only needed when setup finds a real directory.
+   */
+  rename?: (oldPath: string, newPath: string) => void;
+  /**
+   * Create a directory at the given path (used for the empty isolated surface).
+   * Optional: only needed when setup finds a real directory or absent path.
+   */
+  mkdir?: (path: string) => void;
   /** Create a temporary directory for the isolated surface. */
   mkdtempSync: (prefix: string) => string;
   /** Remove the throwaway dir on teardown. */
   rmSync: (dir: string, options: { recursive: boolean; force: boolean }) => void;
 }
 
-/** Result of {@link setupIsolation} — consumed by the run body and {@link teardownIsolation}. */
-export interface IsolationSetupResult {
-  /**
-   * The override-scan dirs to hand to the gate: always empty ([]) in isolation mode.
-   * Zero dirs → no mis-bind audits → auditNotRunReason: 'not-run' → pass-through (#262).
-   */
+// ── Discriminated setup result ────────────────────────────────────────────────
+
+/**
+ * Setup recorded a symlink — original target saved for restore.
+ * Teardown: repoint symlink to savedTarget; rmSync throwawayDir.
+ */
+export interface IsolationSetupSymlink {
+  kind: 'symlink';
   overrideDirs: string[];
-  /** The original `~/.tweakcc/system-prompts` symlink target, saved for restore. */
-  savedSymlinkTarget: string;
-  /** The throwaway empty dir the symlink now points at (under os.tmpdir()). */
+  /** The original symlink target, for restore. */
+  savedTarget: string;
+  /** The throwaway empty dir the symlink now points at. */
   throwawayDir: string;
 }
 
-/** The symlink path inside the tweakcc config dir that tweakcc-fixed reads named-prompt overrides from. */
+/**
+ * Setup found a real directory — moved it aside to savedPath.
+ * Teardown: rmSync throwawayDir (the empty isolated surface at the link path);
+ *           rename savedPath back to link path.
+ */
+export interface IsolationSetupDirectory {
+  kind: 'directory';
+  overrideDirs: string[];
+  /** The path where the original real dir was renamed to (under tmpdir). */
+  savedPath: string;
+  /** The throwaway empty dir placed at the link path as the isolated surface. */
+  throwawayDir: string;
+}
+
+/**
+ * Setup found the path absent — created an empty dir as the isolated surface.
+ * Teardown: rmSync the created dir; path goes back to absent.
+ */
+export interface IsolationSetupAbsent {
+  kind: 'absent';
+  overrideDirs: string[];
+  /** The path of the empty dir created as the isolated surface (same as link path). */
+  throwawayDir: string;
+}
+
+/** Discriminated union — teardown reverses exactly the recorded case. */
+export type IsolationSetupResult =
+  | IsolationSetupSymlink
+  | IsolationSetupDirectory
+  | IsolationSetupAbsent;
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+/** The `system-prompts` path inside the tweakcc config dir. */
 function symlinkPath(tweakccConfigDir: string): string {
   return join(tweakccConfigDir, 'system-prompts');
 }
 
 /**
- * Set up isolation: save the current `~/.tweakcc/system-prompts` symlink target, create
- * a throwaway empty dir under os.tmpdir(), and repoint the symlink at it. Returns the
- * setup result for the run body and teardown.
+ * Detect which of the three states `link` is in.
+ * Returns 'symlink' | 'directory' | 'absent'.
+ * When `fs.lstat` is absent (backward-compat fakes), falls back to 'symlink'.
+ */
+function detectState(link: string, fs: IsolationFsSeam): 'symlink' | 'directory' | 'absent' {
+  if (!fs.lstat) return 'symlink';
+  try {
+    const stat = fs.lstat(link);
+    return stat.isSymbolicLink() ? 'symlink' : 'directory';
+  } catch (err: unknown) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return 'absent';
+    throw err;
+  }
+}
+
+// ── Core API ──────────────────────────────────────────────────────────────────
+
+/**
+ * Set up isolation: detect the current state of `<tweakccConfigDir>/system-prompts`,
+ * preserve it, and put an empty isolated surface at that path.
+ *
+ * Returns a discriminated {@link IsolationSetupResult} — pass to {@link teardownIsolation}
+ * to reverse exactly what was done.
  *
  * Must be paired with {@link teardownIsolation} (or use {@link withIsolation}).
  */
 export function setupIsolation(tweakccConfigDir: string, fs: IsolationFsSeam): IsolationSetupResult {
   const link = symlinkPath(tweakccConfigDir);
-  const savedSymlinkTarget = fs.readlink(link);
-  const throwawayDir = fs.mkdtempSync(join(tmpdir(), 'isolated-overrides-'));
-  // Remove the existing symlink and create a new one pointing at the throwaway dir.
-  // We do this by re-creating the symlink through the seam — the seam's symlinkSync is
-  // responsible for replacing the existing link (the production seam uses unlinkSync first).
-  fs.symlinkSync(throwawayDir, link);
-  return { overrideDirs: [], savedSymlinkTarget, throwawayDir };
+  const state = detectState(link, fs);
+
+  if (state === 'symlink') {
+    const savedTarget = fs.readlink(link);
+    const throwawayDir = fs.mkdtempSync(join(tmpdir(), 'isolated-overrides-'));
+    // Repoint the symlink at the throwaway dir.
+    fs.symlinkSync(throwawayDir, link);
+    return { kind: 'symlink', overrideDirs: [], savedTarget, throwawayDir };
+  }
+
+  if (state === 'directory') {
+    // Move the real dir aside so we can place an empty isolated surface at its path.
+    if (!fs.rename || !fs.mkdir) {
+      throw new Error(
+        'IsolationFsSeam must provide rename and mkdir to handle a real-directory system-prompts path',
+      );
+    }
+    const savedPath = fs.mkdtempSync(join(tmpdir(), 'isolated-overrides-saved-'));
+    fs.rename(link, savedPath);
+    // Create the empty isolated surface at the original path.
+    fs.mkdir(link);
+    return { kind: 'directory', overrideDirs: [], savedPath, throwawayDir: link };
+  }
+
+  // state === 'absent'
+  // Create an empty dir at the path as the isolated surface.
+  if (!fs.mkdir) {
+    throw new Error(
+      'IsolationFsSeam must provide mkdir to handle an absent system-prompts path',
+    );
+  }
+  fs.mkdir(link);
+  return { kind: 'absent', overrideDirs: [], throwawayDir: link };
 }
 
 /**
- * Restore the original `~/.tweakcc/system-prompts` symlink target and remove the throwaway
- * dir. Always call this after {@link setupIsolation}, even on error (use {@link withIsolation}
- * to guarantee this via try/finally).
+ * Reverse exactly the setup that {@link setupIsolation} recorded.
+ * Always call this after {@link setupIsolation}, even on error (use {@link withIsolation}).
  */
 export function teardownIsolation(
   tweakccConfigDir: string,
@@ -87,9 +206,28 @@ export function teardownIsolation(
   fs: IsolationFsSeam,
 ): void {
   const link = symlinkPath(tweakccConfigDir);
-  // Restore the symlink: point it back at the original target.
-  fs.symlinkSync(setup.savedSymlinkTarget, link);
-  // Remove the throwaway dir — runtime writes that landed inside it are discarded.
+
+  if (setup.kind === 'symlink') {
+    // Restore the original symlink, then remove the throwaway dir.
+    fs.symlinkSync(setup.savedTarget, link);
+    fs.rmSync(setup.throwawayDir, { recursive: true, force: true });
+    return;
+  }
+
+  if (setup.kind === 'directory') {
+    // Remove the empty isolated surface placed at the link path.
+    fs.rmSync(setup.throwawayDir, { recursive: true, force: true });
+    // Rename the saved real dir back to the original path.
+    if (!fs.rename) {
+      throw new Error(
+        'IsolationFsSeam must provide rename to teardown a real-directory system-prompts path',
+      );
+    }
+    fs.rename(setup.savedPath, link);
+    return;
+  }
+
+  // kind === 'absent': remove the empty dir we created; path returns to absent.
   fs.rmSync(setup.throwawayDir, { recursive: true, force: true });
 }
 
@@ -120,12 +258,16 @@ export function withIsolation<T>(
  * (symlinks cannot be overwritten atomically on all platforms via `symlinkSync` alone).
  */
 export const productionIsolationFsSeam: IsolationFsSeam = {
+  lstat: (path) => lstatSync(path),
   readlink: (path) => readlinkSync(path, 'utf8'),
   symlinkSync: (target, path) => {
     // Remove the existing symlink if present, then create the new one.
     if (existsSync(path)) unlinkSync(path);
     symlinkSync(target, path);
   },
+  unlinkSync: (path) => unlinkSync(path),
+  rename: (oldPath, newPath) => renameSync(oldPath, newPath),
+  mkdir: (path) => mkdirSync(path, { recursive: true }),
   mkdtempSync: (prefix) => mkdtempSync(prefix),
   rmSync: (dir, options) => rmSync(dir, options),
 };

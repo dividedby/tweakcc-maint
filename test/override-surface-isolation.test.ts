@@ -3,11 +3,12 @@
  *
  * Covers the Override-surface composition module (setup + teardown):
  *   - AC 1: isolation points both surfaces at throwaway/empty dirs
- *   - AC 2: teardown restores the original symlink target on success AND on throw
+ *   - AC 2: teardown restores the original state on success AND on throw — for all three
+ *     possible states of ~/.tweakcc/system-prompts (symlink / real-dir / absent)
  *   - AC 3: isolated run → orphans [], Boot-verify ✓, mis-bind not-run pass-through
  *   - AC 4: no gate runtime writes land inside a tracked work clone
  *
- * Fakes: injected temp-dir + fake symlink read/write ops — no real fs mutations.
+ * Fakes: injected temp-dir + fake fs ops — no real fs mutations.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -22,105 +23,220 @@ import { evaluate } from '../src/four-zeros-verdict.js';
 
 // ── Fake fs seam ─────────────────────────────────────────────────────────────
 
-interface SymlinkState {
-  target: string | null;
+type FsEntry =
+  | { kind: 'symlink'; target: string }
+  | { kind: 'directory' }
+  | { kind: 'absent' };
+
+interface FsState {
+  [path: string]: FsEntry;
 }
 
-function makeFakeSeam(originalTarget: string): {
+function makeFakeSeam(initialFs: FsState): {
   seam: IsolationFsSeam;
-  symlink: SymlinkState;
-  thrownTemp: string[];
+  fs: FsState;
+  removedPaths: string[];
 } {
-  const symlink: SymlinkState = { target: originalTarget };
-  const thrownTemp: string[] = [];
+  const fs: FsState = { ...initialFs };
+  const removedPaths: string[] = [];
   let tempCounter = 0;
 
   const seam: IsolationFsSeam = {
-    readlink: () => symlink.target!,
-    symlinkSync: (target, _path) => {
-      symlink.target = target;
+    lstat: (path) => {
+      const entry = fs[path];
+      if (!entry || entry.kind === 'absent') {
+        const err = new Error(`ENOENT: no such file or directory, lstat '${path}'`) as NodeJS.ErrnoException;
+        err.code = 'ENOENT';
+        throw err;
+      }
+      return {
+        isSymbolicLink: () => entry.kind === 'symlink',
+      };
+    },
+    readlink: (path) => {
+      const entry = fs[path];
+      if (!entry || entry.kind !== 'symlink') throw new Error(`Not a symlink: ${path}`);
+      return entry.target;
+    },
+    symlinkSync: (target, path) => {
+      fs[path] = { kind: 'symlink', target };
+    },
+    unlinkSync: (path) => {
+      delete fs[path];
+    },
+    rename: (oldPath, newPath) => {
+      fs[newPath] = fs[oldPath]!;
+      delete fs[oldPath];
+    },
+    mkdir: (path) => {
+      fs[path] = { kind: 'directory' };
     },
     mkdtempSync: (prefix) => {
       const dir = `${prefix}${tempCounter++}`;
+      fs[dir] = { kind: 'directory' };
       return dir;
     },
     rmSync: (dir, _opts) => {
-      thrownTemp.push(dir);
+      removedPaths.push(dir);
+      delete fs[dir];
     },
   };
 
-  return { seam, symlink, thrownTemp };
+  return { seam, fs, removedPaths };
 }
 
 const TWEAKCC_CONFIG = '/home/user/.tweakcc';
+const LINK_PATH = '/home/user/.tweakcc/system-prompts';
 const ORIGINAL_TARGET = '/home/user/repos/lobotomized-claude-code/system-prompts-opus-4-8';
+
+// Helper: make a fresh seam for each variant
+function makeSymlinkSeam() {
+  return makeFakeSeam({ [LINK_PATH]: { kind: 'symlink', target: ORIGINAL_TARGET } });
+}
+function makeDirectorySeam() {
+  return makeFakeSeam({ [LINK_PATH]: { kind: 'directory' } });
+}
+function makeAbsentSeam() {
+  return makeFakeSeam({});
+}
 
 // ── AC 1: setup points both surfaces at throwaway/empty dirs ─────────────────
 
-describe('setupIsolation — both surfaces point at throwaway dirs (AC 1)', () => {
-  it('returns an empty overrideDirs array (no dirs for the gate to scan)', () => {
-    const { seam } = makeFakeSeam(ORIGINAL_TARGET);
+describe('setupIsolation — symlink case (AC 1)', () => {
+  it('returns an empty overrideDirs array', () => {
+    const { seam } = makeSymlinkSeam();
     const result = setupIsolation(TWEAKCC_CONFIG, seam);
     expect(result.overrideDirs).toEqual([]);
   });
 
-  it('repoints the ~/.tweakcc/system-prompts symlink at a throwaway dir', () => {
-    const { seam, symlink } = makeFakeSeam(ORIGINAL_TARGET);
+  it('records kind: symlink', () => {
+    const { seam } = makeSymlinkSeam();
+    const result = setupIsolation(TWEAKCC_CONFIG, seam);
+    expect(result.kind).toBe('symlink');
+  });
+
+  it('repoints the symlink at a throwaway dir', () => {
+    const { seam, fs } = makeSymlinkSeam();
     setupIsolation(TWEAKCC_CONFIG, seam);
-    expect(symlink.target).not.toBe(ORIGINAL_TARGET);
-    expect(symlink.target).toContain('isolated-');
+    const entry = fs[LINK_PATH];
+    expect(entry?.kind).toBe('symlink');
+    expect((entry as { kind: 'symlink'; target: string }).target).not.toBe(ORIGINAL_TARGET);
+    expect((entry as { kind: 'symlink'; target: string }).target).toContain('isolated-');
   });
 
-  it('saves the original symlink target so teardown can restore it', () => {
-    const { seam } = makeFakeSeam(ORIGINAL_TARGET);
+  it('saves the original symlink target', () => {
+    const { seam } = makeSymlinkSeam();
     const result = setupIsolation(TWEAKCC_CONFIG, seam);
-    expect(result.savedSymlinkTarget).toBe(ORIGINAL_TARGET);
+    if (result.kind !== 'symlink') throw new Error('expected symlink kind');
+    expect(result.savedTarget).toBe(ORIGINAL_TARGET);
   });
 
-  it('records the throwaway dir path for cleanup', () => {
-    const { seam } = makeFakeSeam(ORIGINAL_TARGET);
+  it('the new symlink target equals the throwawayDir', () => {
+    const { seam, fs } = makeSymlinkSeam();
     const result = setupIsolation(TWEAKCC_CONFIG, seam);
-    expect(result.throwawayDir).toBeDefined();
-    expect(typeof result.throwawayDir).toBe('string');
-  });
-
-  it('the new symlink target equals the throwaway dir', () => {
-    const { seam, symlink } = makeFakeSeam(ORIGINAL_TARGET);
-    const result = setupIsolation(TWEAKCC_CONFIG, seam);
-    expect(symlink.target).toBe(result.throwawayDir);
+    if (result.kind !== 'symlink') throw new Error('expected symlink kind');
+    const entry = fs[LINK_PATH] as { kind: 'symlink'; target: string };
+    expect(entry.target).toBe(result.throwawayDir);
   });
 });
 
-// ── AC 2: teardown restores original symlink target on success AND on throw ──
+describe('setupIsolation — real-directory case (AC 1)', () => {
+  it('returns an empty overrideDirs array', () => {
+    const { seam } = makeDirectorySeam();
+    const result = setupIsolation(TWEAKCC_CONFIG, seam);
+    expect(result.overrideDirs).toEqual([]);
+  });
 
-describe('teardownIsolation — restores original symlink target (AC 2)', () => {
+  it('records kind: directory', () => {
+    const { seam } = makeDirectorySeam();
+    const result = setupIsolation(TWEAKCC_CONFIG, seam);
+    expect(result.kind).toBe('directory');
+  });
+
+  it('moves the real dir aside (link path becomes a directory, real dir at savedPath)', () => {
+    const { seam, fs } = makeDirectorySeam();
+    const result = setupIsolation(TWEAKCC_CONFIG, seam);
+    if (result.kind !== 'directory') throw new Error('expected directory kind');
+    // The link path now has an empty directory (the isolated surface).
+    expect(fs[LINK_PATH]?.kind).toBe('directory');
+    // The savedPath has the original directory (moved there).
+    expect(fs[result.savedPath]?.kind).toBe('directory');
+    // The throwawayDir is the link path itself.
+    expect(result.throwawayDir).toBe(LINK_PATH);
+  });
+
+  it('does NOT call readlink on the real directory (no EINVAL)', () => {
+    const { seam } = makeDirectorySeam();
+    // The real seam would throw EINVAL on readlink for a non-symlink;
+    // our fake would throw "Not a symlink". This confirms readlink is not called.
+    const readlinkCalls: string[] = [];
+    const wrappedSeam: IsolationFsSeam = {
+      ...seam,
+      readlink: (path) => { readlinkCalls.push(path); return seam.readlink(path); },
+    };
+    setupIsolation(TWEAKCC_CONFIG, wrappedSeam);
+    expect(readlinkCalls).toHaveLength(0);
+  });
+});
+
+describe('setupIsolation — absent case (AC 1)', () => {
+  it('returns an empty overrideDirs array', () => {
+    const { seam } = makeAbsentSeam();
+    const result = setupIsolation(TWEAKCC_CONFIG, seam);
+    expect(result.overrideDirs).toEqual([]);
+  });
+
+  it('records kind: absent', () => {
+    const { seam } = makeAbsentSeam();
+    const result = setupIsolation(TWEAKCC_CONFIG, seam);
+    expect(result.kind).toBe('absent');
+  });
+
+  it('creates a directory at the link path as the isolated surface', () => {
+    const { seam, fs } = makeAbsentSeam();
+    setupIsolation(TWEAKCC_CONFIG, seam);
+    expect(fs[LINK_PATH]?.kind).toBe('directory');
+  });
+
+  it('throwawayDir equals the link path', () => {
+    const { seam } = makeAbsentSeam();
+    const result = setupIsolation(TWEAKCC_CONFIG, seam);
+    expect(result.throwawayDir).toBe(LINK_PATH);
+  });
+});
+
+// ── AC 2: teardown restores original state on success AND on throw ────────────
+
+describe('teardownIsolation — symlink case (AC 2)', () => {
   it('restores the symlink to the original target on normal exit', () => {
-    const { seam, symlink } = makeFakeSeam(ORIGINAL_TARGET);
+    const { seam, fs } = makeSymlinkSeam();
     const setup = setupIsolation(TWEAKCC_CONFIG, seam);
     teardownIsolation(TWEAKCC_CONFIG, setup, seam);
-    expect(symlink.target).toBe(ORIGINAL_TARGET);
+    const entry = fs[LINK_PATH] as { kind: 'symlink'; target: string };
+    expect(entry?.kind).toBe('symlink');
+    expect(entry?.target).toBe(ORIGINAL_TARGET);
   });
 
   it('removes the throwaway dir on teardown', () => {
-    const { seam, thrownTemp } = makeFakeSeam(ORIGINAL_TARGET);
+    const { seam, removedPaths } = makeSymlinkSeam();
     const setup = setupIsolation(TWEAKCC_CONFIG, seam);
+    if (setup.kind !== 'symlink') throw new Error('expected symlink kind');
     teardownIsolation(TWEAKCC_CONFIG, setup, seam);
-    expect(thrownTemp).toContain(setup.throwawayDir);
+    expect(removedPaths).toContain(setup.throwawayDir);
   });
 
-  it('withIsolation restores even when the run body throws', () => {
-    const { seam, symlink } = makeFakeSeam(ORIGINAL_TARGET);
+  it('withIsolation restores the symlink even when the run body throws', () => {
+    const { seam, fs } = makeSymlinkSeam();
     expect(() =>
-      withIsolation(TWEAKCC_CONFIG, seam, (_result) => {
-        throw new Error('body failure');
-      }),
+      withIsolation(TWEAKCC_CONFIG, seam, () => { throw new Error('body failure'); }),
     ).toThrow('body failure');
-    // Symlink must be restored despite the throw
-    expect(symlink.target).toBe(ORIGINAL_TARGET);
+    const entry = fs[LINK_PATH] as { kind: 'symlink'; target: string };
+    expect(entry?.kind).toBe('symlink');
+    expect(entry?.target).toBe(ORIGINAL_TARGET);
   });
 
   it('withIsolation removes the throwaway dir even when the run body throws', () => {
-    const { seam, thrownTemp } = makeFakeSeam(ORIGINAL_TARGET);
+    const { seam, removedPaths } = makeSymlinkSeam();
     let capturedThrowaway: string | undefined;
     expect(() =>
       withIsolation(TWEAKCC_CONFIG, seam, (result) => {
@@ -128,28 +244,66 @@ describe('teardownIsolation — restores original symlink target (AC 2)', () => 
         throw new Error('body failure');
       }),
     ).toThrow('body failure');
-    expect(thrownTemp).toContain(capturedThrowaway);
+    expect(removedPaths).toContain(capturedThrowaway);
   });
+});
 
-  it('withIsolation returns the body return value on success', () => {
-    const { seam } = makeFakeSeam(ORIGINAL_TARGET);
-    const value = withIsolation(TWEAKCC_CONFIG, seam, () => 42);
-    expect(value).toBe(42);
-  });
-
-  it('withIsolation restores the symlink on success', () => {
-    const { seam, symlink } = makeFakeSeam(ORIGINAL_TARGET);
-    withIsolation(TWEAKCC_CONFIG, seam, () => 'done');
-    expect(symlink.target).toBe(ORIGINAL_TARGET);
-  });
-
-  it('no leftover isolated symlink after teardown: target is the original, not the throwaway', () => {
-    const { seam, symlink } = makeFakeSeam(ORIGINAL_TARGET);
+describe('teardownIsolation — real-directory case (AC 2)', () => {
+  it('removes the isolated surface and renames the real dir back on normal exit', () => {
+    const { seam, fs, removedPaths } = makeDirectorySeam();
     const setup = setupIsolation(TWEAKCC_CONFIG, seam);
-    const throwawayDir = setup.throwawayDir;
+    if (setup.kind !== 'directory') throw new Error('expected directory kind');
+    const savedPath = setup.savedPath;
     teardownIsolation(TWEAKCC_CONFIG, setup, seam);
-    expect(symlink.target).toBe(ORIGINAL_TARGET);
-    expect(symlink.target).not.toBe(throwawayDir);
+    // The isolated surface (at link path) was removed.
+    expect(removedPaths).toContain(LINK_PATH);
+    // The real dir was renamed back to the link path.
+    expect(fs[LINK_PATH]?.kind).toBe('directory');
+    // The savedPath is now absent.
+    expect(fs[savedPath]).toBeUndefined();
+  });
+
+  it('withIsolation renames the real dir back even when the run body throws', () => {
+    const { seam, fs } = makeDirectorySeam();
+    let savedPath: string | undefined;
+    expect(() =>
+      withIsolation(TWEAKCC_CONFIG, seam, (result) => {
+        if (result.kind !== 'directory') throw new Error('expected directory kind');
+        savedPath = result.savedPath;
+        throw new Error('body failure');
+      }),
+    ).toThrow('body failure');
+    // The real dir must be back at the link path.
+    expect(fs[LINK_PATH]?.kind).toBe('directory');
+    // The savedPath should be absent (renamed back).
+    if (savedPath) expect(fs[savedPath]).toBeUndefined();
+  });
+
+  it('withIsolation removes the isolated surface even when the run body throws', () => {
+    const { seam, removedPaths } = makeDirectorySeam();
+    expect(() =>
+      withIsolation(TWEAKCC_CONFIG, seam, () => { throw new Error('body failure'); }),
+    ).toThrow('body failure');
+    expect(removedPaths).toContain(LINK_PATH);
+  });
+});
+
+describe('teardownIsolation — absent case (AC 2)', () => {
+  it('removes the created empty dir on normal exit (path returns to absent)', () => {
+    const { seam, fs, removedPaths } = makeAbsentSeam();
+    const setup = setupIsolation(TWEAKCC_CONFIG, seam);
+    teardownIsolation(TWEAKCC_CONFIG, setup, seam);
+    expect(removedPaths).toContain(LINK_PATH);
+    expect(fs[LINK_PATH]).toBeUndefined();
+  });
+
+  it('withIsolation removes the created dir even when the run body throws', () => {
+    const { seam, fs, removedPaths } = makeAbsentSeam();
+    expect(() =>
+      withIsolation(TWEAKCC_CONFIG, seam, () => { throw new Error('body failure'); }),
+    ).toThrow('body failure');
+    expect(removedPaths).toContain(LINK_PATH);
+    expect(fs[LINK_PATH]).toBeUndefined();
   });
 });
 
@@ -188,7 +342,7 @@ describe('isolated run produces clean patcher+prompts record (AC 3)', () => {
 
   it('isolated run with stale lobotomized overrides: isolation prevents the stale dirs from reaching the gate', () => {
     // The gate receives empty overrideDirs (the isolated state) — stale dirs never enter the scan.
-    const { seam } = makeFakeSeam(ORIGINAL_TARGET);
+    const { seam } = makeSymlinkSeam();
     const setup = setupIsolation(TWEAKCC_CONFIG, seam);
     // overrideDirs is empty — stale lobotomized dirs are not present
     expect(setup.overrideDirs).toEqual([]);
@@ -199,31 +353,37 @@ describe('isolated run produces clean patcher+prompts record (AC 3)', () => {
 // ── AC 4: no gate runtime writes inside a tracked work clone ─────────────────
 
 describe('isolation prevents runtime writes inside a tracked work clone (AC 4)', () => {
-  it('the throwaway dir is under tmpdir, not inside any lobotomized clone path', () => {
-    // The fake seam prefixes throwaway dirs with a temp prefix — in the real seam, mkdtempSync
-    // uses os.tmpdir(). The throwaway must not be a subdirectory of the tracked clone path.
+  it('symlink case: the symlink points at throwaway (not the tracked clone)', () => {
     const trackedClone = '/home/user/repos/lobotomized-claude-code';
-    const { seam, symlink } = makeFakeSeam(ORIGINAL_TARGET);
-    const result = setupIsolation(TWEAKCC_CONFIG, seam);
-    // The symlink now points at the throwaway (not the tracked clone), so tweakcc-fixed's
-    // runtime writes land in the throwaway dir, not in the tracked clone.
-    expect(symlink.target!.startsWith(trackedClone)).toBe(false);
-    teardownIsolation(TWEAKCC_CONFIG, result, seam);
+    const { seam, fs } = makeSymlinkSeam();
+    setupIsolation(TWEAKCC_CONFIG, seam);
+    const entry = fs[LINK_PATH] as { kind: 'symlink'; target: string };
+    expect(entry.target.startsWith(trackedClone)).toBe(false);
   });
 
   it('after teardown, the symlink points back at the original target (tracked clone or wherever)', () => {
-    const { seam, symlink } = makeFakeSeam(ORIGINAL_TARGET);
+    const { seam, fs } = makeSymlinkSeam();
     const setup = setupIsolation(TWEAKCC_CONFIG, seam);
     teardownIsolation(TWEAKCC_CONFIG, setup, seam);
-    expect(symlink.target).toBe(ORIGINAL_TARGET);
+    const entry = fs[LINK_PATH] as { kind: 'symlink'; target: string };
+    expect(entry.target).toBe(ORIGINAL_TARGET);
+  });
+
+  it('directory case: the real dir is moved aside, not left at the link path during the run', () => {
+    const { seam, fs } = makeDirectorySeam();
+    const setup = setupIsolation(TWEAKCC_CONFIG, seam);
+    if (setup.kind !== 'directory') throw new Error('expected directory kind');
+    // During the run, the savedPath holds the original dir — it should exist there.
+    expect(fs[setup.savedPath]?.kind).toBe('directory');
+    teardownIsolation(TWEAKCC_CONFIG, setup, seam);
   });
 });
 
 // ── withIsolation: the run body receives the setup result ────────────────────
 
 describe('withIsolation — body receives IsolationSetupResult (setup shape)', () => {
-  it('body receives overrideDirs: [] from the setup', () => {
-    const { seam } = makeFakeSeam(ORIGINAL_TARGET);
+  it('body receives overrideDirs: [] from the setup (symlink case)', () => {
+    const { seam } = makeSymlinkSeam();
     let capturedOverrideDirs: string[] | undefined;
     withIsolation(TWEAKCC_CONFIG, seam, (result) => {
       capturedOverrideDirs = result.overrideDirs;
@@ -231,12 +391,36 @@ describe('withIsolation — body receives IsolationSetupResult (setup shape)', (
     expect(capturedOverrideDirs).toEqual([]);
   });
 
-  it('body receives throwawayDir string from the setup', () => {
-    const { seam } = makeFakeSeam(ORIGINAL_TARGET);
+  it('body receives overrideDirs: [] from the setup (directory case)', () => {
+    const { seam } = makeDirectorySeam();
+    let capturedOverrideDirs: string[] | undefined;
+    withIsolation(TWEAKCC_CONFIG, seam, (result) => {
+      capturedOverrideDirs = result.overrideDirs;
+    });
+    expect(capturedOverrideDirs).toEqual([]);
+  });
+
+  it('body receives overrideDirs: [] from the setup (absent case)', () => {
+    const { seam } = makeAbsentSeam();
+    let capturedOverrideDirs: string[] | undefined;
+    withIsolation(TWEAKCC_CONFIG, seam, (result) => {
+      capturedOverrideDirs = result.overrideDirs;
+    });
+    expect(capturedOverrideDirs).toEqual([]);
+  });
+
+  it('body receives throwawayDir string from the setup (symlink case)', () => {
+    const { seam } = makeSymlinkSeam();
     let capturedDir: string | undefined;
     withIsolation(TWEAKCC_CONFIG, seam, (result) => {
       capturedDir = result.throwawayDir;
     });
     expect(typeof capturedDir).toBe('string');
+  });
+
+  it('withIsolation returns the body return value on success', () => {
+    const { seam } = makeSymlinkSeam();
+    const value = withIsolation(TWEAKCC_CONFIG, seam, () => 42);
+    expect(value).toBe(42);
   });
 });
