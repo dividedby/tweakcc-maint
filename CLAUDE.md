@@ -108,3 +108,10 @@ human-facing and carries no operating instructions).
 
 When I say **"file a *tracked* issue"** — or hand you a **plainly-scoped bug** —
 skip the Inbox and file a `needs-triage` issue directly via `gh`.
+
+### Refused-capability record
+
+`.out-of-scope/` — one file per deliberately-refused capability; the
+`apply-agent-research` loop reads it as the already-refused filter. When a
+`source:agent-research` proposal is closed `wontfix`, add a file here (format
+and convention: `.out-of-scope/README.md`).
