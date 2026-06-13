@@ -26,6 +26,14 @@ version-independent helper units; reject coverage redundant with a gate he
 already runs; root-cause a quirk rather than snapshot it (tweakcc-fixed#6;
 ADR 0007) — before proposing.
 
+When the PR carries code into `tweakcc-fixed`, follow his
+[`CONTRIBUTING.md`](https://github.com/skrabe/tweakcc-fixed/blob/main/CONTRIBUTING.md)
+for the mechanics we don't re-document here: branch prefix (`feature/` · `fix/` ·
+`docs/`), typed commit messages (`Add` · `Fix` · `Prompts for <ver>` · `Sort` ·
+`Update` · `Refactor` + subject + optional `(#NN)`), and code style (ESLint +
+Prettier; `pnpm lint` before the PR). This is **tweakcc-fixed-specific** — the
+`lobotomized-claude-code` leaf ships no CONTRIBUTING, so don't impose these on lcc PRs.
+
 ### Alignment preflight — reconcile against his current state first
 We **prove, benchmark, and suggest; we do not race** skrabe on realign speed (he's
 faster solo and owns the repos). His leaves move hourly, so before you author OR
