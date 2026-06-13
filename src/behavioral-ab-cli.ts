@@ -32,9 +32,7 @@ import type { ArtifactFsSeam } from './prove-value-artifact.js';
 import { RealJudgePanel } from './real-judge-panel.js';
 import { RealCorrectnessJudge } from './real-correctness-judge.js';
 import { detectCredentials, credentialMessage } from './credentials-preflight.js';
-import { argv } from 'node:process';
-import { realpathSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { isEntryPoint } from './cli-entrypoint.js';
 import type { ProvisionedVariants } from './provision-variants.js';
 import type { JudgePanelPort } from './judge-panel-port.js';
 import type { CorrectnessJudgePort } from './correctness-judge-port.js';
@@ -150,14 +148,4 @@ async function main(): Promise<void> {
 
 // Run only when invoked as the process entry point — never when imported (the all-fake wiring
 // test imports {@link runBehavioralABCli} and must NOT trigger a real provision/exit).
-function isEntryPoint(): boolean {
-  const entry = argv[1];
-  if (entry === undefined) return false;
-  try {
-    return realpathSync(entry) === fileURLToPath(import.meta.url);
-  } catch {
-    return false;
-  }
-}
-
-if (isEntryPoint()) void main();
+if (isEntryPoint(import.meta.url)) void main();
