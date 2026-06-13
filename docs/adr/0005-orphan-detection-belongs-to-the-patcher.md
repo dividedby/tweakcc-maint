@@ -113,3 +113,56 @@ path:
   and the gate's boot-verify carries the cost-ledger wiring), and the static
   validator stays the advisory authoring-drift pre-check — this addendum narrows
   nothing decided above.
+
+## Addendum (2026-06-13, #262): a not-run mis-bind audit is pass-through, not a failure
+
+The first real `/adopt` run (CC 2.1.177) red-failed the **Four-zeros bar** on a
+*phantom* fourth zero. With the **named-prompt** override surface isolated (the
+"ship patcher PR isolated from lobotomized" discipline — an empty surface so a
+stale `lobotomized-claude-code` does not red an otherwise-clean patcher+prompts
+record), the gate had **zero override dirs to audit**. The driver verification
+runs `tools/auditMisbinds.mjs` once per override dir; with none, the captured
+`auditMisbinds` signal was the **empty string `""`**, which the verdict parsed as
+"audit failed" → `auditMisbindsPassed: false`, `misbinds: []`. A failure with no
+findings is the tell: the audit never ran.
+
+This refines how the bar treats its fourth zero — it does **not** re-open the
+authority split above. The mis-bind audit has **three** verdict states, not two:
+
+1. **ran-and-clean** (`mis-bind audit: 0`) → PASS — skrabe's fourth zero satisfied.
+2. **ran-and-found-misbinds** (`MIS-BINDS: N`) → FAIL.
+3. **not-asserted** → **pass-through** (does not fail the bar). Two distinct,
+   separately-recorded sub-states:
+   - **SKIPPED** — the audit *ran* but had no upstream reference dump to compare
+     against (the retired-Piebald reality on most boxes); already honored as
+     non-failing by the driver's own design.
+   - **not-run** — there were **no override dirs** to audit (e.g. the named-prompt
+     surface is isolated).
+
+**Representation invariant (the fix).** A not-asserted audit is `undefined`
+(absent) in the `CapturedSignals` seam, **never** `""`. The verdict's pass
+condition is `auditMisbindsPassed !== false`, so `undefined` passes through while a
+genuine `false` (state 2) still fails. The SKIPPED vs not-run reason is preserved
+in the **Adoption record** so the record honestly shows *why* the fourth zero
+didn't assert `0`, rather than collapsing both into a bare "not asserted."
+
+**Why pass-through is sound (vacuous truth).** A **Mis-bind** is an *override*
+placeholder resolving to a wrong-but-valid slot. With no overrides applied, there
+is nothing that *can* mis-bind — the fourth zero has nothing to assert, so failing
+it would be phantom. This is the same vacuity that makes an isolated-overrides
+record a valid *patcher+prompts* record (its scope excludes the override surfaces).
+
+**The Boot-verify asymmetry (the load-bearing nuance).** Boot-verify is
+deliberately **fail-when-absent**: the absence of its `Boot-verify OK` marker is a
+failure, because a non-negotiable runtime check must *positively* assert success
+and the patched binary always either boots or doesn't — it is never vacuous. The
+mis-bind audit is **pass-through-when-absent** because its subject (applied
+overrides) can legitimately be absent. The two markers look alike but their
+absence means opposite things; conflating them is what produced the phantom red.
+
+**Guard against a silent accidental-empty.** not-run is pass-through, but an empty
+override set when isolation was **not** explicitly requested (e.g. a path/config
+bug that drops the override dirs) is recorded as a **warning** in the Adoption
+record — surfaced, never a hard fail. The explicit-isolation signal (the
+`ISOLATE_OVERRIDES` capability, #263) is what marks an empty surface *expected*;
+its absence is what makes an empty surface *worth flagging*.
