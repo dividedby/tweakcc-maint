@@ -19,7 +19,8 @@
 
 import { homedir } from 'node:os';
 import { createHash } from 'node:crypto';
-import { existsSync, readdirSync, readFileSync, realpathSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { delimiter, join } from 'node:path';
 
 import type { AdoptionEnvironment, RestoreOutcome } from './adoption-environment.js';
@@ -32,6 +33,23 @@ import {
   productionIsolationFsSeam,
   type IsolationFsSeam,
 } from './override-surface-isolation.js';
+
+/**
+ * Seam for leaf-dist build operations — injected so the stale-build check is unit-testable
+ * without a real filesystem or a real `pnpm build` invocation (#261).
+ *
+ * The production seam walks the `src/` tree for the newest mtime, reads the `dist/index.mjs`
+ * mtime, and shells out to `pnpm build` in the leaf directory. The test seam returns canned
+ * timestamps and records build calls.
+ */
+export interface LeafBuildSeam {
+  /** Newest mtime (ms since epoch) of any file under `<tweakccFixedDir>/src/`. */
+  newestSrcMtime: (tweakccFixedDir: string) => number;
+  /** mtime (ms since epoch) of `<tweakccFixedDir>/dist/index.mjs`. */
+  distMtime: (distCli: string) => number;
+  /** Run the leaf build tool (e.g. `pnpm build`) in the given directory. Throws on failure. */
+  build: (tweakccFixedDir: string) => void;
+}
 
 /** Configuration for the real adapter — paths to the leaves and boot-verify knobs. */
 export interface RealAdoptionEnvironmentConfig {
@@ -56,6 +74,57 @@ export interface RealAdoptionEnvironmentConfig {
    */
   isolateOverrides?: boolean;
 }
+
+/**
+ * Walk a directory tree and return the newest mtime (ms since epoch) found under it.
+ * Returns 0 when the directory is empty or unreadable — 0 is older than any real mtime,
+ * so an empty/missing `src/` is treated as "dist is fresh enough" rather than forcing
+ * a spurious rebuild (the existsSync check on dist still guards the not-built case).
+ */
+function newestMtimeUnder(dir: string): number {
+  let newest = 0;
+  try {
+    for (const entry of readdirSync(dir, { withFileTypes: true, recursive: true })) {
+      if (!entry.isFile()) continue;
+      // entry.parentPath is the directory containing the entry (Node ≥ 20.1 / 21.2).
+      // Fall back to joining dir + entry.name for older Node versions.
+      const parentPath = (entry as { parentPath?: string }).parentPath ?? dir;
+      try {
+        const mtime = statSync(join(parentPath, entry.name)).mtimeMs;
+        if (mtime > newest) newest = mtime;
+      } catch {
+        // unreadable file — skip
+      }
+    }
+  } catch {
+    // unreadable dir — treat as empty
+  }
+  return newest;
+}
+
+/**
+ * Production `LeafBuildSeam`: real fs mtimes + `pnpm build` shell-out (#261).
+ * Exported so integrations can import it if needed, but the class defaults to it.
+ */
+export const productionLeafBuildSeam: LeafBuildSeam = {
+  newestSrcMtime: (tweakccFixedDir) => newestMtimeUnder(join(tweakccFixedDir, 'src')),
+  distMtime: (distCli) => {
+    try {
+      return statSync(distCli).mtimeMs;
+    } catch {
+      return 0;
+    }
+  },
+  build: (tweakccFixedDir) => {
+    const r = spawnSync('pnpm', ['build'], { cwd: tweakccFixedDir, encoding: 'utf8' });
+    if (r.status !== 0) {
+      throw new Error(
+        `LeafBuildSeam: \`pnpm build\` failed in ${tweakccFixedDir}` +
+          (r.stderr ? `:\n${r.stderr}` : ''),
+      );
+    }
+  },
+};
 
 const DEFAULT_PROMPT = 'Reply with exactly the word: ok';
 // Deliberate pin: keep boot-verify on the cheap haiku tier intentionally, but pin the exact
@@ -88,6 +157,7 @@ export class RealAdoptionEnvironment implements AdoptionEnvironment {
     bootVerifyModel: string;
   };
   private readonly isolationFsSeam: IsolationFsSeam;
+  private readonly leafBuildSeam: LeafBuildSeam;
   private cachedVersion?: string;
   private cachedPromptDirs?: string[];
 
@@ -96,8 +166,15 @@ export class RealAdoptionEnvironment implements AdoptionEnvironment {
    * @param isolationFsSeam - injected fs seam for symlink manipulation; defaults to the
    *   production seam (`productionIsolationFsSeam`). Inject a fake in tests to exercise
    *   the isolation wiring without real fs mutations (#263).
+   * @param leafBuildSeam - injected seam for stale-build detection + `pnpm build`; defaults
+   *   to the production seam (`productionLeafBuildSeam`). Inject a fake in tests to exercise
+   *   the stale-build refresh path without a real build (#261).
    */
-  constructor(config: RealAdoptionEnvironmentConfig, isolationFsSeam?: IsolationFsSeam) {
+  constructor(
+    config: RealAdoptionEnvironmentConfig,
+    isolationFsSeam?: IsolationFsSeam,
+    leafBuildSeam?: LeafBuildSeam,
+  ) {
     // Default with `??` per field — a trailing `...config` spread would let an explicitly
     // passed `undefined` clobber a default (e.g. `--model undefined`).
     this.cfg = {
@@ -106,6 +183,7 @@ export class RealAdoptionEnvironment implements AdoptionEnvironment {
       bootVerifyModel: config.bootVerifyModel ?? DEFAULT_MODEL,
     };
     this.isolationFsSeam = isolationFsSeam ?? productionIsolationFsSeam;
+    this.leafBuildSeam = leafBuildSeam ?? productionLeafBuildSeam;
   }
 
   /** Path to the built tweakcc-fixed CLI entry. */
@@ -203,6 +281,11 @@ export class RealAdoptionEnvironment implements AdoptionEnvironment {
       );
     }
 
+    // Stale-build check (#261): if src/ is newer than dist/index.mjs, rebuild before --apply
+    // so the gate always exercises the current source. Runs for both isolation and non-isolation
+    // paths — the build happens once here, before any symlink manipulation.
+    this.buildOrAssertFresh();
+
     // Resolve the identifierMap strings file BEFORE the mutating `--apply` — a missing
     // prompts file fails fast rather than leaving the install patched with no record.
     const stringsFile = resolveStringsFilePath(this.cfg.tweakccFixedDir, ccVersion);
@@ -221,6 +304,46 @@ export class RealAdoptionEnvironment implements AdoptionEnvironment {
     // Non-isolation path — byte-for-byte unchanged from the original.
     // Resolve override dirs BEFORE the mutating `--apply` so a missing dir fails fast.
     return this.runVerification(this.promptDirs, stringsFile, ccVersion);
+  }
+
+  /**
+   * Stale-build refresh step (#261): compare the newest mtime under `src/` against
+   * `dist/index.mjs`. When stale, rebuild and re-check; if still stale or the build
+   * errors, throw with an explicit message — never a silently-stale apply.
+   *
+   * `private` — called only from {@link adopt}, before the Driver shell-out. Extracted
+   * as a named method so the intent is readable at the call site.
+   */
+  private buildOrAssertFresh(): void {
+    const srcMtime = this.leafBuildSeam.newestSrcMtime(this.cfg.tweakccFixedDir);
+    const distMtime = this.leafBuildSeam.distMtime(this.tweakccCli);
+
+    if (srcMtime <= distMtime) {
+      // dist is fresh — nothing to do
+      return;
+    }
+
+    // src is newer: attempt a rebuild then re-check freshness.
+    try {
+      this.leafBuildSeam.build(this.cfg.tweakccFixedDir);
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : String(err);
+      throw new Error(
+        `RealAdoptionEnvironment: leaf build failed in ${this.cfg.tweakccFixedDir} — ` +
+          `cannot proceed with a stale dist/. Fix the build error and retry.\n${detail}`,
+      );
+    }
+
+    // Re-check: if dist is still older than src the build didn't produce a fresh output.
+    const distMtimeAfter = this.leafBuildSeam.distMtime(this.tweakccCli);
+    const srcMtimeAfter = this.leafBuildSeam.newestSrcMtime(this.cfg.tweakccFixedDir);
+    if (srcMtimeAfter > distMtimeAfter) {
+      throw new Error(
+        `RealAdoptionEnvironment: dist/ in ${this.cfg.tweakccFixedDir} is still stale after ` +
+          `\`pnpm build\` — the build completed but did not refresh dist/index.mjs. ` +
+          `Check the leaf's build configuration.`,
+      );
+    }
   }
 
   // ── Restore-drill trio (#23) — real backup/restore/verify-clean ──────────────────────
