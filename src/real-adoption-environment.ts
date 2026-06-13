@@ -27,6 +27,11 @@ import type { CapturedSignals } from './four-zeros-verdict.js';
 import { driverPresent, runDriverVerification } from './driver-verification.js';
 import { runSync, runBootVerify, combinedOutput, normalizeBootVerify } from './leaf-shell.js';
 import { runOrphanValidator, resolveStringsFilePath } from './orphan-validator.js';
+import {
+  withIsolation,
+  productionIsolationFsSeam,
+  type IsolationFsSeam,
+} from './override-surface-isolation.js';
 
 /** Configuration for the real adapter — paths to the leaves and boot-verify knobs. */
 export interface RealAdoptionEnvironmentConfig {
@@ -42,6 +47,14 @@ export interface RealAdoptionEnvironmentConfig {
   promptDirs?: string[];
   /** tweakcc-fixed's config/backup dir — holds the backups + `config.json` (default `~/.tweakcc`). */
   tweakccConfigDir?: string;
+  /**
+   * When `true`, activate the ISOLATE_OVERRIDES capability (#263): repoint the runtime
+   * `~/.tweakcc/system-prompts` symlink at a throwaway empty dir for the duration of the
+   * run, and scan no override dirs (overrideDirs = []). Produces a clean patcher+prompts
+   * Four-zeros record when lobotomized-claude-code overrides are stale (#26 class).
+   * The symlink is always restored, even on throw.
+   */
+  isolateOverrides?: boolean;
 }
 
 const DEFAULT_PROMPT = 'Reply with exactly the word: ok';
@@ -74,10 +87,17 @@ export class RealAdoptionEnvironment implements AdoptionEnvironment {
     bootVerifyPrompt: string;
     bootVerifyModel: string;
   };
+  private readonly isolationFsSeam: IsolationFsSeam;
   private cachedVersion?: string;
   private cachedPromptDirs?: string[];
 
-  constructor(config: RealAdoptionEnvironmentConfig) {
+  /**
+   * @param config - adapter configuration
+   * @param isolationFsSeam - injected fs seam for symlink manipulation; defaults to the
+   *   production seam (`productionIsolationFsSeam`). Inject a fake in tests to exercise
+   *   the isolation wiring without real fs mutations (#263).
+   */
+  constructor(config: RealAdoptionEnvironmentConfig, isolationFsSeam?: IsolationFsSeam) {
     // Default with `??` per field — a trailing `...config` spread would let an explicitly
     // passed `undefined` clobber a default (e.g. `--model undefined`).
     this.cfg = {
@@ -85,6 +105,7 @@ export class RealAdoptionEnvironment implements AdoptionEnvironment {
       bootVerifyPrompt: config.bootVerifyPrompt ?? DEFAULT_PROMPT,
       bootVerifyModel: config.bootVerifyModel ?? DEFAULT_MODEL,
     };
+    this.isolationFsSeam = isolationFsSeam ?? productionIsolationFsSeam;
   }
 
   /** Path to the built tweakcc-fixed CLI entry. */
@@ -103,8 +124,11 @@ export class RealAdoptionEnvironment implements AdoptionEnvironment {
     return (this.cachedPromptDirs ??= discoverPromptDirs(this.cfg.lobotomizedDir));
   }
 
-  /** The installed Claude Code version (from `claude --version`), read once and memoized. */
-  private installedVersion(): string {
+  /**
+   * The installed Claude Code version (from `claude --version`), read once and memoized.
+   * `protected` so tests can subclass and override it without a real Claude Code install (#263).
+   */
+  protected installedVersion(): string {
     if (this.cachedVersion !== undefined) return this.cachedVersion;
     const r = runSync('claude', ['--version']);
     const m = SEMVER.exec(r.stdout);
@@ -124,6 +148,28 @@ export class RealAdoptionEnvironment implements AdoptionEnvironment {
    */
   listMatrix(): string[] {
     return [this.installedVersion()];
+  }
+
+  /**
+   * Run the real leaf tools against the given `overrideDirs` and `stringsFile`, returning
+   * the base signals (before isolation metadata is overlaid). Both the isolation and
+   * non-isolation paths in {@link adopt} call this method; overriding it in tests replaces
+   * the real shell-outs with a fake without touching the isolation wiring (#263).
+   */
+  protected runVerification(
+    overrideDirs: string[],
+    stringsFile: string,
+    ccVersion: string,
+  ): Pick<CapturedSignals, 'apply' | 'bootVerify' | 'validator'> &
+    Partial<Pick<CapturedSignals, 'orphanReport' | 'auditMisbinds' | 'auditNotRunReason'>> {
+    const sourced = driverPresent(this.cfg.tweakccFixedDir)
+      ? runDriverVerification(this.cfg.tweakccFixedDir, ccVersion, stringsFile, overrideDirs)
+      : { apply: combinedOutput(runSync('node', [this.tweakccCli, '--apply'])) };
+    const bootVerify = normalizeBootVerify(
+      runBootVerify(this.cfg.bootVerifyPrompt, this.cfg.bootVerifyModel),
+    );
+    const validator = runOrphanValidator(overrideDirs, stringsFile);
+    return { ...sourced, bootVerify, validator };
   }
 
   /**
@@ -157,26 +203,24 @@ export class RealAdoptionEnvironment implements AdoptionEnvironment {
       );
     }
 
-    // Resolve the read-only inputs (override dirs, identifierMap strings file) BEFORE the
-    // mutating `--apply`, so a missing prompts file / override dir fails fast rather than
-    // leaving the install patched with no record (the stubbed restore would not undo it).
-    const overrideDirs = this.promptDirs;
+    // Resolve the identifierMap strings file BEFORE the mutating `--apply` — a missing
+    // prompts file fails fast rather than leaving the install patched with no record.
     const stringsFile = resolveStringsFilePath(this.cfg.tweakccFixedDir, ccVersion);
 
-    // Canonical driver path (#80): the driver's `check` performs the idempotent re-apply
-    // itself, so it runs first and Boot-verify exercises the patched binary it left behind.
-    // Hand-rolled fallback (driver-absent older checkout — the #31 fallback shape): plain
-    // `--apply`, and no `orphanReport` — the patcher's `--report-orphans` (producer, #43) has
-    // not landed, so FourZerosVerdict sees the absent report and falls back to Boot-verify as
-    // the orphan authority (#31 AC 4), with the static `validator` advisory only.
-    const sourced = driverPresent(this.cfg.tweakccFixedDir)
-      ? runDriverVerification(this.cfg.tweakccFixedDir, ccVersion, stringsFile, overrideDirs)
-      : { apply: combinedOutput(runSync('node', [this.tweakccCli, '--apply'])) };
-    const bootVerify = normalizeBootVerify(
-      runBootVerify(this.cfg.bootVerifyPrompt, this.cfg.bootVerifyModel),
-    );
-    const validator = runOrphanValidator(overrideDirs, stringsFile);
-    return { ...sourced, bootVerify, validator };
+    // ISOLATE_OVERRIDES (#263): wrap the verification body in withIsolation so the runtime
+    // `~/.tweakcc/system-prompts` symlink is repointed at a throwaway dir for the duration
+    // of the run, and overrideDirs is empty. The symlink is restored on both success and
+    // throw. isolationExplicit: true suppresses the unexpected-empty-overrides warning (#262).
+    if (this.cfg.isolateOverrides) {
+      return withIsolation(this.tweakccConfigDir, this.isolationFsSeam, (setup) => {
+        const base = this.runVerification(setup.overrideDirs, stringsFile, ccVersion);
+        return { ...base, auditNotRunReason: 'not-run' as const, isolationExplicit: true };
+      });
+    }
+
+    // Non-isolation path — byte-for-byte unchanged from the original.
+    // Resolve override dirs BEFORE the mutating `--apply` so a missing dir fails fast.
+    return this.runVerification(this.promptDirs, stringsFile, ccVersion);
   }
 
   // ── Restore-drill trio (#23) — real backup/restore/verify-clean ──────────────────────
