@@ -596,15 +596,21 @@ Only reached after a green gate. A run opens **0–2 PRs** in this order:
 
 Open a **draft** PR on skrabe's `tweakcc-fixed` leaf, from our fork
 (`dividedby/tweakcc-fixed`), per the cockpit rule (CLAUDE.md / CONTEXT.md →
-"Contributor cockpit"). Branch off `origin/main`:
+"Contributor cockpit"). This PR carries code into his leaf, so it follows his
+[`CONTRIBUTING.md`](https://github.com/skrabe/tweakcc-fixed/blob/main/CONTRIBUTING.md):
+`feature/`-prefixed branch, the `Prompts for <newVersion>` commit type (his
+"update for new Claude version"), and `pnpm lint` clean before pushing. Branch
+off `origin/main`:
 
 ```bash
-git checkout -b adopt/<newVersion> origin/main
-# ... commit the adoption record and any patcher changes ...
-git push origin adopt/<newVersion>
+git checkout -b feature/cc-<newVersion> origin/main
+pnpm lint                                   # CONTRIBUTING: clean before PR
+git add -A                                  # stage + commit as SEPARATE calls (git-guard)
+git commit -m "Prompts for <newVersion>"    # his typed-commit format
+git push origin feature/cc-<newVersion>
 gh pr create \
   -R skrabe/tweakcc-fixed \
-  --head dividedby:adopt/<newVersion> \
+  --head dividedby:feature/cc-<newVersion> \
   --draft \
   --title "adopt CC <newVersion>" \
   --body-file /tmp/adopt-<newVersion>-tf-body.md
