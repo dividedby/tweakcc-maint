@@ -41,19 +41,16 @@ import { join } from 'node:path';
  * The `node:fs` / `node:os` subset used for symlink manipulation and throwaway dir
  * management — injected so the module is testable with a fake seam.
  *
- * The `lstat`, `unlinkSync`, `rename`, and `mkdir` fields were added in the multi-state
- * fix (#263 hardening). They are optional for backward compat with existing fakes that
- * only exercise the symlink path; when absent, `setupIsolation` falls back to assuming
- * the path is a symlink (the original behavior). The production seam always provides all
+ * The `unlinkSync`, `rename`, and `mkdir` fields are optional: only needed when setup
+ * may encounter a non-symlink or absent path. The production seam always provides all
  * fields.
  */
 export interface IsolationFsSeam {
   /**
    * Stat the path without following symlinks. Throws ENOENT when absent.
    * Returns an object with `isSymbolicLink()`.
-   * Optional: when absent, `setupIsolation` assumes the path is a symlink.
    */
-  lstat?: (path: string) => { isSymbolicLink: () => boolean };
+  lstat: (path: string) => { isSymbolicLink: () => boolean };
   /** Read the current target of the `~/.tweakcc/system-prompts` symlink. */
   readlink: (path: string) => string;
   /** Point the symlink at a new target (replacing the old one if present). */
@@ -135,10 +132,8 @@ function symlinkPath(tweakccConfigDir: string): string {
 /**
  * Detect which of the three states `link` is in.
  * Returns 'symlink' | 'directory' | 'absent'.
- * When `fs.lstat` is absent (backward-compat fakes), falls back to 'symlink'.
  */
 function detectState(link: string, fs: IsolationFsSeam): 'symlink' | 'directory' | 'absent' {
-  if (!fs.lstat) return 'symlink';
   try {
     const stat = fs.lstat(link);
     return stat.isSymbolicLink() ? 'symlink' : 'directory';

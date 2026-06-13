@@ -44,6 +44,7 @@ function makeFakeSeam(originalTarget: string): { seam: IsolationFsSeam; calls: S
   };
 
   const seam: IsolationFsSeam = {
+    lstat: (_path) => ({ isSymbolicLink: () => true }),
     readlink: (_path) => {
       calls.readlinkCalled = true;
       return currentTarget;
