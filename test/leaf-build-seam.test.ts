@@ -29,6 +29,7 @@ import type { IsolationFsSeam } from '../src/override-surface-isolation.js';
 // ── Null IsolationFsSeam (isolation not under test here) ─────────────────────
 
 const nullIsolationSeam: IsolationFsSeam = {
+  lstat: () => ({ isSymbolicLink: () => true }),
   readlink: () => '/original/target',
   symlinkSync: () => {},
   mkdtempSync: (prefix) => `${prefix}0`,
