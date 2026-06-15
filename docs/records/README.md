@@ -17,21 +17,31 @@ the merged leaf mains) lands.
 
 ## Run-context notes
 
-- **2.1.177 — DRAFT / pre-merge (NOT a matrix member)** (2026-06-13, local run,
-  **overrides isolated**). Leaves: tweakcc-fixed PR **#11** (head `feat/adopt-2.1.177`,
-  prompts-2.1.177 + the `user-sent-new-message` anchor fix) **stacked on PR #10**
-  (`feat/adopt-2.1.176`, which also carries the `versionBumpReport`→`.cjs` tooling fix);
-  lobotomized **not** realigned (its `main` is 2.1.175-aligned). Green Four-zeros
-  (`failedPatches` / `missingSystemPrompts` / `orphanVariables` / `misbinds` all empty) +
-  Boot-verify + clean Restore drill (byte-identical clean stock). Overrides isolated
-  (empty system-prompts dir) — validates the **patcher + prompts** only; the lobotomized
-  overrides boot-crash against 2.1.177 (pre-existing #26 class), a separate leaf concern.
-  `auditMisbinds`: **SKIPPED** (no Piebald upstream dump on the box — Piebald is retired;
-  moot here since overrides are isolated), honored as non-failing per the driver's design.
-  The only real Four-zeros blocker was the `user-sent-new-message` anchor — stale across
-  2.1.175/176/177 (upstream hoisted the first sentence into a variable), identical to
-  skrabe's HEAD; fixed for 2.1.176/177 in #11 (2.1.175's different prose left out of scope).
-  Matrix entry awaits the suffix-less merge-day re-run against the merged leaf mains.
+- **2.1.177 — DRAFT / NOT a matrix member** (re-confirmed 2026-06-15, local run,
+  **overrides isolated**, against skrabe's now-**merged** tweakcc-fixed `main` @`a8ae557`
+  — he shipped 2.1.177 himself: release 2.0.3 `4b4d445` / prompts-2.1.177 `006c070` /
+  `user-sent-new-message` anchor `c4bae1f`; our pre-merge **tweakcc-fixed** PRs #11/#10
+  closed superseded). Green Four-zeros (`failedPatches` / `missingSystemPrompts` /
+  `orphanVariables` / `misbinds` all empty) + Boot-verify + clean Restore drill —
+  validates the **patcher + prompts** only. `auditMisbinds`: **not-run** (moot under
+  isolation — empty override surface).
+  **Matrix finalize is blocked** — not on the patcher, but on the lobotomized override
+  surface being clean at 2.1.177. The matrix bar is `auditMisbinds=0` against the *real*
+  override surfaces (per the 2.1.170 finalized precedent below); a full-override run reds
+  on orphans this gate surfaced:
+  - **claude-code-guide** (active `opus-4-8` + `opus-4-7`): 2.1.177 renamed slot 0 of
+    `Agent Prompt: claude-code-guide` (`AGENT_PROMPT_CLAUDE_CODE_GUIDE_VAR_0` →
+    `SEND_MESSAGE_TOOL_NAME`); the override stayed pinned `ccVersion: 2.1.141` and is now
+    orphaned — skrabe's `85ef3bd` realign batch missed it. Realign prepared as
+    **lobotomized draft PR #10** (dividedby → skrabe), opus-4-8 + opus-4-7 only.
+  - **fable-5** (dormant): `system-prompt-autonomous-loop-tick-dynamic` (4 slots renamed)
+    + the claude-code-guide copy, orphaned at 2.1.177; skrabe marked fable-5 dormant in
+    `85ef3bd`, so left untouched (his call).
+  - The patcher-report orphan list also named `WORKFLOW_*` / `EMPTY_STRING`, which the
+    control-plane orphan producer does not reproduce at HEAD — a detector mismatch flagged
+    for separate reconciliation, not confirmed drift.
+  Finalize once skrabe's lobotomized `main` is clean at 2.1.177 (lobotomized PR #10 merged
+  + fable-5 resolved/excluded), via a merge-day re-run with `auditMisbinds` executed.
 
 - **2.1.170 — FINALIZED / MATRIX MEMBER** (2026-06-10, merge-day re-run against the
   **merged leaf mains**: tweakcc-fixed@`7d9b30b` × lobotomized@`f1db0de` — the merged
