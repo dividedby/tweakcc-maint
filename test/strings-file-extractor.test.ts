@@ -5,6 +5,9 @@ import { join } from 'node:path';
 import {
   extractStringsFile,
   assertPristineStringsFile,
+  assertCoverage,
+  selectPristineSource,
+  promptCount,
   loadOverrideBodies,
   stripFrontmatter,
 } from '../src/strings-file-extractor.js';
@@ -152,5 +155,100 @@ describe('stripFrontmatter / loadOverrideBodies', () => {
     } finally {
       rmSync(od, { recursive: true, force: true });
     }
+  });
+});
+
+/**
+ * Regression tests for the #302 fix: selectPristineSource, assertCoverage, promptCount.
+ *
+ * Fixture helpers write minimal `{ version, prompts: [...] }` JSON files with a controllable
+ * number of prompt entries — no real binary or adapter involved.
+ */
+describe('selectPristineSource / assertCoverage / promptCount (#302)', () => {
+  let dir: string;
+
+  /** Write a minimal prompts JSON with `count` stub prompts and return its absolute path. */
+  function writePromptsJson(name: string, version: string, count: number): string {
+    const path = join(dir, name);
+    const prompts = Array.from({ length: count }, (_, i) => ({ id: `prompt-${i}` }));
+    writeFileSync(path, JSON.stringify({ version, prompts }));
+    return path;
+  }
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'source-select-'));
+  });
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  // Test 1: committed present, complete (count >= native), version match → mode 'committed',
+  // sourcePath = committedPath, committed file NOT modified.
+  it('returns mode committed when the committed file exists, version matches, and count >= native', () => {
+    const native = writePromptsJson('native.json', '2.1.178', 312);
+    const committed = writePromptsJson('committed.json', '2.1.178', 410);
+    const contentBefore = readFileSync(committed, 'utf8');
+
+    const result = selectPristineSource({
+      committedPath: committed,
+      nativeExtractPath: native,
+      version: '2.1.178',
+    });
+
+    expect(result.mode).toBe('committed');
+    expect(result.sourcePath).toBe(committed);
+    // The committed file must NOT have been overwritten.
+    expect(readFileSync(committed, 'utf8')).toBe(contentBefore);
+  });
+
+  // Test 2: committed present but lossy (count well below native - SLACK) → assertCoverage throws.
+  it('assertCoverage throws when source prompt count is too far below the native reference', () => {
+    // native=410, source=312, default SLACK=8 → 312+8=320 < 410 → must throw
+    const native = writePromptsJson('native.json', '2.1.178', 410);
+    const source = writePromptsJson('source.json', '2.1.178', 312);
+
+    expect(() => assertCoverage(source, native)).toThrow(/coverage floor|regressed|#302/);
+  });
+
+  // Test 3: committed present, version mismatch → selectPristineSource throws, message names both.
+  it('throws on version mismatch, naming both the committed and requested versions', () => {
+    const native = writePromptsJson('native.json', '2.1.178', 410);
+    // committed file carries the wrong version internally
+    const committed = writePromptsJson('committed.json', '2.1.177', 410);
+
+    expect(() =>
+      selectPristineSource({
+        committedPath: committed,
+        nativeExtractPath: native,
+        version: '2.1.178',
+      }),
+    ).toThrow(/2\.1\.177.*2\.1\.178|2\.1\.178.*2\.1\.177|version mismatch/i);
+  });
+
+  // Test 4: committed absent → mode 'native-fallback', sourcePath = nativeExtractPath.
+  it('returns mode native-fallback when no committed file exists', () => {
+    const native = writePromptsJson('native.json', '2.1.178', 312);
+    const absent = join(dir, 'does-not-exist.json');
+
+    const result = selectPristineSource({
+      committedPath: absent,
+      nativeExtractPath: native,
+      version: '2.1.178',
+    });
+
+    expect(result.mode).toBe('native-fallback');
+    expect(result.sourcePath).toBe(native);
+  });
+
+  it('promptCount returns the number of prompts in a file path', () => {
+    const f = writePromptsJson('p.json', '2.1.178', 7);
+    expect(promptCount(f)).toBe(7);
+  });
+
+  it('assertCoverage passes when source count + slack >= reference count', () => {
+    // source=402, native=410, slack=8 → 402+8=410 >= 410 → should NOT throw
+    const native = writePromptsJson('native.json', '2.1.178', 410);
+    const source = writePromptsJson('source.json', '2.1.178', 402);
+    expect(() => assertCoverage(source, native)).not.toThrow();
   });
 });
