@@ -19,7 +19,10 @@ const fakeRunner: VariantRunner = {
 const fakePanel: JudgePanelPort = {
   async scorePanel(_fixtureId, _first, _second) {
     const flat = () => Object.fromEntries(BEHAVIORAL_AXES.map((a) => [a, 2])) as Record<(typeof BEHAVIORAL_AXES)[number], number>;
-    return JUDGE_PERSONAS.map(() => ({ A: flat(), B: flat() }));
+    return {
+      graded: JUDGE_PERSONAS.map((persona) => ({ persona, scores: { A: flat(), B: flat() } })),
+      omitted: [],
+    };
   },
 };
 

@@ -6,8 +6,9 @@ import { FakeVariantRunner } from '../src/fake-variant-runner.js';
 import { SeededRng } from '../src/seeded-rng.js';
 import type { AdoptionRecord } from '../src/integration-gate.js';
 import { panelOf, JUDGE_PERSONAS } from '../src/judge-panel-port.js';
-import type { JudgePanelPort } from '../src/judge-panel-port.js';
+import type { JudgePanelPort, PanelResult } from '../src/judge-panel-port.js';
 import type { PresentedOutput } from '../src/judge-port.js';
+import { BEHAVIORAL_AXES } from '../src/judge-port.js';
 
 /** A fixture whose stock/lobotomized outputs and correctness both pass by default. */
 function fixture(id: string): BaitFixture {
@@ -207,6 +208,34 @@ describe('ABDriver.runBenchmark', () => {
     expect(verdict.degenerate).toBe(false);
   });
 
+  it('omissions.panelPersonas carries the omitted persona when one panelist deferred (#304)', async () => {
+    const omittedPersona = JUDGE_PERSONAS[0];
+    const flatAxes = () => Object.fromEntries(BEHAVIORAL_AXES.map((a) => [a, 2])) as Record<(typeof BEHAVIORAL_AXES)[number], number>;
+    // A panel that omits the first persona and grades with the remaining two.
+    const panelWithOmission: JudgePanelPort = {
+      async scorePanel(_fixtureId, _first, _second): Promise<PanelResult> {
+        return {
+          graded: JUDGE_PERSONAS.slice(1).map((persona) => ({
+            persona,
+            scores: { A: flatAxes(), B: flatAxes() },
+          })),
+          omitted: [omittedPersona],
+        };
+      },
+    };
+
+    const fixtures = [fixture('f1')];
+    const verdict = await runBenchmark({
+      fixtures,
+      runner: runnerFor(fixtures),
+      judge: panelWithOmission,
+      correctnessCheck: allPass,
+      rng: new SeededRng(1),
+    });
+
+    expect(verdict.omissions.panelPersonas).toContain(omittedPersona);
+  });
+
   it('handles an empty fixture set without throwing', async () => {
     const judge = new StubJudge();
     const verdict = await runBenchmark({
@@ -240,8 +269,12 @@ describe('ABDriver.runBenchmark', () => {
     });
 
     const panel: JudgePanelPort = {
-      async scorePanel(fixtureId, first: PresentedOutput, second: PresentedOutput) {
-        return Promise.all(personas.map((j) => j.score(fixtureId, first, second)));
+      async scorePanel(fixtureId, first: PresentedOutput, second: PresentedOutput): Promise<PanelResult> {
+        const personaScores = await Promise.all(personas.map((j) => j.score(fixtureId, first, second)));
+        return {
+          graded: JUDGE_PERSONAS.map((persona, i) => ({ persona, scores: personaScores[i]! })),
+          omitted: [],
+        };
       },
     };
 

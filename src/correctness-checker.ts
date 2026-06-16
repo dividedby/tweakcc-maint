@@ -16,8 +16,11 @@ import type { CorrectnessJudgePort } from './correctness-judge-port.js';
 export class CorrectnessChecker {
   constructor(private readonly judge: CorrectnessJudgePort) {}
 
-  /** Decide whether `output` is correct for `fixture`, routing by its correctness spec. */
-  async check(fixture: BehavioralFixture, output: string): Promise<boolean> {
+  /**
+   * Decide whether `output` is correct for `fixture`, routing by its correctness spec.
+   * Returns `null` on the open-ended path when the judge could not evaluate (#304).
+   */
+  async check(fixture: BehavioralFixture, output: string): Promise<boolean | null> {
     const spec = fixture.correctness;
     if (spec.kind === 'deterministic') {
       return spec.check(output);

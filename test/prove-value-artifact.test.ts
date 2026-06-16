@@ -12,6 +12,7 @@ function result(ccVersion: string): ProveValueResult {
     guardrailRegressions: [],
     degenerate: false,
     provesValue: true,
+    omissions: { panelPersonas: [], correctnessFixtures: [] },
   };
 }
 

@@ -22,8 +22,7 @@
 
 import { BEHAVIORAL_AXES } from './judge-port.js';
 import type { AxisScores, BehavioralAxis, PresentedOutput } from './judge-port.js';
-import type { JudgePanelPort } from './judge-panel-port.js';
-import { JUDGE_PERSONAS } from './judge-panel-port.js';
+import type { JudgePanelPort, JudgePersona } from './judge-panel-port.js';
 import type { Variant, VariantRunner } from './variant-runner.js';
 import type { Rng } from './seeded-rng.js';
 import type { AdoptionRecord } from './integration-gate.js';
@@ -40,8 +39,10 @@ export interface BaitFixture {
  * Decide pass/fail for one arm's output on one fixture (CONTEXT.md → "Correctness
  * guardrail"). May be async: the #138 open-ended fallback routes to a correctness judge
  * (a model call), while deterministic fixtures and test stubs stay synchronous.
+ * Returns `null` when the judge could not evaluate (#304, degrade-to-partial) — the
+ * driver records the omission and skips the guardrail for that fixture.
  */
-export type CorrectnessCheck = (fixtureId: string, output: string) => boolean | Promise<boolean>;
+export type CorrectnessCheck = (fixtureId: string, output: string) => boolean | null | Promise<boolean | null>;
 
 /** The Correctness guardrail's outcome — the benchmark records it, never raises it. */
 export type GuardrailOutcome = 'passed' | 'failed';
@@ -72,6 +73,12 @@ export interface BehavioralVerdict {
    * (#192) — not a gate.
    */
   degenerate: boolean;
+  /**
+   * Run-level omission record (#304, degrade-to-partial). `panelPersonas` is the union of
+   * personas omitted across all fixtures; `correctnessFixtures` is the set of fixture ids
+   * where the correctness judge could not evaluate. Both are empty on a clean run.
+   */
+  omissions: { panelPersonas: JudgePersona[]; correctnessFixtures: string[] };
 }
 
 export interface BenchmarkRun {
@@ -115,6 +122,9 @@ export async function runBenchmark(run: BenchmarkRun): Promise<BehavioralVerdict
   let personaScoreCount = 0;
   // Degenerate-run backstop: do the two arms produce byte-identical output on every fixture? (#192)
   let allIdentical = true;
+  // Run-level omission accumulators (#304, degrade-to-partial).
+  const omittedPersonasSet = new Set<JudgePersona>();
+  const correctnessOmittedFixtures: string[] = [];
 
   for (const fixture of fixtures) {
     const outputs = {} as Record<Variant, string>;
@@ -125,9 +135,14 @@ export async function runBenchmark(run: BenchmarkRun): Promise<BehavioralVerdict
     if (outputs.stock !== outputs.lobotomized) allIdentical = false;
 
     // Correctness guardrail: a regression is lobotomized failing where stock passed.
+    // A null result means the judge could not evaluate (#304) — skip the guardrail for this fixture.
     const stockPassed = await correctnessCheck(fixture.id, outputs.stock);
     const lobotomizedPassed = await correctnessCheck(fixture.id, outputs.lobotomized);
-    if (stockPassed && !lobotomizedPassed) guardrailRegressions.push(fixture.id);
+    if (stockPassed === null || lobotomizedPassed === null) {
+      correctnessOmittedFixtures.push(fixture.id);
+    } else if (stockPassed && !lobotomizedPassed) {
+      guardrailRegressions.push(fixture.id);
+    }
 
     // Present the pairing blind and order-randomized (kills position bias).
     const stockFirst = rng.bool();
@@ -139,11 +154,11 @@ export async function runBenchmark(run: BenchmarkRun): Promise<BehavioralVerdict
       ? [stockPresented, lobotomizedPresented]
       : [lobotomizedPresented, stockPresented];
 
-    // The whole panel scores this pairing; each persona is a distinct judge in aggregation.
-    const panel = await judge.scorePanel(fixture.id, first, second);
-    panel.forEach((scores, i) => {
-      // Label each persona by its panel-order slot; a 1-element panel (panelOf) is persona 0.
-      const persona = JUDGE_PERSONAS[i] ?? `persona-${i}`;
+    // The whole panel scores this pairing; each graded persona is a distinct judge in aggregation.
+    // Omitted personas are accumulated into the run-level omissions set.
+    const panelResult = await judge.scorePanel(fixture.id, first, second);
+    for (const p of panelResult.omitted) omittedPersonasSet.add(p);
+    for (const { persona, scores } of panelResult.graded) {
       const stockScores = scores[stockSlot];
       const lobotomizedScores = scores[lobotomizedSlot];
       for (const axis of BEHAVIORAL_AXES) {
@@ -155,7 +170,7 @@ export async function runBenchmark(run: BenchmarkRun): Promise<BehavioralVerdict
         { fixtureId: fixture.id, variant: 'lobotomized', judge: persona, axisScores: lobotomizedScores },
       );
       personaScoreCount += 1;
-    });
+    }
   }
 
   const n = fixtures.length;
@@ -178,6 +193,10 @@ export async function runBenchmark(run: BenchmarkRun): Promise<BehavioralVerdict
     guardrail: guardrailRegressions.length === 0 ? 'passed' : 'failed',
     guardrailRegressions,
     degenerate: n > 0 && allIdentical,
+    omissions: {
+      panelPersonas: Array.from(omittedPersonasSet),
+      correctnessFixtures: correctnessOmittedFixtures,
+    },
   };
 }
 
