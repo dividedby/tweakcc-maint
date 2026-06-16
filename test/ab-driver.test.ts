@@ -9,6 +9,7 @@ import { panelOf, JUDGE_PERSONAS } from '../src/judge-panel-port.js';
 import type { JudgePanelPort, PanelResult } from '../src/judge-panel-port.js';
 import type { PresentedOutput } from '../src/judge-port.js';
 import { BEHAVIORAL_AXES } from '../src/judge-port.js';
+import type { VariantRunner } from '../src/variant-runner.js';
 
 /** A fixture whose stock/lobotomized outputs and correctness both pass by default. */
 function fixture(id: string): BaitFixture {
@@ -289,5 +290,106 @@ describe('ABDriver.runBenchmark', () => {
     // Each persona scored every fixture → three judges per cell drove aggregation.
     for (const j of personas) expect(j.captured).toHaveLength(5);
     expect(verdict.aggregation.axes['anti-hedging'].disagreement).toBe(true);
+  });
+
+  describe('trials knob', () => {
+    /** Wraps a VariantRunner to count run() invocations. */
+    function countingRunner(inner: VariantRunner): { runner: VariantRunner; runCount: () => number } {
+      let n = 0;
+      return {
+        runner: {
+          run: async (fixtureId, prompt, variant) => {
+            n++;
+            return inner.run(fixtureId, prompt, variant);
+          },
+        },
+        runCount: () => n,
+      };
+    }
+
+    /** Wraps a JudgePanelPort to count scorePanel() invocations. */
+    function countingPanel(inner: JudgePanelPort): { panel: JudgePanelPort; panelCount: () => number } {
+      let n = 0;
+      return {
+        panel: {
+          scorePanel: async (fixtureId, first, second) => {
+            n++;
+            return inner.scorePanel(fixtureId, first, second);
+          },
+        },
+        panelCount: () => n,
+      };
+    }
+
+    it('trials=3: runner.run and judge.scorePanel called fixtures×3 times, pairings===fixtures×3', async () => {
+      const fixtures = [fixture('f1'), fixture('f2')];
+      const { runner, runCount } = countingRunner(runnerFor(fixtures));
+      const { panel, panelCount } = countingPanel(panelOf(new StubJudge()));
+
+      const verdict = await runBenchmark({
+        fixtures,
+        runner,
+        judge: panel,
+        correctnessCheck: allPass,
+        rng: new SeededRng(1),
+        trials: 3,
+      });
+
+      // 2 fixtures × 3 trials × 2 arms = 12 runner.run calls.
+      expect(runCount()).toBe(2 * 3 * 2);
+      // 2 fixtures × 3 trials = 6 scorePanel calls.
+      expect(panelCount()).toBe(2 * 3);
+      // pairings = fixtures.length × trials.
+      expect(verdict.pairings).toBe(2 * 3);
+    });
+
+    it('trials=3: a fixture regressing on one trial appears once in guardrailRegressions', async () => {
+      const fixtures = [fixture('f1'), fixture('f2')];
+      let f2TrialCount = 0;
+
+      // f2's lobotomized arm fails correctness on the first trial only.
+      const selectiveCheck = (_fixtureId: string, output: string): boolean => {
+        if (output === 'f2:lobo') {
+          f2TrialCount++;
+          return f2TrialCount !== 1; // fail on trial 0, pass on subsequent trials
+        }
+        return true;
+      };
+
+      const verdict = await runBenchmark({
+        fixtures,
+        runner: runnerFor(fixtures),
+        judge: panelOf(new StubJudge()),
+        correctnessCheck: selectiveCheck,
+        rng: new SeededRng(1),
+        trials: 3,
+      });
+
+      // The fixture appears once (deduped), even though it only regressed on trial 0.
+      expect(verdict.guardrail).toBe('failed');
+      expect(verdict.guardrailRegressions).toEqual(['f2']);
+      expect(verdict.guardrailRegressions).toHaveLength(1);
+    });
+
+    it('trials unset: call counts and pairings match the single-trial baseline', async () => {
+      const fixtures = [fixture('f1'), fixture('f2'), fixture('f3')];
+      const { runner, runCount } = countingRunner(runnerFor(fixtures));
+      const { panel, panelCount } = countingPanel(panelOf(new StubJudge()));
+
+      const verdict = await runBenchmark({
+        fixtures,
+        runner,
+        judge: panel,
+        correctnessCheck: allPass,
+        rng: new SeededRng(1),
+        // trials not set → defaults to 1
+      });
+
+      // 3 fixtures × 1 trial × 2 arms = 6 runner.run calls.
+      expect(runCount()).toBe(3 * 1 * 2);
+      // 3 fixtures × 1 trial = 3 scorePanel calls.
+      expect(panelCount()).toBe(3 * 1);
+      expect(verdict.pairings).toBe(3);
+    });
   });
 });

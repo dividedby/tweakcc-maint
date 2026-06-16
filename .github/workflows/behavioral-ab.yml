@@ -47,6 +47,11 @@ on:
         required: false
         default: "main"
         type: string
+      trials:
+        description: "Generations per fixture (statistical power)"
+        required: false
+        default: "5"
+        type: string
 
 permissions:
   contents: read
@@ -70,6 +75,7 @@ jobs:
       BEHAVIORAL_AB_MODEL: ${{ inputs.model }}
       BEHAVIORAL_AB_EFFORT: ${{ inputs.effort }}
       BEHAVIORAL_AB_CC_VERSION: ${{ inputs.cc_version }}
+      BEHAVIORAL_AB_TRIALS: ${{ inputs.trials }}
     steps:
       - name: Guard — require a license secret
         run: |
