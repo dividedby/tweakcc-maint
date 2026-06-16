@@ -60,6 +60,7 @@ permissions:
 jobs:
   gate:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     env:
       # The gate reads credentials from the environment (ADR 0003); either authenticates
       # `claude -p` headlessly (ADR 0006), checked CLAUDE_CODE_OAUTH_TOKEN-first to match
