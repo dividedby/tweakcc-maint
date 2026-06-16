@@ -144,13 +144,18 @@ jobs:
           node "${TWEAKCC_FIXED_DIR}/dist/index.mjs" --apply
           node "${TWEAKCC_FIXED_DIR}/dist/index.mjs" --restore
 
-      # provision-variants reads promptDataCacheDir from homedir()/.tweakcc/prompt-data-cache.
-      # TWEAKCC_CONFIG_DIR is pinned to the workspace above (isolates the gate's config), so
-      # symlink the seeded cache into the runner's home dir so provision-variants finds it.
-      - name: Link prompt-data-cache into HOME/.tweakcc for provision-variants
+      # provision-variants copies homedir()/.tweakcc/prompt-data-cache into its sandbox so the lobo
+      # arm's --apply finds the matching prompts-<ver>.json (else it skips the system-prompt
+      # customizations -> a degenerate stock-vs-stock verdict). It must be a REAL dir: post-#302 the
+      # authoritative strings file is the committed/pristine data/prompts JSON (which the pristine
+      # seed step above leaves at $TWEAKCC_FIXED_DIR/data/prompts), and --apply no longer writes a
+      # prompt-data-cache when data/prompts already supplies the strings file — so a symlink to the
+      # apply-cache dangles. Seed the cache directly from data/prompts instead.
+      - name: Seed prompt-data-cache for provision-variants
         run: |
-          mkdir -p "${HOME}/.tweakcc"
-          ln -sfn "${TWEAKCC_CONFIG_DIR}/prompt-data-cache" "${HOME}/.tweakcc/prompt-data-cache"
+          mkdir -p "${HOME}/.tweakcc/prompt-data-cache"
+          cp "${TWEAKCC_FIXED_DIR}/data/prompts/prompts-${{ inputs.cc_version }}.json" \
+             "${HOME}/.tweakcc/prompt-data-cache/prompts-${{ inputs.cc_version }}.json"
 
       # --- The bench: always exits 0 (evidence, not a gate) ---
       - name: Run the Behavioral A/B bench
