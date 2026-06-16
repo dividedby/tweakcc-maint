@@ -20,6 +20,7 @@
 
 import { spawnSync } from 'node:child_process';
 import {
+  existsSync,
   readFileSync,
   writeFileSync,
   mkdtempSync,
@@ -72,9 +73,108 @@ export async function extractStringsFile(
   return outputPath;
 }
 
-/** Minimal shape of a strings file the patched-source guard inspects. */
+/** Minimal shape of a published prompts JSON file. */
 interface ParsedStringsFile {
-  prompts?: Array<{ pieces?: unknown }>;
+  version?: string;
+  prompts?: Array<{ pieces?: unknown; id?: unknown; identifierMap?: unknown }>;
+}
+
+/**
+ * The number of prompts in a parsed (or path-identified) strings file.
+ * Accepts either a pre-parsed object or an absolute file path.
+ */
+export function promptCount(parsedOrPath: ParsedStringsFile | string): number {
+  const parsed: ParsedStringsFile =
+    typeof parsedOrPath === 'string'
+      ? (JSON.parse(readFileSync(parsedOrPath, 'utf8')) as ParsedStringsFile)
+      : parsedOrPath;
+  return (parsed.prompts ?? []).length;
+}
+
+/**
+ * How many prompts the curated committed file may legitimately lag the native extraction before
+ * we treat it as a coverage regression. A committed file may omit a handful of brand-new-version
+ * prompts that skrabe hasn't curated yet, but a difference larger than this indicates a lossy
+ * extraction problem.
+ *
+ * ponytail: flat constant; upgrade path is a ratio if version churn makes a flat slack too tight
+ * (e.g. if prompt counts grow above ~500 the proportion 8/N < 2% starts being a meaningful cut).
+ */
+const COVERAGE_SLACK = 8;
+
+/**
+ * Fail closed when the source file's prompt count has regressed below the native extraction's
+ * completeness floor. `sourcePath` is the file under review (e.g. the committed prompts JSON);
+ * `referencePath` is the trusted native extraction (lower bound). `slack` allows the source to
+ * legitimately lag by that many prompts (newly-added prompts skrabe hasn't yet curated).
+ */
+export function assertCoverage(
+  sourcePath: string,
+  referencePath: string,
+  slack: number = COVERAGE_SLACK,
+): void {
+  const sourceCount = promptCount(sourcePath);
+  const referenceCount = promptCount(referencePath);
+  if (sourceCount + slack < referenceCount) {
+    throw new Error(
+      `pristine-extract: committed prompts file has ${sourceCount} prompts but the native ` +
+        `extraction has ${referenceCount} — source regressed below coverage floor ` +
+        `(sourceCount + SLACK=${slack} < referenceCount). The committed file is too lossy to ` +
+        `serve as the pristine source. Check that the committed file is complete (#302).`,
+    );
+  }
+}
+
+/** Inputs for {@link selectPristineSource}. */
+export interface SelectPristineSourceInputs {
+  /** Absolute path to `<tweakccFixedDir>/data/prompts/prompts-<version>.json`. */
+  committedPath: string;
+  /** Absolute path to the native extraction written into a temp dir. */
+  nativeExtractPath: string;
+  /** The CC version being gated (e.g. `"2.1.178"`). */
+  version: string;
+}
+
+/** Result of {@link selectPristineSource}. */
+export interface SelectPristineSourceResult {
+  sourcePath: string;
+  mode: 'committed' | 'native-fallback';
+}
+
+/**
+ * Decide which prompts JSON to use as the pristine strings-file SOURCE for the gate run.
+ *
+ * - `committed`: the committed `data/prompts/` file exists AND its internal version matches.
+ *   Throws (fail-closed) on a version mismatch — a wrong-version identifierMap lobotomizes
+ *   against the wrong vocab.
+ * - `native-fallback`: no committed file yet for this version (brand-new release skrabe
+ *   hasn't extracted yet); fall back to the native extraction.
+ *
+ * Coverage and contamination checks (assertCoverage / assertPristineStringsFile) are the
+ * caller's responsibility and must follow a 'committed' result before trusting the source.
+ */
+export function selectPristineSource(
+  inputs: SelectPristineSourceInputs,
+): SelectPristineSourceResult {
+  const { committedPath, nativeExtractPath, version } = inputs;
+
+  if (!existsSync(committedPath)) {
+    return { sourcePath: nativeExtractPath, mode: 'native-fallback' };
+  }
+
+  // Version mismatch → fail closed. A committed file for the wrong version carries the wrong
+  // identifierMap and would silently lobotomize against a stale vocab.
+  const committedParsed = JSON.parse(readFileSync(committedPath, 'utf8')) as ParsedStringsFile;
+  if (committedParsed.version !== version) {
+    throw new Error(
+      `pristine-extract: committed prompts file at ${committedPath} carries internal version ` +
+        `"${String(committedParsed.version)}" but the gate is running for version "${version}" — ` +
+        `version mismatch, refusing to use a wrong-version identifierMap as the pristine source. ` +
+        `Ensure the committed file is for the correct CC version (#302).`,
+    );
+  }
+
+  return { sourcePath: committedPath, mode: 'committed' };
 }
 
 /** A leaf override body, frontmatter already stripped, used as a patched-source fingerprint. */

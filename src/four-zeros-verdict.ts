@@ -149,8 +149,13 @@ export function evaluate(signals: CapturedSignals): FourZerosResult {
   const missingSystemPrompts = captureAll(signals.apply, MISSING_PROMPT);
   const bootVerifyPassed = BOOT_VERIFY_OK.test(signals.bootVerify);
 
-  // The patcher report is the authoritative orphan signal; its absence/malformity means the
-  // leaf does not support the flag → fall back to Boot-verify as the runtime authority.
+  // The orphan report is the authoritative static orphan signal; its absence/malformity means
+  // the leaf does not support the flag → fall back to Boot-verify as the runtime authority.
+  // NOTE (#302): `signals.orphanReport` is currently populated by the in-repo control-plane
+  // producer (`runOrphanReport`, driver-verification.ts), seeded from the PRISTINE prompts JSON
+  // (pristine-extract-cli.ts). The `'patcher-report'` label is historical — named for the leaf
+  // patcher's own `--report-orphans`, which it does not yet emit — so the source it really
+  // reflects is the producer keyed to the committed identifierMap (ADR 0005).
   const reportFindings = parseOrphanReport(signals.orphanReport);
   const orphanSource: OrphanSource =
     reportFindings === undefined ? 'boot-verify-fallback' : 'patcher-report';
