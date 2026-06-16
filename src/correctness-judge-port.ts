@@ -15,6 +15,8 @@ export interface CorrectnessJudgePort {
   /**
    * Decide whether `output` is correct for an open-ended fixture, given its ground
    * truth. The judge sees the fixture's content, never which arm produced the output.
+   * Returns `null` when the backend deferred or failed (#304, degrade-to-partial) —
+   * the caller records the omission and skips the correctness guardrail for this fixture.
    */
-  isCorrect(fixtureId: string, groundTruth: string, output: string): Promise<boolean>;
+  isCorrect(fixtureId: string, groundTruth: string, output: string): Promise<boolean | null>;
 }

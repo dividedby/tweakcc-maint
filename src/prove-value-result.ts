@@ -21,6 +21,7 @@
 import type { BehavioralVerdict } from './ab-driver.js';
 import { BEHAVIORAL_AXES } from './judge-port.js';
 import type { BehavioralAxis } from './judge-port.js';
+import type { JudgePersona } from './judge-panel-port.js';
 
 /** One Behavioral axis's vanilla-vs-fork delta in the run's prove-value result. */
 export interface AxisProveValue {
@@ -58,6 +59,12 @@ export interface ProveValueResult {
    * guardrail passed, and the run is not degenerate. False does not block an adoption.
    */
   provesValue: boolean;
+  /**
+   * Run-level omissions (#304, degrade-to-partial). `panelPersonas` is the union of personas
+   * omitted across all fixtures; `correctnessFixtures` is the set of fixture ids where the
+   * correctness judge could not evaluate. Both empty on a clean run.
+   */
+  omissions: { panelPersonas: JudgePersona[]; correctnessFixtures: string[] };
 }
 
 /**
@@ -91,6 +98,10 @@ export function buildProveValueResult(
     guardrailRegressions: [...verdict.guardrailRegressions],
     degenerate: verdict.degenerate,
     provesValue,
+    omissions: {
+      panelPersonas: [...verdict.omissions.panelPersonas],
+      correctnessFixtures: [...verdict.omissions.correctnessFixtures],
+    },
   };
 }
 
@@ -118,6 +129,14 @@ export function renderProveValueResult(result: ProveValueResult): string {
       ? 'Correctness guardrail: ✅ passed'
       : `Correctness guardrail: ❌ failed — regressions: ${result.guardrailRegressions.join(', ')}`;
 
+  const omissionLines: string[] = [];
+  if (result.omissions.panelPersonas.length > 0) {
+    omissionLines.push(`Omitted panelists: ${result.omissions.panelPersonas.join(', ')}`);
+  }
+  if (result.omissions.correctnessFixtures.length > 0) {
+    omissionLines.push(`Correctness unevaluated: ${result.omissions.correctnessFixtures.join(', ')}`);
+  }
+
   return [
     `## Behavioral A/B prove-value — CC ${result.ccVersion}`,
     '',
@@ -129,5 +148,6 @@ export function renderProveValueResult(result: ProveValueResult): string {
     ...rows,
     '',
     guardrailLine,
+    ...omissionLines.map((l) => `\n${l}`),
   ].join('\n');
 }

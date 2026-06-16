@@ -35,6 +35,7 @@ function verdictOf(overrides: Partial<BehavioralVerdict> = {}): BehavioralVerdic
     guardrail: 'passed',
     guardrailRegressions: [],
     degenerate: false,
+    omissions: { panelPersonas: [], correctnessFixtures: [] },
     ...overrides,
   };
 }

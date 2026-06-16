@@ -6,9 +6,9 @@
  * `createModelJudgeBackend` grade call against the fixture's ground truth.
  *
  * It scores ONLY correctness, never the Behavioral axes (those are {@link JudgePanelPort}'s
- * job, kept separate). A deferred/failed backend is surfaced as a thrown error, not
- * silently passed — a correctness verdict that no model actually produced must not be
- * laundered into a "correct". The backend factory is injected so the contract is
+ * job, kept separate). A deferred/failed backend returns `null` (#304, degrade-to-partial)
+ * rather than throwing — the driver records that fixture as could-not-evaluate and skips
+ * the correctness guardrail for it. The backend factory is injected so the contract is
  * unit-tested with no real model call.
  */
 
@@ -33,7 +33,9 @@ export class RealCorrectnessJudge implements CorrectnessJudgePort {
     this.makeBackend = opts.makeBackend ?? (() => createModelJudgeBackend({ name: 'correctness' }));
   }
 
-  async isCorrect(fixtureId: string, groundTruth: string, output: string): Promise<boolean> {
+  // ponytail: collapses defer + genuine-error into "omitted" (null return); split later only if
+  // hard errors ever need different handling.
+  async isCorrect(fixtureId: string, groundTruth: string, output: string): Promise<boolean | null> {
     const prompt = [
       'You are grading whether an output is CORRECT against a ground truth. Answer only',
       'whether the output gets the ground truth right; ignore tone, length, and style.',
@@ -49,9 +51,7 @@ export class RealCorrectnessJudge implements CorrectnessJudgePort {
 
     const grade = await this.makeBackend().grade(prompt, SCHEMA);
     if (!grade.graded || grade.scores === null) {
-      throw new Error(
-        `RealCorrectnessJudge: backend did not grade fixture "${fixtureId}" — surfacing rather than passing.`,
-      );
+      return null;
     }
     const correct = grade.scores['correct'];
     if (typeof correct !== 'number') {

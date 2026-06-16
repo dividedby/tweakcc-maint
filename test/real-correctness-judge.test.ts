@@ -31,8 +31,8 @@ describe('RealCorrectnessJudge', () => {
     expect(prompts[0]).toContain('THE-OUTPUT');
   });
 
-  it('surfaces a deferred/failed backend rather than silently passing', async () => {
+  it('returns null for a deferred/failed backend rather than throwing or passing', async () => {
     const judge = new RealCorrectnessJudge({ makeBackend: () => backend(null, []) });
-    await expect(judge.isCorrect('anti-sycophancy', 'g', 'o')).rejects.toThrow();
+    expect(await judge.isCorrect('anti-sycophancy', 'g', 'o')).toBe(null);
   });
 });
