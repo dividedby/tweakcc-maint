@@ -1,0 +1,28 @@
+{
+  "pass": true,
+  "versions": [
+    {
+      "ccVersion": "2.1.178",
+      "fourZeros": {
+        "pass": true,
+        "failedPatches": [],
+        "missingSystemPrompts": [],
+        "orphanVariables": [],
+        "orphanSource": "patcher-report",
+        "advisoryOrphans": [],
+        "bootVerifyPassed": true,
+        "misbinds": [],
+        "auditNotRunReason": "not-run",
+        "unexpectedEmptyOverrideDirs": false
+      },
+      "restoreDrill": {
+        "pass": true,
+        "status": "pass",
+        "backupExists": true,
+        "restored": true,
+        "cleanStock": true
+      }
+    }
+  ],
+  "date": "2026-06-16T18:51:56.385Z"
+}
