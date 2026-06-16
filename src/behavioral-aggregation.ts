@@ -9,18 +9,21 @@
  * a rank-gap disagreement flag) and `groupByCell` (trial-to-trial variance + a noisy
  * flag) from `@dividedby/bench-core` rather than reimplementing them.
  *
- * The mapping onto the bench shapes is per axis, treating one arm's output on one
- * fixture as a bench "cell" (`blindId = "<variant>::<fixtureId>"`):
+ * The mapping onto the bench shapes is per axis, treating one arm×fixture×trial as a
+ * bench "cell" (`blindId = "<variant>::<fixtureId>::<trial>"`):
  *   - normalize: one bench `Grade` per (judge × cell), `scores.overall` = that judge's
  *     axis score. Yields a per-cell `normZ` (fair across judges) + a `disagree` flag.
  *   - groupByCell: each normalized cell is a "trial" of its arm — `resolve` maps the
  *     blindId's variant onto the bench `model` slot and the axis onto `effort`. Yields
- *     a per-arm `meanZ` + `trialStd` + a `noisy` flag (the across-fixture variance).
+ *     a per-arm `meanZ` + `trialStd` + `nTrials` + a `noisy` flag (across-cell variance).
  *
  * Significance is OURS (bench has no two-arm comparator): the lobotomized−stock gap in
- * normalized mean (`meanZ`) must clear a noise floor scaled by the arms' trial noise,
- * else it reads as not-significant. A within-noise win must never read as real — that
- * is the whole point of the evidence-not-a-gate track (ADR 0002).
+ * normalized mean (`meanZ`) must satisfy a two-part criterion:
+ *   1. Exceed the noise floor (a within-noise win must never read as real — ADR 0002).
+ *   2. Be ≥ k·SE(delta), where SE(delta) = sqrt(SE_stock²+SE_lobo²) is the Welch-style
+ *      standard error of the difference. More trials shrink SE, tightening the bound so
+ *      additional bench runs add genuine statistical power.
+ * When seDelta is 0 (zero trial variance), the SE term is 0 so only the floor governs.
  */
 
 import { normalize, groupByCell } from '@dividedby/bench-core';
@@ -32,8 +35,10 @@ import type { AxisScores, BehavioralAxis } from './judge-port.js';
 export type AggVariant = 'stock' | 'lobotomized';
 
 /**
- * One judge's per-axis scores for ONE arm's output on ONE fixture — the raw grain the
- * aggregation folds. (Higher = more of the targeted behavior, per JudgePort.)
+ * One judge's per-axis scores for ONE arm's output on ONE fixture on ONE trial —
+ * the raw grain the aggregation folds. Each (variant × fixtureId × trial) is a
+ * distinct bench cell so `groupByCell` sees `nTrials = fixtures×trials` per arm/axis.
+ * (Higher = more of the targeted behavior, per JudgePort.)
  */
 export interface MultiJudgeScore {
   fixtureId: string;
@@ -41,6 +46,8 @@ export interface MultiJudgeScore {
   /** Opaque judge identity (a Judge-panel persona). */
   judge: string;
   axisScores: AxisScores;
+  /** Trial index (0-based). Each (variant×fixtureId×trial) is a separate bench cell. */
+  trial: number;
 }
 
 /**
@@ -53,16 +60,25 @@ export const DEFAULT_DISAGREEMENT_RANK_GAP = 4;
 
 /**
  * Significance noise floor, in judge-std (z-score) units. The lobotomized−stock gap in
- * normalized mean must exceed this PLUS the arms' trial noise to read as significant.
- * 0.5 z is deliberately conservative — it matches bench's own `noisy` trial-std cutoff,
- * so a delta no larger than a single arm's trial wobble is never called real (ADR 0002:
- * a within-noise win must read as not-significant). Tunable via {@link AggregationOptions}.
+ * normalized mean must exceed this AND clear `significanceSeMultiplier × SE(delta)` to
+ * read as significant. 0.5 z is deliberately conservative — a delta within typical judge
+ * noise is never called real regardless of SE (ADR 0002). Tunable via {@link AggregationOptions}.
  */
 export const DEFAULT_SIGNIFICANCE_NOISE_FLOOR = 0.5;
+
+/**
+ * SE multiplier for the significance criterion. The lobotomized−stock gap must be
+ * ≥ `significanceSeMultiplier × SE(delta)` (Welch-style SE of the difference of means),
+ * in addition to exceeding the noise floor. At 2, a delta must exceed 2·SE to read as
+ * significant; more trials shrink SE so the bound tightens with sample size. Default 2.
+ */
+export const DEFAULT_SIGNIFICANCE_SE_MULTIPLIER = 2;
 
 export interface AggregationOptions {
   disagreementRankGap?: number;
   significanceNoiseFloor?: number;
+  /** Multiplier on SE(delta); default {@link DEFAULT_SIGNIFICANCE_SE_MULTIPLIER}. */
+  significanceSeMultiplier?: number;
 }
 
 /** Per-arm normalized summary for one axis (the bench `GroupedCell` signal we keep). */
@@ -85,7 +101,11 @@ export interface AxisVerdict {
   lobotomized: ArmAxisSummary;
   /** True iff any cell on this axis tripped bench's judge-disagreement rank gap. */
   disagreement: boolean;
-  /** True iff the lobotomized−stock normalized gap cleared the noise floor + trial noise. */
+  /**
+   * True iff the lobotomized−stock normalized gap cleared BOTH the noise floor AND
+   * `significanceSeMultiplier × SE(delta)` (Welch-style SE of the difference of means).
+   * More trials shrink SE, so additional bench runs tighten the bound (statistical power).
+   */
   significant: boolean;
 }
 
@@ -93,8 +113,8 @@ export interface BehavioralAggregationVerdict {
   axes: Record<BehavioralAxis, AxisVerdict>;
 }
 
-function blindId(variant: AggVariant, fixtureId: string): string {
-  return `${variant}::${fixtureId}`;
+function blindId(variant: AggVariant, fixtureId: string, trial: number): string {
+  return `${variant}::${fixtureId}::${trial}`;
 }
 
 function emptyArmSummary(): ArmAxisSummary {
@@ -103,16 +123,17 @@ function emptyArmSummary(): ArmAxisSummary {
 
 /**
  * Aggregate one axis: z-normalize judges via bench `normalize`, then fold each arm's
- * cells across fixtures via bench `groupByCell`, then derive disagreement + significance.
+ * cells across fixtures×trials via bench `groupByCell`, then derive disagreement +
+ * significance using the two-part SE criterion.
  */
 function aggregateAxis(
   axis: BehavioralAxis,
   scores: MultiJudgeScore[],
   opts: Required<AggregationOptions>,
 ): AxisVerdict {
-  // One bench Grade per (judge × arm-fixture cell); scores.overall = this axis's score.
+  // One bench Grade per (judge × arm×fixture×trial cell); scores.overall = this axis's score.
   const grades: Grade[] = scores.map((s) => ({
-    blindId: blindId(s.variant, s.fixtureId),
+    blindId: blindId(s.variant, s.fixtureId, s.trial),
     judge: s.judge,
     scores: { overall: s.axisScores[axis] },
   }));
@@ -125,9 +146,9 @@ function aggregateAxis(
     (c) => c.judges > 1 && c.rankGap >= opts.disagreementRankGap,
   );
 
-  // Group each arm's cells across fixtures: variant → bench `model`, axis → bench `effort`.
+  // Group each arm's cells across fixtures×trials: variant → bench `model`, axis → `effort`.
   const cellVariant = new Map<string, AggVariant>();
-  for (const s of scores) cellVariant.set(blindId(s.variant, s.fixtureId), s.variant);
+  for (const s of scores) cellVariant.set(blindId(s.variant, s.fixtureId, s.trial), s.variant);
 
   const blindCells: BlindCell[] = normalized.cells.map((c) => ({
     blindId: c.blindId,
@@ -155,14 +176,28 @@ function aggregateAxis(
     };
   }
 
-  // Significance: the lobotomized−stock normalized gap must clear the noise floor PLUS
-  // the arms' trial noise. Within either arm's trial wobble → not significant (ADR 0002).
+  // Significance: two-part criterion (ADR 0002 + SE upgrade).
+  //   1. |delta| > noise floor (a within-noise win must never read as real).
+  //   2. |delta| >= seMultiplier × SE(delta), where SE(delta) is the Welch-style
+  //      standard error of the difference of means:
+  //        seStock = trialStd / sqrt(nTrials)   (shrinks with more trials)
+  //        seLobo  = trialStd / sqrt(nTrials)
+  //        seDelta = sqrt(seStock² + seLobo²)
+  //   When seDelta === 0 (zero trial variance), the SE term is 0 so only the floor
+  //   governs. Infinity from a zero-trial arm keeps the verdict not-significant.
   const delta = summaries.lobotomized.meanZ - summaries.stock.meanZ;
-  const trialNoise = Math.max(summaries.stock.trialStd, summaries.lobotomized.trialStd);
+  const seStock = summaries.stock.nTrials > 0
+    ? summaries.stock.trialStd / Math.sqrt(summaries.stock.nTrials)
+    : Infinity;
+  const seLobo = summaries.lobotomized.nTrials > 0
+    ? summaries.lobotomized.trialStd / Math.sqrt(summaries.lobotomized.nTrials)
+    : Infinity;
+  const seDelta = Math.sqrt(seStock ** 2 + seLobo ** 2);
   const significant =
     summaries.stock.nTrials > 0 &&
     summaries.lobotomized.nTrials > 0 &&
-    Math.abs(delta) > opts.significanceNoiseFloor + trialNoise;
+    Math.abs(delta) > opts.significanceNoiseFloor &&
+    Math.abs(delta) >= opts.significanceSeMultiplier * seDelta;
 
   return { stock: summaries.stock, lobotomized: summaries.lobotomized, disagreement, significant };
 }
@@ -178,6 +213,7 @@ export function aggregate(
   const opts: Required<AggregationOptions> = {
     disagreementRankGap: options.disagreementRankGap ?? DEFAULT_DISAGREEMENT_RANK_GAP,
     significanceNoiseFloor: options.significanceNoiseFloor ?? DEFAULT_SIGNIFICANCE_NOISE_FLOOR,
+    significanceSeMultiplier: options.significanceSeMultiplier ?? DEFAULT_SIGNIFICANCE_SE_MULTIPLIER,
   };
 
   const axes = {} as Record<BehavioralAxis, AxisVerdict>;

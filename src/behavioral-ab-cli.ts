@@ -67,6 +67,11 @@ export interface BehavioralABCliDeps {
   artifactDir?: string;
   /** The artifact fs boundary; defaults to real `node:fs`. Injected so the test writes no real file. */
   artifactFs?: ArtifactFsSeam;
+  /**
+   * Number of independent generations per fixture per arm (default 1, back-compat).
+   * Read from `BEHAVIORAL_AB_TRIALS` in prod; injected so the test never reads process.env.
+   */
+  trials?: number;
 }
 
 /** A minimal Adoption record to carry the verdict — this slice proves wiring, not a real adoption. */
@@ -99,6 +104,7 @@ export async function runBehavioralABCli(deps: BehavioralABCliDeps): Promise<voi
         runner,
         panel: deps.panel,
         correctnessJudge: deps.correctnessJudge,
+        trials: deps.trials,
       });
 
       deps.log(JSON.stringify(record, null, 2));
@@ -130,6 +136,8 @@ async function main(): Promise<void> {
   // arm's overrides in provisionVariants and is the held model the runner passes to `claude` (#192).
   const model = process.env.BEHAVIORAL_AB_MODEL ?? 'claude-opus-4-8';
 
+  const trials = Math.max(1, Number(process.env.BEHAVIORAL_AB_TRIALS ?? 1) || 1);
+
   await runBehavioralABCli({
     provision: () => provisionVariants({ model }),
     panel: new RealJudgePanel(),
@@ -143,6 +151,7 @@ async function main(): Promise<void> {
     // the version-keyed prove-value artifact alongside the Adoption record (#214).
     ccVersion: process.env.BEHAVIORAL_AB_CC_VERSION,
     artifactDir: process.env.BEHAVIORAL_AB_ARTIFACT_DIR ?? 'fallow-baselines',
+    trials,
   });
 }
 

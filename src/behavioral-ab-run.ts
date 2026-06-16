@@ -33,6 +33,11 @@ export interface BehavioralABDeps {
   rng?: Rng;
   /** Defaults to the canonical {@link BEHAVIORAL_FIXTURES}. */
   fixtures?: readonly BehavioralFixture[];
+  /**
+   * Number of independent generations per fixture per arm (default 1, back-compat).
+   * Passed through to {@link runBenchmark}; values < 1 are clamped to 1.
+   */
+  trials?: number;
 }
 
 /**
@@ -58,6 +63,7 @@ export async function runBehavioralAB(record: AdoptionRecord, deps: BehavioralAB
     judge: deps.panel,
     correctnessCheck,
     rng: deps.rng ?? new SeededRng(0),
+    trials: deps.trials,
   });
 
   return attachBehavioralVerdict(record, verdict);

@@ -87,6 +87,12 @@ export interface BenchmarkRun {
   judge: JudgePanelPort;
   correctnessCheck: CorrectnessCheck;
   rng: Rng;
+  /**
+   * Number of independent generations per fixture per arm (default 1, back-compat).
+   * Each trial calls runner.run + judge.scorePanel afresh, so `nTrials = fixtures×trials`
+   * per arm in aggregation and SE shrinks with more trials. Values < 1 are clamped to 1.
+   */
+  trials?: number;
 }
 
 const VARIANTS: readonly Variant[] = ['stock', 'lobotomized'];
@@ -109,74 +115,86 @@ function emptyAxisMeans(): AxisMeanPair {
 /**
  * Run one benchmark: pair → randomize → score → guardrail → aggregate. Returns a
  * {@link BehavioralVerdict} and never throws as a gate.
+ *
+ * When `trials > 1`, each fixture is run that many times (fresh runner.run + scorePanel
+ * per trial). Aggregation sees `nTrials = fixtures × trials` per arm so SE shrinks with
+ * more trials — additional bench runs add genuine statistical power.
  */
 export async function runBenchmark(run: BenchmarkRun): Promise<BehavioralVerdict> {
   const { fixtures, runner, judge, correctnessCheck, rng } = run;
+  const trials = Math.max(1, run.trials ?? 1);
 
   // Per-axis running totals per arm (folded into a trivial mean at the end).
   const totals: Record<Variant, AxisScores> = { stock: zeroAxes(), lobotomized: zeroAxes() };
-  // Raw per-arm, per-fixture scores collected for the normalized aggregation (#139).
+  // Raw per-arm, per-fixture×trial scores collected for the normalized aggregation (#139).
   const judgeScores: MultiJudgeScore[] = [];
-  const guardrailRegressions: string[] = [];
-  // Per-arm count of (fixture × persona) scores folded into the trivial mean.
+  // Sets keyed by fixtureId: a fixture appears once even if it regressed/was-omitted on
+  // multiple trials (dedup prevents double-counting across the trial loop).
+  const guardrailRegressionSet = new Set<string>();
+  const correctnessOmittedFixtureSet = new Set<string>();
+  // Per-arm count of (fixture × trial × persona) scores folded into the trivial mean.
   let personaScoreCount = 0;
-  // Degenerate-run backstop: do the two arms produce byte-identical output on every fixture? (#192)
+  // Degenerate-run backstop: do the two arms produce byte-identical output on every
+  // (fixture × trial)? (#192)
   let allIdentical = true;
-  // Run-level omission accumulators (#304, degrade-to-partial).
+  // Run-level omission accumulator (#304, degrade-to-partial).
   const omittedPersonasSet = new Set<JudgePersona>();
-  const correctnessOmittedFixtures: string[] = [];
 
   for (const fixture of fixtures) {
-    const outputs = {} as Record<Variant, string>;
-    for (const variant of VARIANTS) {
-      const out = await runner.run(fixture.id, fixture.prompt, variant);
-      outputs[variant] = out.output;
-    }
-    if (outputs.stock !== outputs.lobotomized) allIdentical = false;
-
-    // Correctness guardrail: a regression is lobotomized failing where stock passed.
-    // A null result means the judge could not evaluate (#304) — skip the guardrail for this fixture.
-    const stockPassed = await correctnessCheck(fixture.id, outputs.stock);
-    const lobotomizedPassed = await correctnessCheck(fixture.id, outputs.lobotomized);
-    if (stockPassed === null || lobotomizedPassed === null) {
-      correctnessOmittedFixtures.push(fixture.id);
-    } else if (stockPassed && !lobotomizedPassed) {
-      guardrailRegressions.push(fixture.id);
-    }
-
-    // Present the pairing blind and order-randomized (kills position bias).
-    const stockFirst = rng.bool();
-    const stockSlot: 'A' | 'B' = stockFirst ? 'A' : 'B';
-    const lobotomizedSlot: 'A' | 'B' = stockFirst ? 'B' : 'A';
-    const stockPresented: PresentedOutput = { position: stockSlot, output: outputs.stock };
-    const lobotomizedPresented: PresentedOutput = { position: lobotomizedSlot, output: outputs.lobotomized };
-    const [first, second] = stockFirst
-      ? [stockPresented, lobotomizedPresented]
-      : [lobotomizedPresented, stockPresented];
-
-    // The whole panel scores this pairing; each graded persona is a distinct judge in aggregation.
-    // Omitted personas are accumulated into the run-level omissions set.
-    const panelResult = await judge.scorePanel(fixture.id, first, second);
-    for (const p of panelResult.omitted) omittedPersonasSet.add(p);
-    for (const { persona, scores } of panelResult.graded) {
-      const stockScores = scores[stockSlot];
-      const lobotomizedScores = scores[lobotomizedSlot];
-      for (const axis of BEHAVIORAL_AXES) {
-        totals.stock[axis] += stockScores[axis];
-        totals.lobotomized[axis] += lobotomizedScores[axis];
+    for (let trial = 0; trial < trials; trial++) {
+      // Fresh generation per trial → real sampling variance feeds SE.
+      const outputs = {} as Record<Variant, string>;
+      for (const variant of VARIANTS) {
+        const out = await runner.run(fixture.id, fixture.prompt, variant);
+        outputs[variant] = out.output;
       }
-      judgeScores.push(
-        { fixtureId: fixture.id, variant: 'stock', judge: persona, axisScores: stockScores },
-        { fixtureId: fixture.id, variant: 'lobotomized', judge: persona, axisScores: lobotomizedScores },
-      );
-      personaScoreCount += 1;
+      if (outputs.stock !== outputs.lobotomized) allIdentical = false;
+
+      // Correctness guardrail: a regression is lobotomized failing where stock passed.
+      // A null result means the judge could not evaluate (#304) — skip the guardrail for
+      // this (fixture×trial). A fixture is recorded once even if it fails on multiple trials.
+      const stockPassed = await correctnessCheck(fixture.id, outputs.stock);
+      const lobotomizedPassed = await correctnessCheck(fixture.id, outputs.lobotomized);
+      if (stockPassed === null || lobotomizedPassed === null) {
+        correctnessOmittedFixtureSet.add(fixture.id);
+      } else if (stockPassed && !lobotomizedPassed) {
+        guardrailRegressionSet.add(fixture.id);
+      }
+
+      // Present the pairing blind and order-randomized (kills position bias).
+      const stockFirst = rng.bool();
+      const stockSlot: 'A' | 'B' = stockFirst ? 'A' : 'B';
+      const lobotomizedSlot: 'A' | 'B' = stockFirst ? 'B' : 'A';
+      const stockPresented: PresentedOutput = { position: stockSlot, output: outputs.stock };
+      const lobotomizedPresented: PresentedOutput = { position: lobotomizedSlot, output: outputs.lobotomized };
+      const [first, second] = stockFirst
+        ? [stockPresented, lobotomizedPresented]
+        : [lobotomizedPresented, stockPresented];
+
+      // The whole panel scores this pairing; each graded persona is a distinct judge in aggregation.
+      // Omitted personas are accumulated into the run-level omissions set.
+      const panelResult = await judge.scorePanel(fixture.id, first, second);
+      for (const p of panelResult.omitted) omittedPersonasSet.add(p);
+      for (const { persona, scores } of panelResult.graded) {
+        const stockScores = scores[stockSlot];
+        const lobotomizedScores = scores[lobotomizedSlot];
+        for (const axis of BEHAVIORAL_AXES) {
+          totals.stock[axis] += stockScores[axis];
+          totals.lobotomized[axis] += lobotomizedScores[axis];
+        }
+        judgeScores.push(
+          { fixtureId: fixture.id, variant: 'stock', judge: persona, axisScores: stockScores, trial },
+          { fixtureId: fixture.id, variant: 'lobotomized', judge: persona, axisScores: lobotomizedScores, trial },
+        );
+        personaScoreCount += 1;
+      }
     }
   }
 
-  const n = fixtures.length;
+  const pairings = fixtures.length * trials;
   const axisMeans = emptyAxisMeans();
-  // Trivial mean is per arm across every (fixture × persona) score, so a 3-persona panel
-  // and a 1-persona panel both yield a per-axis mean on the same 0–4 scale.
+  // Trivial mean is per arm across every (fixture × trial × persona) score, so a 3-persona
+  // panel and a 1-persona panel both yield a per-axis mean on the same 0–4 scale.
   if (personaScoreCount > 0) {
     for (const axis of BEHAVIORAL_AXES) {
       axisMeans[axis] = {
@@ -187,15 +205,15 @@ export async function runBenchmark(run: BenchmarkRun): Promise<BehavioralVerdict
   }
 
   return {
-    pairings: n,
+    pairings,
     axisMeans,
     aggregation: aggregate(judgeScores),
-    guardrail: guardrailRegressions.length === 0 ? 'passed' : 'failed',
-    guardrailRegressions,
-    degenerate: n > 0 && allIdentical,
+    guardrail: guardrailRegressionSet.size === 0 ? 'passed' : 'failed',
+    guardrailRegressions: Array.from(guardrailRegressionSet),
+    degenerate: pairings > 0 && allIdentical,
     omissions: {
       panelPersonas: Array.from(omittedPersonasSet),
-      correctnessFixtures: correctnessOmittedFixtures,
+      correctnessFixtures: Array.from(correctnessOmittedFixtureSet),
     },
   };
 }
