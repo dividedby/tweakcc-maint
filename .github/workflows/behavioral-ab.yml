@@ -1,0 +1,183 @@
+# Behavioral A/B prove-value bench (ADR 0002/0003) — evidence only, NEVER a gate.
+#
+# Runs `pnpm tsx src/behavioral-ab-cli.ts` (opus-4-8 stock vs. lobotomized A/B + 3-persona judge
+# panel) and uploads the prove-value artifact. The bench always exits 0 — a partial or failed run
+# still surfaces cost and uploads whatever artifacts were written.
+#
+# Headless `claude -p` cost is metered into the agent-research cost ledger via BENCH_COST_LOG
+# (NDJSON, one line per arm/judge call). The "Surface bench cost" step aggregates and emits the
+# ledger line on every run, including failures.
+name: behavioral-ab
+
+on:
+  workflow_dispatch:
+    inputs:
+      cc_version:
+        description: "Claude Code version this bench proves value for (e.g. 2.1.178)"
+        required: true
+        default: "2.1.178"
+        type: string
+      model:
+        description: "Model to hold constant across both arms"
+        required: false
+        default: "claude-opus-4-8"
+        type: string
+      effort:
+        description: "Effort level passed to the bench runner"
+        required: false
+        default: "high"
+        type: string
+      tweakcc_fixed_repo:
+        description: "tweakcc-fixed repo to clone (owner/repo, default: skrabe/tweakcc-fixed)"
+        required: false
+        default: "skrabe/tweakcc-fixed"
+        type: string
+      tweakcc_fixed_ref:
+        description: "tweakcc-fixed ref/branch to clone (default: main)"
+        required: false
+        default: "main"
+        type: string
+      lobotomized_repo:
+        description: "lobotomized-claude-code repo to clone (owner/repo, default: skrabe/lobotomized-claude-code)"
+        required: false
+        default: "skrabe/lobotomized-claude-code"
+        type: string
+      lobotomized_ref:
+        description: "lobotomized-claude-code ref/branch to clone (default: main)"
+        required: false
+        default: "main"
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  prove-value:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      DISABLE_AUTOUPDATER: "1"
+      TWEAKCC_CONFIG_DIR: ${{ github.workspace }}/.tweakcc
+      TWEAKCC_FIXED_DIR: ${{ github.workspace }}/leaves/tweakcc-fixed
+      LOBOTOMIZED_DIR: ${{ github.workspace }}/leaves/lobotomized-claude-code
+      # provision-variants reads LOBOTOMIZED_CLAUDE_CODE_DIR for the tracked override sets
+      LOBOTOMIZED_CLAUDE_CODE_DIR: ${{ github.workspace }}/leaves/lobotomized-claude-code
+      # BENCH_COST_LOG: NDJSON sink for per-call cost records; aggregated in the Surface step.
+      BENCH_COST_LOG: ${{ github.workspace }}/bench-cost.ndjson
+      BEHAVIORAL_AB_ARTIFACT_DIR: ${{ github.workspace }}/prove-value-out
+      BEHAVIORAL_AB_MODEL: ${{ inputs.model }}
+      BEHAVIORAL_AB_EFFORT: ${{ inputs.effort }}
+      BEHAVIORAL_AB_CC_VERSION: ${{ inputs.cc_version }}
+    steps:
+      - name: Guard — require a license secret
+        run: |
+          if [ -z "${CLAUDE_CODE_OAUTH_TOKEN}" ] && [ -z "${ANTHROPIC_API_KEY}" ]; then
+            echo "::error::Neither CLAUDE_CODE_OAUTH_TOKEN nor ANTHROPIC_API_KEY is set on this fork; the bench cannot run headless claude -p." >&2
+            exit 1
+          fi
+
+      - name: Checkout tweakcc-maint
+        uses: actions/checkout@v6
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 11.5.2  # exact pin; satisfies devEngines.packageManager (pnpm ^11.5.2)
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      # --- Leaf clones (read-only; the control plane never pushes to skrabe) ---
+      - name: Clone leaf repos
+        run: |
+          git clone --depth 1 --branch "${{ inputs.tweakcc_fixed_ref }}" https://github.com/${{ inputs.tweakcc_fixed_repo }} "${TWEAKCC_FIXED_DIR}"
+          git clone --depth 1 --branch "${{ inputs.lobotomized_ref }}" https://github.com/${{ inputs.lobotomized_repo }} "${LOBOTOMIZED_DIR}"
+
+      # Always install + build: the bench runs the leaf's dist/index.mjs, which needs its
+      # runtime node_modules present. pnpm's symlinked node_modules is fragile to cache,
+      # so we rebuild fresh each run (on-demand workflow).
+      - name: Install + build tweakcc-fixed (the bench runs its dist/index.mjs)
+        working-directory: ${{ env.TWEAKCC_FIXED_DIR }}
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm build
+
+      # --- Pinned Claude Code binary (CI owns install + cache; ADR 0006) ---
+      - name: Cache Claude Code ${{ inputs.cc_version }}
+        id: cc-cache
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.local/bin/claude
+            ~/.local/share/claude
+          key: claude-code-${{ inputs.cc_version }}
+
+      - name: Install Claude Code ${{ inputs.cc_version }}
+        if: steps.cc-cache.outputs.cache-hit != 'true'
+        run: curl -fsSL https://claude.ai/install.sh | bash -s "${{ inputs.cc_version }}"
+
+      - name: Put Claude Code on PATH and verify the pin
+        run: |
+          echo "${HOME}/.local/bin" >> "${GITHUB_PATH}"
+          "${HOME}/.local/bin/claude" --version
+
+      # Seed the strings file from the freshly-installed native binary, NOT the --apply cache.
+      # This step runs BEFORE any --apply, so the native binary is pristine. It writes
+      # prompts-<version>.json into tweakcc-fixed/data/prompts — the first source
+      # resolveStringsFilePath prefers — so provision-variants reads a pristine identifierMap.
+      - name: Seed the PRISTINE strings file (native binary, never --apply)
+        env:
+          CC_VERSION: ${{ inputs.cc_version }}
+        run: pnpm tsx src/pristine-extract-cli.ts
+
+      # The bench's provision-variants needs a stock backup + the prompt-data-cache seeded so
+      # tweakcc-fixed --apply can find the matching prompts JSON. Mirrors the gate's runbook
+      # prereq: one --apply creates the stock backup + prompt-data-cache under TWEAKCC_CONFIG_DIR,
+      # then --restore returns CC to clean stock.
+      - name: Seed the stock backup (runbook prereq)
+        run: |
+          node "${TWEAKCC_FIXED_DIR}/dist/index.mjs" --apply
+          node "${TWEAKCC_FIXED_DIR}/dist/index.mjs" --restore
+
+      # provision-variants reads promptDataCacheDir from homedir()/.tweakcc/prompt-data-cache.
+      # TWEAKCC_CONFIG_DIR is pinned to the workspace above (isolates the gate's config), so
+      # symlink the seeded cache into the runner's home dir so provision-variants finds it.
+      - name: Link prompt-data-cache into HOME/.tweakcc for provision-variants
+        run: |
+          mkdir -p "${HOME}/.tweakcc"
+          ln -sfn "${TWEAKCC_CONFIG_DIR}/prompt-data-cache" "${HOME}/.tweakcc/prompt-data-cache"
+
+      # --- The bench: always exits 0 (evidence, not a gate) ---
+      - name: Run the Behavioral A/B bench
+        run: pnpm tsx src/behavioral-ab-cli.ts
+
+      # Surface the bench's headless-claude cost to the run log for the agent-research cost ledger.
+      # BENCH_COST_LOG is NDJSON; each line is { total_cost_usd, num_turns, duration_ms }.
+      # Emits zeros (never fails) when the log is missing or empty.
+      - name: Surface bench cost to the run log
+        if: always()
+        run: |
+          if [ -s "${BENCH_COST_LOG}" ]; then
+            total=$(jq -rs 'map(.total_cost_usd // 0) | add // 0' "${BENCH_COST_LOG}")
+            turns=$(jq -rs 'map(.num_turns // 0) | add // 0' "${BENCH_COST_LOG}")
+            duration=$(jq -rs 'map(.duration_ms // 0) | add // 0' "${BENCH_COST_LOG}")
+            echo "total_cost_usd=${total}  duration_ms=${duration}  num_turns=${turns}"
+          else
+            echo "total_cost_usd=0  duration_ms=0  num_turns=0"
+            echo "::notice::No bench cost log captured (BENCH_COST_LOG missing or empty)."
+          fi
+
+      - name: Upload prove-value artifact + cost log
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: prove-value-${{ inputs.cc_version }}
+          path: |
+            prove-value-out/
+            bench-cost.ndjson
+          if-no-files-found: warn
