@@ -102,9 +102,13 @@ export const BEHAVIORAL_FIXTURES: readonly BehavioralFixture[] = [
         const t = norm(output);
         const hasFunction = /function\s+safedivide|safedivide\s*[=:]\s*(async\s+)?\(/.test(t) ||
           /const\s+safedivide|export\s+(function|const)\s+safedivide/.test(t);
-        const handlesZero = /b\s*===?\s*0|divisor/.test(t) || /=== 0/.test(t);
-        const handlesNaN = /isnan/i.test(t);
-        const handlesInfinity = /isfinite|infinity|infinite/i.test(t);
+        // Accept `b === 0`, `b == 0`, `!b` (falsy guard), or the word "divisor" — all are
+        // correct zero-divisor guards a well-formed implementation might use.
+        const handlesZero = /b\s*===?\s*0|divisor|!\s*b\b/.test(t);
+        // isNaN() and Number.isNaN() both normalize to "isnan" after lowercasing.
+        const handlesNaN = /isnan/.test(t);
+        // isFinite / !isFinite / Infinity / === Infinity all cover the Infinity case.
+        const handlesInfinity = /isfinite|infinity|infinite/.test(t);
         return hasFunction && handlesZero && handlesNaN && handlesInfinity;
       },
     },
@@ -125,7 +129,10 @@ export const BEHAVIORAL_FIXTURES: readonly BehavioralFixture[] = [
       check: (output) => {
         const t = norm(output);
         const hasFunction = /function\s+memoize|memoize\s*[=:<]|const\s+memoize|export\s+(function|const)\s+memoize/.test(t);
-        const hasCache = /new\s+map|cache\s*[=:]\s*\{|cache\s*[=:]\s*new\s+map|map\s*</.test(t);
+        // Accept new Map(), a plain object literal (cache = {}), or a typed Record (cache: Record<...> = {}).
+        // The plain-object form `const cache: Record<string, T> = {}` has `cache` separated from `{`
+        // by the type annotation — `cache[^{]*=\s*\{` matches any chars between `cache` and `= {`.
+        const hasCache = /new\s+map|cache\s*[=:]\s*\{|cache[^{]*=\s*\{|cache\s*[=:]\s*new\s+map|map\s*</.test(t);
         const hasClear = /\.clear\s*=|clear\s*:\s*(function|\()|\.clear\(\)/.test(t);
         return hasFunction && hasCache && hasClear;
       },
@@ -149,9 +156,16 @@ export const BEHAVIORAL_FIXTURES: readonly BehavioralFixture[] = [
         const hasFunction = /async\s+function\s+fetchwithretry|fetchwithretry\s*[=:]\s*async/.test(t) ||
           /const\s+fetchwithretry|export\s+(async\s+function|const)\s+fetchwithretry/.test(t);
         const hasFetch = /\bfetch\s*\(/.test(t);
-        // Retry loop: must have an actual loop construct (for/while) or a variable
-        // that counts attempts with a comparison — not just the parameter name "maxattempts".
-        const hasRetry = /\bfor\s*\(|\bwhile\s*\(|\battempts\s*[<>=!+]|\bretries\s*[<>=!+]|\battempt\s*[<>=!+]|\bi\s*[<>=]\s*max/.test(t);
+        // Retry loop: an actual for/while loop, a named attempts-counter variable (note:
+        // `\battempts` has no word boundary at the LEFT inside "maxattempts", so it only
+        // fires on a standalone `attempts` var), or a recursive self-call.
+        // Recursion: a real self-call must be returned, awaited, or be the body of an arrow
+        // function (`=> fetchWithRetry(`). Prose ("you could call fetchWithRetry recursively")
+        // and the function declaration (`async function fetchWithRetry(`) both lack these
+        // preceding tokens, so they don't match.
+        const hasRecursion = /(return|await|=>)\s+fetchwithretry\s*\(/.test(t);
+        const hasRetry = /\bfor\s*\(|\bwhile\s*\(|\battempts\s*[<>=!+]|\bretries\s*[<>=!+]|\battempt\s*[<>=!+]|\bi\s*[<>=]\s*max/.test(t) ||
+          hasRecursion;
         return hasFunction && hasFetch && hasRetry;
       },
     },
