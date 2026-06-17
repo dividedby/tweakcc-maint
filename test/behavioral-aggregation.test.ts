@@ -22,10 +22,10 @@ function scoresFor(
     // with the same (fixtureId, variant) but different judges share the same cell.
     trial: r.trial ?? 0,
     axisScores: {
-      'anti-sycophancy': axis === 'anti-sycophancy' ? r.score : 0,
-      'anti-hedging': axis === 'anti-hedging' ? r.score : 0,
-      'fewer-unsolicited-offers': axis === 'fewer-unsolicited-offers' ? r.score : 0,
-      'terse-directness': axis === 'terse-directness' ? r.score : 0,
+      'completes-in-scope': axis === 'completes-in-scope' ? r.score : 0,
+      'no-stub-or-mvp': axis === 'no-stub-or-mvp' ? r.score : 0,
+      'no-deferral': axis === 'no-deferral' ? r.score : 0,
+      'no-hedge-on-in-scope': axis === 'no-hedge-on-in-scope' ? r.score : 0,
     },
   }));
 }
@@ -37,7 +37,7 @@ describe('BehavioralAggregation.aggregate', () => {
     //   judgeNarrow: stock=1, lobo=2  (spread 1)
     // A raw mean would let judgeWide dominate; z-scoring makes them count equally,
     // so both cells land at symmetric z (-1 / +1) and the per-axis arm means mirror.
-    const scores = scoresFor('terse-directness', [
+    const scores = scoresFor('no-deferral', [
       { fixtureId: 'f1', variant: 'stock', judge: 'wide', score: 10 },
       { fixtureId: 'f1', variant: 'lobotomized', judge: 'wide', score: 90 },
       { fixtureId: 'f1', variant: 'stock', judge: 'narrow', score: 1 },
@@ -45,7 +45,7 @@ describe('BehavioralAggregation.aggregate', () => {
     ]);
 
     const verdict = aggregate(scores);
-    const axis = verdict.axes['terse-directness'];
+    const axis = verdict.axes['no-deferral'];
 
     // Both judges rank lobo above stock; z-scoring collapses the scale difference.
     expect(axis.stock.normZ).toBeCloseTo(-1, 6);
@@ -66,8 +66,8 @@ describe('BehavioralAggregation.aggregate', () => {
       rows.push({ fixtureId: f, variant: 'stock', judge: 'A', score: 50 + i });
       rows.push({ fixtureId: f, variant: 'stock', judge: 'B', score: 50 + i });
     });
-    const verdict = aggregate(scoresFor('anti-hedging', rows));
-    expect(verdict.axes['anti-hedging'].disagreement).toBe(true);
+    const verdict = aggregate(scoresFor('no-stub-or-mvp', rows));
+    expect(verdict.axes['no-stub-or-mvp'].disagreement).toBe(true);
   });
 
   it('does not flag disagreement when all judges agree (edge: all-agree)', () => {
@@ -78,8 +78,8 @@ describe('BehavioralAggregation.aggregate', () => {
         rows.push({ fixtureId: f, variant: 'stock', judge, score: 10 });
       }
     }
-    const verdict = aggregate(scoresFor('anti-sycophancy', rows));
-    expect(verdict.axes['anti-sycophancy'].disagreement).toBe(false);
+    const verdict = aggregate(scoresFor('completes-in-scope', rows));
+    expect(verdict.axes['completes-in-scope'].disagreement).toBe(false);
   });
 
   it('reports trial-to-trial variance and flags noisy cells (AC3)', () => {
@@ -92,8 +92,8 @@ describe('BehavioralAggregation.aggregate', () => {
       rows.push({ fixtureId: `f${i}`, variant: 'lobotomized', judge: 'A', score: lobo });
       rows.push({ fixtureId: `f${i}`, variant: 'stock', judge: 'A', score: stockScores[i] as number });
     });
-    const verdict = aggregate(scoresFor('terse-directness', rows));
-    const axis = verdict.axes['terse-directness'];
+    const verdict = aggregate(scoresFor('no-deferral', rows));
+    const axis = verdict.axes['no-deferral'];
     expect(axis.lobotomized.trialStd).toBeGreaterThan(0);
     expect(axis.lobotomized.noisy).toBe(true);
     expect(axis.stock.noisy).toBe(false);
@@ -107,8 +107,8 @@ describe('BehavioralAggregation.aggregate', () => {
       rows.push({ fixtureId: `f${i}`, variant: 'lobotomized', judge: 'A', score: 50 + (i % 2) });
       rows.push({ fixtureId: `f${i}`, variant: 'stock', judge: 'A', score: 50 + (i % 2) });
     }
-    const verdict = aggregate(scoresFor('anti-hedging', rows));
-    expect(verdict.axes['anti-hedging'].significant).toBe(false);
+    const verdict = aggregate(scoresFor('no-stub-or-mvp', rows));
+    expect(verdict.axes['no-stub-or-mvp'].significant).toBe(false);
   });
 
   it('reports a clear, low-noise delta as significant', () => {
@@ -117,8 +117,8 @@ describe('BehavioralAggregation.aggregate', () => {
       rows.push({ fixtureId: `f${i}`, variant: 'lobotomized', judge: 'A', score: 90 + (i % 2) });
       rows.push({ fixtureId: `f${i}`, variant: 'stock', judge: 'A', score: 10 + (i % 2) });
     }
-    const verdict = aggregate(scoresFor('anti-sycophancy', rows));
-    const axis = verdict.axes['anti-sycophancy'];
+    const verdict = aggregate(scoresFor('completes-in-scope', rows));
+    const axis = verdict.axes['completes-in-scope'];
     expect(Math.abs(axis.lobotomized.meanZ - axis.stock.meanZ)).toBeGreaterThan(DEFAULT_SIGNIFICANCE_NOISE_FLOOR);
     expect(axis.significant).toBe(true);
   });
@@ -130,8 +130,8 @@ describe('BehavioralAggregation.aggregate', () => {
       { fixtureId: 'f1', variant: 'lobotomized' as const, judge: 'solo', score: 7 },
       { fixtureId: 'f1', variant: 'stock' as const, judge: 'solo', score: 3 },
     ];
-    const verdict = aggregate(scoresFor('terse-directness', rows));
-    const axis = verdict.axes['terse-directness'];
+    const verdict = aggregate(scoresFor('no-deferral', rows));
+    const axis = verdict.axes['no-deferral'];
     expect(axis.disagreement).toBe(false);
     expect(Number.isFinite(axis.lobotomized.meanZ)).toBe(true);
     expect(Number.isFinite(axis.stock.meanZ)).toBe(true);
@@ -145,8 +145,8 @@ describe('BehavioralAggregation.aggregate', () => {
       rows.push({ fixtureId: `f${i}`, variant: 'lobotomized', judge: 'A', score: 90 + (i % 2) });
       rows.push({ fixtureId: `f${i}`, variant: 'stock', judge: 'A', score: 10 + (i % 2) });
     }
-    const aggressiveFloor = aggregate(scoresFor('anti-sycophancy', rows), { significanceNoiseFloor: 1e9 });
-    expect(aggressiveFloor.axes['anti-sycophancy'].significant).toBe(false);
+    const aggressiveFloor = aggregate(scoresFor('completes-in-scope', rows), { significanceNoiseFloor: 1e9 });
+    expect(aggressiveFloor.axes['completes-in-scope'].significant).toBe(false);
   });
 
   it('exposes conservative documented default thresholds', () => {
@@ -160,7 +160,7 @@ describe('BehavioralAggregation.aggregate', () => {
       { fixtureId: 'f1', variant: 'stock' as const, judge: 'A', score: 1 },
     ];
     // Score only one axis; the others should still be present (flat baseline).
-    const verdict = aggregate(scoresFor('terse-directness', rows));
+    const verdict = aggregate(scoresFor('no-deferral', rows));
     for (const axis of BEHAVIORAL_AXES) {
       expect(verdict.axes[axis]).toBeDefined();
     }
@@ -193,8 +193,8 @@ describe('BehavioralAggregation.aggregate', () => {
       rows.push({ fixtureId: `f${i}`, variant: 'stock',       judge: 'A', score: stockScores[i]!, trial: i });
       rows.push({ fixtureId: `f${i}`, variant: 'lobotomized', judge: 'A', score: loboScores[i]!,  trial: i });
     }
-    const verdict = aggregate(scoresFor('terse-directness', rows));
-    const axis = verdict.axes['terse-directness'];
+    const verdict = aggregate(scoresFor('no-deferral', rows));
+    const axis = verdict.axes['no-deferral'];
     // The arms differ, but the wobble is comparable to the gap → not significant.
     expect(axis.significant).toBe(false);
   });
@@ -207,8 +207,8 @@ describe('BehavioralAggregation.aggregate', () => {
       rows.push({ fixtureId: `f${i}`, variant: 'stock',       judge: 'A', score: 10, trial: i });
       rows.push({ fixtureId: `f${i}`, variant: 'lobotomized', judge: 'A', score: 90, trial: i });
     }
-    const verdict = aggregate(scoresFor('anti-sycophancy', rows));
-    const axis = verdict.axes['anti-sycophancy'];
+    const verdict = aggregate(scoresFor('completes-in-scope', rows));
+    const axis = verdict.axes['completes-in-scope'];
     expect(axis.significant).toBe(true);
   });
 
@@ -230,12 +230,12 @@ describe('BehavioralAggregation.aggregate', () => {
     }
     // Use a custom significanceSeMultiplier of 3 to make it borderline at 4 trials.
     const opts = { significanceSeMultiplier: 3 };
-    const fewTrials  = aggregate(scoresFor('anti-hedging', buildRows(4)),  opts);
-    const moreTrials = aggregate(scoresFor('anti-hedging', buildRows(16)), opts);
+    const fewTrials  = aggregate(scoresFor('no-stub-or-mvp', buildRows(4)),  opts);
+    const moreTrials = aggregate(scoresFor('no-stub-or-mvp', buildRows(16)), opts);
     // Borderline at 4 trials → not significant.
-    expect(fewTrials.axes['anti-hedging'].significant).toBe(false);
+    expect(fewTrials.axes['no-stub-or-mvp'].significant).toBe(false);
     // Same scores, 4× more trials → SE shrunk → significant.
-    expect(moreTrials.axes['anti-hedging'].significant).toBe(true);
+    expect(moreTrials.axes['no-stub-or-mvp'].significant).toBe(true);
   });
 
   it('SE-criterion (d): normalized delta below the 0.5 floor stays not significant even with many trials', () => {
@@ -250,8 +250,8 @@ describe('BehavioralAggregation.aggregate', () => {
       rows.push({ fixtureId: `f${i}`, variant: 'stock',       judge: 'A', score: s, trial: i });
       rows.push({ fixtureId: `f${i}`, variant: 'lobotomized', judge: 'A', score: l, trial: i });
     }
-    const verdict = aggregate(scoresFor('fewer-unsolicited-offers', rows));
-    const axis = verdict.axes['fewer-unsolicited-offers'];
+    const verdict = aggregate(scoresFor('no-hedge-on-in-scope', rows));
+    const axis = verdict.axes['no-hedge-on-in-scope'];
     // Delta is tiny in normalized space (< 0.5 floor).
     expect(Math.abs(axis.lobotomized.meanZ - axis.stock.meanZ)).toBeLessThan(DEFAULT_SIGNIFICANCE_NOISE_FLOOR);
     expect(axis.significant).toBe(false);

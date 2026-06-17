@@ -47,6 +47,18 @@ export type CorrectnessCheck = (fixtureId: string, output: string) => boolean | 
 /** The Correctness guardrail's outcome — the benchmark records it, never raises it. */
 export type GuardrailOutcome = 'passed' | 'failed';
 
+/**
+ * The full transcript of one guardrail regression: the fixture where the lobotomized arm
+ * failed correctness that the stock arm passed, with both raw outputs preserved for audit.
+ * Captured on the FIRST failing trial per fixture (deduped); no truncation — this is evidence.
+ */
+export interface GuardrailRegressionTranscript {
+  fixtureId: string;
+  trial: number;
+  stockOutput: string;
+  lobotomizedOutput: string;
+}
+
 /** A per-axis pair of arm means (trivial mean across fixtures, per #135 scope). */
 export type AxisMeanPair = Record<BehavioralAxis, { stock: number; lobotomized: number }>;
 
@@ -67,6 +79,13 @@ export interface BehavioralVerdict {
   guardrail: GuardrailOutcome;
   /** Fixture ids where the lobotomized arm failed a check the stock arm passed. */
   guardrailRegressions: string[];
+  /**
+   * Full transcripts of the first failing trial per regressed fixture. Populated whenever
+   * guardrailRegressions is non-empty — enables post-hoc audit of a regression without re-running.
+   * Empty when the guardrail passed. Optional for backward compatibility with test fixtures built
+   * before this field was added.
+   */
+  guardrailRegressionTranscripts?: GuardrailRegressionTranscript[];
   /**
    * True when both arms produced byte-identical output on EVERY fixture (the lobotomization had
    * no effect). Evidence the run is untrustworthy — e.g. a stock-vs-stock provisioning slip
@@ -99,10 +118,10 @@ const VARIANTS: readonly Variant[] = ['stock', 'lobotomized'];
 
 function zeroAxes(): AxisScores {
   return {
-    'anti-sycophancy': 0,
-    'anti-hedging': 0,
-    'fewer-unsolicited-offers': 0,
-    'terse-directness': 0,
+    'completes-in-scope': 0,
+    'no-stub-or-mvp': 0,
+    'no-deferral': 0,
+    'no-hedge-on-in-scope': 0,
   };
 }
 
@@ -131,6 +150,7 @@ export async function runBenchmark(run: BenchmarkRun): Promise<BehavioralVerdict
   // Sets keyed by fixtureId: a fixture appears once even if it regressed/was-omitted on
   // multiple trials (dedup prevents double-counting across the trial loop).
   const guardrailRegressionSet = new Set<string>();
+  const guardrailRegressionTranscripts: GuardrailRegressionTranscript[] = [];
   const correctnessOmittedFixtureSet = new Set<string>();
   // Per-arm count of (fixture × trial × persona) scores folded into the trivial mean.
   let personaScoreCount = 0;
@@ -158,6 +178,15 @@ export async function runBenchmark(run: BenchmarkRun): Promise<BehavioralVerdict
       if (stockPassed === null || lobotomizedPassed === null) {
         correctnessOmittedFixtureSet.add(fixture.id);
       } else if (stockPassed && !lobotomizedPassed) {
+        // Capture the first failing trial's transcript per fixture (deduped via the set).
+        if (!guardrailRegressionSet.has(fixture.id)) {
+          guardrailRegressionTranscripts.push({
+            fixtureId: fixture.id,
+            trial,
+            stockOutput: outputs.stock,
+            lobotomizedOutput: outputs.lobotomized,
+          });
+        }
         guardrailRegressionSet.add(fixture.id);
       }
 
@@ -210,6 +239,7 @@ export async function runBenchmark(run: BenchmarkRun): Promise<BehavioralVerdict
     aggregation: aggregate(judgeScores),
     guardrail: guardrailRegressionSet.size === 0 ? 'passed' : 'failed',
     guardrailRegressions: Array.from(guardrailRegressionSet),
+    guardrailRegressionTranscripts,
     degenerate: pairings > 0 && allIdentical,
     omissions: {
       panelPersonas: Array.from(omittedPersonasSet),

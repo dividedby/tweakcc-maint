@@ -4,8 +4,8 @@
  * A/B run" — on-demand only, never in CI). It pairs the real fixtures with the injected
  * {@link VariantRunner} (RealVariantRunner in prod) and {@link JudgePanelPort}
  * (RealJudgePanel), routes each fixture's correctness through {@link CorrectnessChecker}
- * (deterministic check, or the {@link CorrectnessJudgePort} fallback for the open-ended
- * anti-sycophancy fixture), runs {@link runBenchmark}, and attaches the verdict to the
+ * (deterministic check, or the {@link CorrectnessJudgePort} fallback for any open-ended
+ * fixture), runs {@link runBenchmark}, and attaches the verdict to the
  * Adoption record via {@link attachBehavioralVerdict}.
  *
  * It is EVIDENCE, not a gate: it never folds the verdict into the record's `pass` and

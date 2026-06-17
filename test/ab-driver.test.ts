@@ -78,10 +78,10 @@ describe('ABDriver.runBenchmark', () => {
     const judge = new StubJudge();
     // lobotomized outputs score higher on every axis than stock.
     judge
-      .setScores('f1:stock', { 'anti-sycophancy': 2, 'anti-hedging': 2, 'fewer-unsolicited-offers': 2, 'terse-directness': 2 })
-      .setScores('f2:stock', { 'anti-sycophancy': 4, 'anti-hedging': 4, 'fewer-unsolicited-offers': 4, 'terse-directness': 4 })
-      .setScores('f1:lobo', { 'anti-sycophancy': 8, 'anti-hedging': 8, 'fewer-unsolicited-offers': 8, 'terse-directness': 8 })
-      .setScores('f2:lobo', { 'anti-sycophancy': 6, 'anti-hedging': 6, 'fewer-unsolicited-offers': 6, 'terse-directness': 6 });
+      .setScores('f1:stock', { 'completes-in-scope': 2, 'no-stub-or-mvp': 2, 'no-deferral': 2, 'no-hedge-on-in-scope': 2 })
+      .setScores('f2:stock', { 'completes-in-scope': 4, 'no-stub-or-mvp': 4, 'no-deferral': 4, 'no-hedge-on-in-scope': 4 })
+      .setScores('f1:lobo', { 'completes-in-scope': 8, 'no-stub-or-mvp': 8, 'no-deferral': 8, 'no-hedge-on-in-scope': 8 })
+      .setScores('f2:lobo', { 'completes-in-scope': 6, 'no-stub-or-mvp': 6, 'no-deferral': 6, 'no-hedge-on-in-scope': 6 });
 
     const verdict = await runBenchmark({
       fixtures,
@@ -92,13 +92,13 @@ describe('ABDriver.runBenchmark', () => {
     });
 
     // Trivial per-axis mean across fixtures, per arm: stock (2+4)/2=3, lobo (8+6)/2=7.
-    for (const axis of ['anti-sycophancy', 'anti-hedging', 'fewer-unsolicited-offers', 'terse-directness'] as const) {
+    for (const axis of ['completes-in-scope', 'no-stub-or-mvp', 'no-deferral', 'no-hedge-on-in-scope'] as const) {
       expect(verdict.axisMeans[axis].stock).toBe(3);
       expect(verdict.axisMeans[axis].lobotomized).toBe(7);
     }
     // The normalized aggregation is wired (#139): lobo outscored stock on every axis,
     // so its normalized mean leads stock per axis.
-    for (const axis of ['anti-sycophancy', 'anti-hedging', 'fewer-unsolicited-offers', 'terse-directness'] as const) {
+    for (const axis of ['completes-in-scope', 'no-stub-or-mvp', 'no-deferral', 'no-hedge-on-in-scope'] as const) {
       const a = verdict.aggregation.axes[axis];
       expect(a.lobotomized.meanZ).toBeGreaterThan(a.stock.meanZ);
     }
@@ -250,10 +250,10 @@ describe('ABDriver.runBenchmark', () => {
     expect(verdict.guardrail).toBe('passed');
     // No fixtures → no identical outputs to flag; an empty run is not degenerate (#192).
     expect(verdict.degenerate).toBe(false);
-    expect(verdict.axisMeans['anti-sycophancy'].stock).toBe(0);
+    expect(verdict.axisMeans['completes-in-scope'].stock).toBe(0);
     // Aggregation is present and inert on an empty run (no significant/disagreement).
-    expect(verdict.aggregation.axes['anti-sycophancy'].significant).toBe(false);
-    expect(verdict.aggregation.axes['anti-sycophancy'].disagreement).toBe(false);
+    expect(verdict.aggregation.axes['completes-in-scope'].significant).toBe(false);
+    expect(verdict.aggregation.axes['completes-in-scope'].disagreement).toBe(false);
   });
 
   it('feeds a 3-persona panel to aggregation as distinct judges → judges>1 + disagreement', async () => {
@@ -265,8 +265,8 @@ describe('ABDriver.runBenchmark', () => {
     const fixtures = [fixture('f1'), fixture('f2'), fixture('f3'), fixture('f4'), fixture('f5')];
     fixtures.forEach((f, i) => {
       // A/B: lobo score rises with i; C: lobo score falls with i → inverted ranking.
-      for (const j of [pa, pb]) j.setScores(`${f.id}:lobo`, { 'anti-hedging': i });
-      pc.setScores(`${f.id}:lobo`, { 'anti-hedging': 4 - i });
+      for (const j of [pa, pb]) j.setScores(`${f.id}:lobo`, { 'no-stub-or-mvp': i });
+      pc.setScores(`${f.id}:lobo`, { 'no-stub-or-mvp': 4 - i });
     });
 
     const panel: JudgePanelPort = {
@@ -289,7 +289,7 @@ describe('ABDriver.runBenchmark', () => {
 
     // Each persona scored every fixture → three judges per cell drove aggregation.
     for (const j of personas) expect(j.captured).toHaveLength(5);
-    expect(verdict.aggregation.axes['anti-hedging'].disagreement).toBe(true);
+    expect(verdict.aggregation.axes['no-stub-or-mvp'].disagreement).toBe(true);
   });
 
   describe('trials knob', () => {

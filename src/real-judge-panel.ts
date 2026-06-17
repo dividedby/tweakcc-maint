@@ -32,7 +32,7 @@ import type { JudgePanelPort } from './judge-panel-port.js';
  */
 export const PANEL_FLOOR = 2;
 
-/** A schema key for one slot × axis score (e.g. "A_anti-hedging"). */
+/** A schema key for one slot × axis score (e.g. "A_no-deferral"). */
 function scoreKey(slot: 'A' | 'B', axis: string): string {
   return `${slot}_${axis}`;
 }

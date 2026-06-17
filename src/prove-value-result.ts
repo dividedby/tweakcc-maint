@@ -18,7 +18,7 @@
  * AND the run is not degenerate (a stock-vs-stock provisioning slip — #192 — proves nothing).
  */
 
-import type { BehavioralVerdict } from './ab-driver.js';
+import type { BehavioralVerdict, GuardrailRegressionTranscript } from './ab-driver.js';
 import { BEHAVIORAL_AXES } from './judge-port.js';
 import type { BehavioralAxis } from './judge-port.js';
 import type { JudgePersona } from './judge-panel-port.js';
@@ -52,6 +52,12 @@ export interface ProveValueResult {
   guardrail: 'passed' | 'failed';
   /** Fixture ids where the lobotomized arm regressed a check the stock arm passed. */
   guardrailRegressions: string[];
+  /**
+   * Full transcripts of the first failing trial per regressed fixture. Self-documenting:
+   * a regression is auditable from the artifact without re-running ($). Empty when guardrail passed.
+   * Optional for backward compatibility with persisted artifacts written before this field was added.
+   */
+  guardrailRegressionTranscripts?: GuardrailRegressionTranscript[];
   /** True iff both arms produced byte-identical output on every fixture (the run proves nothing). */
   degenerate: boolean;
   /**
@@ -96,6 +102,7 @@ export function buildProveValueResult(
     axes,
     guardrail: verdict.guardrail,
     guardrailRegressions: [...verdict.guardrailRegressions],
+    guardrailRegressionTranscripts: (verdict.guardrailRegressionTranscripts ?? []).map((t) => ({ ...t })),
     degenerate: verdict.degenerate,
     provesValue,
     omissions: {

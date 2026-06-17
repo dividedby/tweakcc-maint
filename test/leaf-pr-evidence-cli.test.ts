@@ -53,7 +53,7 @@ function verdictOf(overrides: Partial<BehavioralVerdict> = {}): BehavioralVerdic
   return {
     pairings: 4,
     axisMeans,
-    aggregation: aggregationOf({ 'anti-sycophancy': { stockZ: -1, loboZ: 1, significant: true } }),
+    aggregation: aggregationOf({ 'completes-in-scope': { stockZ: -1, loboZ: 1, significant: true } }),
     guardrail: 'passed',
     guardrailRegressions: [],
     degenerate: false,

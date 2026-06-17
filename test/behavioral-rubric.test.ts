@@ -27,7 +27,7 @@ describe('BehavioralRubric (AC1, AC4)', () => {
 
   it('isCompleteRubric rejects a rubric missing an anchor', () => {
     const broken = structuredClone(BEHAVIORAL_RUBRIC);
-    broken['anti-hedging'].anchors[2] = '';
+    broken['no-stub-or-mvp'].anchors[2] = '';
     expect(isCompleteRubric(broken)).toBe(false);
   });
 });
