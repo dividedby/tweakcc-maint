@@ -97,7 +97,7 @@ is to make **leanness** the primary artifact and keep the bench as a guardrail.
 | **A4** | **Bench powered** — multi-trial + SE-based significance | ✅ done (#315d) | `BEHAVIORAL_AB_TRIALS`; significance = noise-floor AND ≥2·SE |
 | **A5** | **Metered dispatch** — `behavioral-ab.yml` + bench-core `0.3.0` cost sink + ledger onboarding | ✅ done (#315b/c) | runs the bench on a credentialed runner; cost in the agent-research ledger |
 | **A6** | **Leanness report tool** — always-on prompt-size delta (stock vs lobo) per model | ✅ done (#328) | `leanness-report.ts` + `-cli.ts`; deterministic char/token delta; always-on 27.2% reproduces README ~30% within ±5pp |
-| **A7** | **Anti-laziness fixtures** — retarget the bench to task-completion (no-defer / no-stub / no-hedge-on-in-scope) | **NEW (#331)** | the one behavioral axis that maps to skrabe's *current* lcc focus (his `bec30a9` anti-laziness pass) and fires on the main prompt; complements A6 |
+| **A7** | **Anti-laziness fixtures** — retarget the bench to task-completion (no-defer / no-stub / no-hedge-on-in-scope) | ✅ done (#331) | instrument landed (4 task-shaped fixtures + axes + repointed ranker); metered verdict @ 2.1.179 ($6.07, 20 pairings): **no significant delta on any axis at n=5** (high judge disagreement). The lone guardrail flag (no-hedge) was a correctness-check recursion false-negative — now fixed + transcript-auditable. **Conclusion: anti-laziness is not a demonstrable value-prop at n=5; do NOT surface it to skrabe — leanness (A6/#328) stays the primary artifact.** |
 
 **Leaf-bar mapping:** A6's leanness artifact is the contribution that maps onto
 `lcc`'s *own* stated value without redundancy — skrabe asserts ~30% leaner but
@@ -185,9 +185,9 @@ the v2 framework:
 
 ## Sequenced priority
 
-1. **A6 (#328) leanness tool** ✅ + **A7 (#331) anti-laziness fixtures** — the two measurement artifacts (A6 landed; A7 next).
+1. **A6 (#328) leanness tool** ✅ + **A7 (#331) anti-laziness fixtures** ✅ — the two measurement artifacts both landed. A6 is the objective primary artifact (27.2% always-on leaner); A7's metered verdict came back null at n=5, so the anti-laziness delta is **not** surfaced. → **Epic E is now the next priority.**
 2. **Epic E (#330) `/adopt` overhaul** — realign the command to verify-and-measure + collapse the command/skill duplication.
-3. **LC1 (#315)** — compose leanness + anti-laziness + the non-regression guardrail into the first draft leaf-PR *(needs 1)*.
+3. **LC1 (#315)** — compose the leanness artifact + the non-regression guardrail into the first draft leaf-PR. (Anti-laziness is null at n=5, so it is recorded but NOT presented as a value-prop; revisit only if a higher-power re-run is commissioned.)
 4. **B2** (#307) config-dir resolution — Restore-drill correctness bug.
 5. **A3** (#306) provisioning preflight — diagnostic so a setup miss ≠ a bad verdict.
 6. **C2** (#310) seam tests — guard release-detection + preflight.
