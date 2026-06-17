@@ -96,7 +96,7 @@ is to make **leanness** the primary artifact and keep the bench as a guardrail.
 | **A3** | `provisionVariants` **preflight/diagnostic** | open (#306) | the runner failed opaquely on a missing prompt-data-cache; a real preflight is still wanted |
 | **A4** | **Bench powered** — multi-trial + SE-based significance | ✅ done (#315d) | `BEHAVIORAL_AB_TRIALS`; significance = noise-floor AND ≥2·SE |
 | **A5** | **Metered dispatch** — `behavioral-ab.yml` + bench-core `0.3.0` cost sink + ledger onboarding | ✅ done (#315b/c) | runs the bench on a credentialed runner; cost in the agent-research ledger |
-| **A6** | **Leanness report tool** — always-on prompt-size delta (stock vs lobo) per model | **NEW — primary (#328)** | the deciding artifact; see #328 and "Leaf-PR candidates" |
+| **A6** | **Leanness report tool** — always-on prompt-size delta (stock vs lobo) per model | ✅ done (#328) | `leanness-report.ts` + `-cli.ts`; deterministic char/token delta; always-on 27.2% reproduces README ~30% within ±5pp |
 | **A7** | **Anti-laziness fixtures** — retarget the bench to task-completion (no-defer / no-stub / no-hedge-on-in-scope) | **NEW (#331)** | the one behavioral axis that maps to skrabe's *current* lcc focus (his `bec30a9` anti-laziness pass) and fires on the main prompt; complements A6 |
 
 **Leaf-bar mapping:** A6's leanness artifact is the contribution that maps onto
@@ -185,7 +185,7 @@ the v2 framework:
 
 ## Sequenced priority
 
-1. **A6 (#328) leanness tool** + **A7 (#331) anti-laziness fixtures** — the two measurement artifacts.
+1. **A6 (#328) leanness tool** ✅ + **A7 (#331) anti-laziness fixtures** — the two measurement artifacts (A6 landed; A7 next).
 2. **Epic E (#330) `/adopt` overhaul** — realign the command to verify-and-measure + collapse the command/skill duplication.
 3. **LC1 (#315)** — compose leanness + anti-laziness + the non-regression guardrail into the first draft leaf-PR *(needs 1)*.
 4. **B2** (#307) config-dir resolution — Restore-drill correctness bug.
