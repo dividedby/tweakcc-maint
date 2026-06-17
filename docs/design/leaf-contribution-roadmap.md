@@ -133,7 +133,7 @@ ADR 0005), **#314** (Piebald/upstream mentions). Add to D's sweep: this reframe 
 purge "Behavioral A/B is the deciding prove-value evidence" wording wherever it
 reads as current (it's now the guardrail, not the headline).
 
-## Epic E — `/adopt` overhaul (verify-and-measure, not version-adopt)
+## Epic E — `/adopt` overhaul (verify-and-measure, not version-adopt) — ✅ landed (#330)
 
 Tracker: **#330**. The `/adopt` command + `release-adoption` skill encode a
 **version-adoption** pipeline (extract → realign → "Prompts for <ver>" PR) — the
@@ -151,15 +151,16 @@ the v2 framework:
 - **Collapse the duplication:** `.claude/commands/adopt.md` (743 lines) and
   `.claude/skills/release-adoption/SKILL.md` (143 lines) are two independent homes
   for one procedure (they will drift). Consolidate to one — the skill as the single
-  source (SKILL.md + REFERENCE.md), `/adopt` a thin invoker; reconcile
-  `docs/design/adopt-command.md` + ADR 0010.
+  source (SKILL.md overview + `references/adopt-flow.md` detail), `/adopt` a thin
+  invoker; reconcile `docs/design/adopt-command.md` + ADR 0010 (amended in place).
 
 ---
 
 ## Concrete leaf-PR candidates (honest, alignment-gated)
 
-- **No version-adoption PR is worth preparing.** Both leaves are at 2.1.179; the
-  catch-up race is one we already lost twice (`tf#10`/`tf#11`).
+- **No version-adoption PR is worth preparing.** Both leaves track CC 2.1.179
+  (tweakcc-fixed CLI 2.0.8); the catch-up race is one we already lost twice
+  (`tf#10`/`tf#11`).
 - **LC1 — leanness artifact for an `lcc` override set** *(retargeted; #315).* A
   deterministic stock-vs-lobo **always-on prompt-size delta** (per model:
   per-prompt + per-category token/char reduction, the always-on subset matching
@@ -186,8 +187,8 @@ the v2 framework:
 
 ## Sequenced priority
 
-1. **A6 (#328) leanness tool** ✅ + **A7 (#331) anti-laziness fixtures** ✅ — the two measurement artifacts both landed. A6 is the objective primary artifact (27.2% always-on leaner); A7's metered verdict came back null at n=5, so the anti-laziness delta is **not** surfaced. → **Epic E is now the next priority.**
-2. **Epic E (#330) `/adopt` overhaul** — realign the command to verify-and-measure + collapse the command/skill duplication.
+1. **A6 (#328) leanness tool** ✅ + **A7 (#331) anti-laziness fixtures** ✅ — the two measurement artifacts both landed. A6 is the objective primary artifact (27.2% always-on leaner); A7's metered verdict came back null at n=5, so the anti-laziness delta is **not** surfaced. → **Epic E landed; LC1 is now the next priority.**
+2. **Epic E (#330) `/adopt` overhaul** ✅ — verify-and-measure reframe landed; command/skill duplication collapsed (skill is the single home + `references/adopt-flow.md`; `/adopt` a thin invoker; ADR 0010 amended in place).
 3. **LC1 (#315)** — compose the leanness artifact + the non-regression guardrail into the first draft leaf-PR. (Anti-laziness is null at n=5, so it is recorded but NOT presented as a value-prop; revisit only if a higher-power re-run is commissioned.)
 4. **B2** (#307) config-dir resolution — Restore-drill correctness bug.
 5. **A3** (#306) provisioning preflight — diagnostic so a setup miss ≠ a bad verdict.

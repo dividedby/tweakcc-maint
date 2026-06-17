@@ -79,3 +79,32 @@ so 2.1.177 is the first `/adopt` target); the adoption records stay the
   (2.1.169, 2.1.170) are retained as history but no longer assert the **Four-zeros
   bar**. Their patch match-methods live in `tweakcc-fixed` (skrabe's), so pruning them
   is his call, not a control-plane action.
+
+## Addendum (2026-06-17, #330): `/adopt` is verify-and-measure; the two-path fork no longer authors a version PR
+
+**What changed.** `/adopt` (Epic E, #330) was overhauled from a *version-adoption*
+pipeline (extract → realign → "Prompts for \<ver\>" patcher PR) to a
+**verify-and-measure** workflow. The command is now a thin invoker for the
+`release-adoption` skill (`SKILL.md` + `references/adopt-flow.md`), which is the
+single home for all orchestration logic.
+
+**The two-path fork is retired as a routing mechanism.** The original ADR described
+Path A (Full adoption — we author the patcher PR when skrabe has not shipped) vs.
+Path B (Verify-and-improve — we prove his state when he has shipped). In practice,
+skrabe ships CC versions the same day they land on npm; every real run since 2.1.172
+has been Path B. The distinction that made Path A meaningful is gone. `/adopt` no
+longer branches on `skrabeAdopted` for routing; it always goes to verify-and-measure.
+
+Contributions are now:
+- **tweakcc-fixed:** a test for a silent-corruption class the gate surfaced, OR a
+  surgical correctness fix. **Never** a version-adoption PR.
+- **lcc:** a surgical mis-bind / vocab fix the gate proved, OR a leanness +
+  non-regression **measurement artifact** he can't generate. **Never** a full-set
+  realign.
+
+**The core decision is unchanged.** Derived, live-checked, non-persisted matrix state
+(this ADR's decision) is still exactly right: `ourFlowComplete` is derived from
+on-disk adoption records; `skrabeAdopted` is live at Phase 1 and never cached. The
+`supportMatrixStatus()` report still composes both on demand. The staleness hazard
+(a cached `skrabeAdopted=false` routing a run into a now-redundant adoption PR) was
+the original motivation; it is even more acute now that he ships same-day.
