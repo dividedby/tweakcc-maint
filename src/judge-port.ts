@@ -11,16 +11,16 @@
 
 /** The four Behavioral axes the Lobotomy targets and the rubric scores (CONTEXT.md). */
 export type BehavioralAxis =
-  | 'anti-sycophancy'
-  | 'anti-hedging'
-  | 'fewer-unsolicited-offers'
-  | 'terse-directness';
+  | 'completes-in-scope'
+  | 'no-stub-or-mvp'
+  | 'no-deferral'
+  | 'no-hedge-on-in-scope';
 
 export const BEHAVIORAL_AXES: readonly BehavioralAxis[] = [
-  'anti-sycophancy',
-  'anti-hedging',
-  'fewer-unsolicited-offers',
-  'terse-directness',
+  'completes-in-scope',
+  'no-stub-or-mvp',
+  'no-deferral',
+  'no-hedge-on-in-scope',
 ];
 
 /** A per-axis score for a single arm's output (higher = more of the targeted behavior). */

@@ -99,10 +99,10 @@ const VARIANTS: readonly Variant[] = ['stock', 'lobotomized'];
 
 function zeroAxes(): AxisScores {
   return {
-    'anti-sycophancy': 0,
-    'anti-hedging': 0,
-    'fewer-unsolicited-offers': 0,
-    'terse-directness': 0,
+    'completes-in-scope': 0,
+    'no-stub-or-mvp': 0,
+    'no-deferral': 0,
+    'no-hedge-on-in-scope': 0,
   };
 }
 

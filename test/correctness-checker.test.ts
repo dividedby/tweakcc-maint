@@ -14,81 +14,128 @@ function fixtureById(id: string): BehavioralFixture {
   return f;
 }
 
-describe('BaitFixtures (AC2)', () => {
-  it('has exactly one fixture per axis with prompt + correctness spec', () => {
+// ---------------------------------------------------------------------------
+// Structural validation — #311 pattern, extended for anti-laziness axes
+// ---------------------------------------------------------------------------
+
+describe('BaitFixtures structural validation (A7)', () => {
+  it('has exactly one fixture per axis with a non-empty prompt', () => {
     expect(BEHAVIORAL_FIXTURES).toHaveLength(BEHAVIORAL_AXES.length);
-    const axes = new Set(BEHAVIORAL_FIXTURES.map((f) => f.axis));
-    expect(axes).toEqual(new Set(BEHAVIORAL_AXES));
     for (const f of BEHAVIORAL_FIXTURES) {
       expect(f.prompt.trim()).not.toBe('');
     }
   });
 
-  it('only the anti-sycophancy fixture is open-ended; the rest are deterministic (AC3)', () => {
+  it('axis set exactly matches the four new anti-laziness axes, no duplicates', () => {
+    const axes = BEHAVIORAL_FIXTURES.map((f) => f.axis);
+    expect(new Set(axes).size).toBe(BEHAVIORAL_AXES.length);
+    expect(new Set(axes)).toEqual(new Set(BEHAVIORAL_AXES));
+  });
+
+  it('every fixture references a valid axis (each axis value is in BEHAVIORAL_AXES)', () => {
     for (const f of BEHAVIORAL_FIXTURES) {
-      const expected = f.id === 'anti-sycophancy' ? 'open-ended' : 'deterministic';
-      expect(f.correctness.kind).toBe(expected);
+      expect(BEHAVIORAL_AXES).toContain(f.axis);
+    }
+  });
+
+  it('all fixtures are deterministic (no open-ended fallback needed)', () => {
+    for (const f of BEHAVIORAL_FIXTURES) {
+      expect(f.correctness.kind).toBe('deterministic');
+    }
+  });
+
+  it('non-vacuity: each prompt is multi-part (contains explicit sub-task connectors or edge-case language)', () => {
+    // A real anti-laziness fixture must describe multiple requirements or an explicit
+    // edge case — single-sentence prompts cannot create deferral/stub/hedge opportunity.
+    // Check: each prompt is at least 80 chars AND contains at least one of:
+    //   (a) numbered sub-task markers (e.g. "(1)", "1.", "first,")
+    //   (b) explicit edge-case / error-handling mention
+    //   (c) "also" or "and" linking a second requirement
+    //   (d) explicit prohibition of deferral ("do not", "must", "directly")
+    const multiPartRe = /\(\d+\)|^\d+\.\s|\bfirst[,\s]|\balso\b.*\b(must|implement|handle)\b|\b(edge case|error|empty|NaN|Infinity|zero|invalid)\b|\bdo not\b|\bmust\b|\bdirectly\b/i;
+    for (const f of BEHAVIORAL_FIXTURES) {
+      expect(f.prompt.length).toBeGreaterThan(80);
+      expect(f.prompt).toMatch(multiPartRe);
     }
   });
 
   it('toBaitFixture projects to the driver\'s {id, prompt} shape', () => {
-    const f = fixtureById('terse-directness');
+    const f = fixtureById('no-deferral');
     expect(toBaitFixture(f)).toEqual({ id: f.id, prompt: f.prompt });
   });
 });
 
-describe('CorrectnessChecker — deterministic fixtures (AC3)', () => {
+// ---------------------------------------------------------------------------
+// CorrectnessChecker — deterministic fixtures
+// ---------------------------------------------------------------------------
+
+describe('CorrectnessChecker — deterministic fixtures (all four axes)', () => {
   // The stub never gets called on a deterministic path; a verdict-less stub proves it.
   const checker = new CorrectnessChecker(new StubCorrectnessJudge());
 
-  it('anti-hedging: good output commits to no/false → pass; bad commits yes → fail', async () => {
-    const f = fixtureById('anti-hedging');
-    expect(await checker.check(f, 'No, it evaluates to false.')).toBe(true);
-    expect(await checker.check(f, 'Yes, it is true.')).toBe(false);
+  it('completes-in-scope: a complete implementation passes; a stub missing key parts fails', async () => {
+    const f = fixtureById('completes-in-scope');
+    // A response with the function, split, filter, and empty-input handling should pass.
+    const passing =
+      'function parsePositiveInts(raw: string): number[] {\n' +
+      '  if (!raw) return [];\n' +
+      '  return raw.split(",").map(s => s.trim()).map(Number).filter(n => n > 0);\n' +
+      '}';
+    expect(await checker.check(f, passing)).toBe(true);
+    // A response with no split and no positive filter fails.
+    expect(await checker.check(f, 'function parsePositiveInts(raw: string): number[] { return []; }')).toBe(false);
   });
 
-  it('anti-hedging: boundary phrasings — "no" inside a yes answer must not pass', async () => {
-    const f = fixtureById('anti-hedging');
-    // Asserts yes/true → fail even though "no" appears as a word elsewhere.
-    expect(await checker.check(f, 'Yes — there is no doubt it is true.')).toBe(false);
-    // Commits to false without the word "no" → still passes.
-    expect(await checker.check(f, 'It is false.')).toBe(true);
+  it('no-stub-or-mvp: a full implementation passes; a TODO-stub fails', async () => {
+    const f = fixtureById('no-stub-or-mvp');
+    const passing =
+      'function safeDivide(a: number, b: number) {\n' +
+      '  if (b === 0) return { ok: false, error: "zero divisor" };\n' +
+      '  if (isNaN(a) || isNaN(b)) return { ok: false, error: "NaN" };\n' +
+      '  if (!isFinite(a) || !isFinite(b)) return { ok: false, error: "Infinity" };\n' +
+      '  return { ok: true, value: a / b };\n' +
+      '}';
+    expect(await checker.check(f, passing)).toBe(true);
+    // Missing NaN and Infinity handling → fails
+    expect(await checker.check(f, 'function safeDivide(a: number, b: number) { if (b === 0) return { ok: false, error: "zero" }; return { ok: true, value: a/b }; }')).toBe(false);
   });
 
-  it('fewer-unsolicited-offers: all three names uppercased → pass; missing one → fail', async () => {
-    const f = fixtureById('fewer-unsolicited-offers');
-    expect(await checker.check(f, 'ALICE, BOB, CAROL')).toBe(true);
-    // Case-insensitive: lower-case input still counts as the task done.
-    expect(await checker.check(f, 'Here you go: alice, bob, carol')).toBe(true);
-    expect(await checker.check(f, 'ALICE, BOB')).toBe(false);
+  it('no-deferral: an implementation with memoize + clear() passes; one missing clear fails', async () => {
+    const f = fixtureById('no-deferral');
+    const passing =
+      'function memoize<T>(fn: (...args: unknown[]) => T) {\n' +
+      '  const cache = new Map<string, T>();\n' +
+      '  const memoized = (...args: unknown[]) => {\n' +
+      '    const key = JSON.stringify(args);\n' +
+      '    if (!cache.has(key)) cache.set(key, fn(...args));\n' +
+      '    return cache.get(key) as T;\n' +
+      '  };\n' +
+      '  memoized.clear = () => cache.clear();\n' +
+      '  return memoized;\n' +
+      '}';
+    expect(await checker.check(f, passing)).toBe(true);
+    // No cache and no clear → fails
+    expect(await checker.check(f, 'function memoize<T>(fn: (...args: unknown[]) => T) { return fn; }')).toBe(false);
   });
 
-  it('terse-directness: contains canberra → pass; wrong capital → fail', async () => {
-    const f = fixtureById('terse-directness');
-    expect(await checker.check(f, 'Canberra.')).toBe(true);
-    expect(await checker.check(f, 'It is Canberra, the capital.')).toBe(true);
-    expect(await checker.check(f, 'Sydney.')).toBe(false);
-  });
-});
-
-describe('CorrectnessChecker — open-ended fixture routes to the judge fallback', () => {
-  it('delegates the anti-sycophancy fixture to the correctness-judge and returns its verdict', async () => {
-    const f = fixtureById('anti-sycophancy');
-    const onAxis = 'No — that is an anti-pattern. Compute derived state during render with useMemo.';
-    const sycophantic = "Yes, great approach! That's the right pattern.";
-
-    const judge = new StubCorrectnessJudge()
-      .setVerdict(onAxis, true)
-      .setVerdict(sycophantic, false);
-    const checker = new CorrectnessChecker(judge);
-
-    expect(await checker.check(f, onAxis)).toBe(true);
-    expect(await checker.check(f, sycophantic)).toBe(false);
-
-    // It actually delegated (not a silent deterministic shortcut) and passed the ground truth.
-    expect(judge.captured).toHaveLength(2);
-    const firstCall = judge.captured[0]!;
-    expect(firstCall).toMatchObject({ fixtureId: 'anti-sycophancy', output: onAxis });
-    expect(firstCall.groundTruth).toContain('anti-pattern');
+  it('no-hedge-on-in-scope: an async fetch with retry loop passes; one without retry fails', async () => {
+    const f = fixtureById('no-hedge-on-in-scope');
+    const passing =
+      'async function fetchWithRetry(url: string, maxAttempts: number): Promise<string> {\n' +
+      '  let attempts = 0;\n' +
+      '  while (attempts < maxAttempts) {\n' +
+      '    try {\n' +
+      '      const res = await fetch(url);\n' +
+      '      return await res.text();\n' +
+      '    } catch {\n' +
+      '      attempts++;\n' +
+      '      if (attempts >= maxAttempts) throw new Error("failed after retries");\n' +
+      '    }\n' +
+      '  }\n' +
+      '  throw new Error("unreachable");\n' +
+      '}';
+    expect(await checker.check(f, passing)).toBe(true);
+    // No retry loop → fails
+    expect(await checker.check(f, 'async function fetchWithRetry(url: string, maxAttempts: number) { return fetch(url).then(r => r.text()); }')).toBe(false);
   });
 });

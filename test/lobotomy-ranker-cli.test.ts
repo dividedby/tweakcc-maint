@@ -83,8 +83,8 @@ describe('runLobotomyRankerCliFromPaths — stdout contract', () => {
     const { dir, cleanup } = makeTmpDir();
     try {
       const promptsJson = writePromptsJson(dir, [
-        // High-signal text: clears the bar.
-        { id: 'high-score', pieces: ['Great question! I think perhaps you might certainly want to of course consider this wonderful absolutely excellent outcome.'] },
+        // High-signal text: clears the bar (stub + deferral + hedge).
+        { id: 'high-score', pieces: ['TODO: implement this. As a next step, add error handling. You may want to add retry logic later.'] },
         // Low-signal text: does not clear bar.
         { id: 'low-score', pieces: ['Execute task.'] },
       ]);
@@ -104,7 +104,7 @@ describe('runLobotomyRankerCliFromPaths — stdout contract', () => {
     const { dir, cleanup } = makeTmpDir();
     try {
       const promptsJson = writePromptsJson(dir, [
-        { id: 'p1', pieces: ['Great question! Certainly absolutely wonderful.'] },
+        { id: 'p1', pieces: ['TODO: implement this. You may want to add the error handling later.'] },
       ]);
 
       const { logs } = await runCli(promptsJson);
@@ -133,7 +133,7 @@ describe('runLobotomyRankerCliFromPaths — stdout contract', () => {
     try {
       const promptsJson = writePromptsJson(dir, [
         { id: 'low', pieces: ['Execute task.'] },
-        { id: 'high', pieces: ['Great question! I think perhaps you might certainly want to of course consider this wonderful absolutely excellent outcome.'] },
+        { id: 'high', pieces: ['TODO: implement this. As a next step, add error handling. You may want to add retry logic later.'] },
       ]);
 
       const { logs } = await runCli(promptsJson);
@@ -152,7 +152,7 @@ describe('runLobotomyRankerCliFromPaths — stdout contract', () => {
     const { dir, cleanup } = makeTmpDir();
     try {
       const promptsJson = writePromptsJson(dir, [
-        { id: 'p1', pieces: ['Great question! I think perhaps you might certainly want to of course consider this wonderful absolutely excellent outcome.'] },
+        { id: 'p1', pieces: ['TODO: implement this. As a next step, add error handling. You may want to add retry logic later.'] },
       ]);
 
       const { logs } = await runCli(promptsJson);
@@ -187,9 +187,9 @@ describe('runLobotomyRankerCliFromPaths — stdout contract', () => {
   it('text is derived by joining pieces array from the prompts JSON', async () => {
     const { dir, cleanup } = makeTmpDir();
     try {
-      // Multi-piece prompt: joined pieces produce sycophantic signal.
+      // Multi-piece prompt: joined pieces produce anti-laziness signal (stub + deferral).
       const promptsJson = writePromptsJson(dir, [
-        { id: 'multi-piece', pieces: ['Great question! ', 'Certainly wonderful.'] },
+        { id: 'multi-piece', pieces: ['TODO: implement this. ', 'As a next step, add the error case.'] },
       ]);
 
       const { logs } = await runCli(promptsJson);
@@ -197,7 +197,7 @@ describe('runLobotomyRankerCliFromPaths — stdout contract', () => {
       const rows = parseLines(logs) as Array<{ promptId?: string; totalScore?: number }>;
       const rankRow = rows.find((r) => 'promptId' in r);
       expect(rankRow?.promptId).toBe('multi-piece');
-      // Joined pieces have sycophancy signals, so totalScore > 0.
+      // Joined pieces have stub + deferral signals, so totalScore > 0.
       expect((rankRow?.totalScore as number)).toBeGreaterThan(0);
     } finally {
       cleanup();

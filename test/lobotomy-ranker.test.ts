@@ -2,7 +2,7 @@
  * Unit tests for lobotomy-ranker (Phase 4 of the Full adoption path, #243).
  *
  * Verifies:
- *   - scoreAxes detects each Behavioral axis correctly
+ *   - scoreAxes detects each anti-laziness Behavioral axis correctly
  *   - rankByLobotomyPotential sorts descending, applies inactive penalty, sets clearsBar
  *   - anyClears reports correctly
  *   - "nothing clears the bar" is a valid output (no crash, explicit false)
@@ -27,48 +27,53 @@ describe('scoreAxes', () => {
     const axes = scoreAxes('');
     expect(axes).toHaveLength(4);
     expect(axes.map((a) => a.axis)).toEqual([
-      'anti-sycophancy',
-      'anti-hedging',
-      'fewer-unsolicited-offers',
-      'terse-directness',
+      'completes-in-scope',
+      'no-stub-or-mvp',
+      'no-deferral',
+      'no-hedge-on-in-scope',
     ]);
   });
 
-  it('scores zero for a clean, terse prompt', () => {
+  it('scores zero for a clean, directive prompt', () => {
     const axes = scoreAxes('List the files in the directory. Do not explain.');
+    // completes-in-scope is always 0 from regex; others should also be 0 for this text
     axes.forEach((a) => expect(a.score).toBe(0));
   });
 
-  it('detects sycophantic phrases', () => {
-    const axes = scoreAxes('Great! Of course, I am happy to help. Certainly!');
-    const s = axes.find((a) => a.axis === 'anti-sycophancy')!;
+  it('completes-in-scope is always 0 (ponytail: not pre-screened by regex)', () => {
+    // Even a text loaded with deferral/stub/hedge language scores 0 on completes-in-scope
+    const axes = scoreAxes('TODO: handle the edge case. You may want to add validation later.');
+    const c = axes.find((a) => a.axis === 'completes-in-scope')!;
+    expect(c.score).toBe(0);
+    expect(c.rationale).toMatch(/not pre-screened/i);
+  });
+
+  it('detects stub/MVP phrases', () => {
+    const axes = scoreAxes('TODO: implement this. Use a minimal version for now.');
+    const s = axes.find((a) => a.axis === 'no-stub-or-mvp')!;
     expect(s.score).toBeGreaterThan(0);
   });
 
-  it('detects hedging phrases', () => {
-    const axes = scoreAxes('I think perhaps this might be the case. It seems correct.');
-    const h = axes.find((a) => a.axis === 'anti-hedging')!;
+  it('detects deferral phrases', () => {
+    const axes = scoreAxes('As a next step, handle the error case. Left for a follow-up.');
+    const d = axes.find((a) => a.axis === 'no-deferral')!;
+    expect(d.score).toBeGreaterThan(0);
+  });
+
+  it('detects hedge-on-scope phrases', () => {
+    const axes = scoreAxes('You may want to add retry logic. Consider implementing error handling.');
+    const h = axes.find((a) => a.axis === 'no-hedge-on-in-scope')!;
     expect(h.score).toBeGreaterThan(0);
-  });
-
-  it('detects unsolicited offer phrases', () => {
-    const axes = scoreAxes('Would you like me to explain? Shall I proceed? Let me know if you need more.');
-    const o = axes.find((a) => a.axis === 'fewer-unsolicited-offers')!;
-    expect(o.score).toBeGreaterThan(0);
-  });
-
-  it('detects verbosity signals', () => {
-    const axes = scoreAxes('In summary, as an AI assistant, I am here to help. I will help.');
-    const v = axes.find((a) => a.axis === 'terse-directness')!;
-    expect(v.score).toBeGreaterThan(0);
   });
 
   it('caps axis score at 3 even for many pattern matches', () => {
     const text =
-      'Great! Excellent! Wonderful! Thanks! Glad to help! Happy to. Of course! Certainly! Absolutely!';
+      'TODO: fix this. FIXME: not implemented. Happy path only. Minimal version. Placeholder here. ' +
+      'For brevity, just skip it. You may want to add it later.';
     const axes = scoreAxes(text);
-    const s = axes.find((a) => a.axis === 'anti-sycophancy')!;
-    expect(s.score).toBeLessThanOrEqual(3);
+    for (const a of axes) {
+      expect(a.score).toBeLessThanOrEqual(3);
+    }
   });
 });
 
@@ -76,7 +81,7 @@ describe('scoreAxes', () => {
 // rankByLobotomyPotential — sorting, penalty, clearsBar
 // ---------------------------------------------------------------------------
 
-const SYCOPHANTIC_PROMPT = 'Great! Of course, I am happy to help. Certainly!';
+const LAZY_PROMPT = 'TODO: implement this. As a next step, add the error case. You may want to add retry logic.';
 const CLEAN_PROMPT = 'Run the linter. Report errors only.';
 
 describe('rankByLobotomyPotential', () => {
@@ -87,28 +92,28 @@ describe('rankByLobotomyPotential', () => {
   it('sorts results descending by totalScore', () => {
     const candidates: PromptCandidate[] = [
       { promptId: 'clean', text: CLEAN_PROMPT },
-      { promptId: 'sycophantic', text: SYCOPHANTIC_PROMPT },
+      { promptId: 'lazy', text: LAZY_PROMPT },
     ];
     const ranked = rankByLobotomyPotential(candidates);
-    expect(ranked[0]!.promptId).toBe('sycophantic');
+    expect(ranked[0]!.promptId).toBe('lazy');
     expect(ranked[1]!.promptId).toBe('clean');
     expect(ranked[0]!.totalScore).toBeGreaterThanOrEqual(ranked[1]!.totalScore);
   });
 
   it('applies inactivePenalty=2 for inactive slots and reduces totalScore', () => {
     const candidates: PromptCandidate[] = [
-      { promptId: 'inactive', text: SYCOPHANTIC_PROMPT, inactive: true },
+      { promptId: 'inactive', text: LAZY_PROMPT, inactive: true },
     ];
     const [r] = rankByLobotomyPotential(candidates);
     expect(r!.inactivePenalty).toBe(2);
     // totalScore = max(0, rawScore - 2)
-    const axes = scoreAxes(SYCOPHANTIC_PROMPT);
+    const axes = scoreAxes(LAZY_PROMPT);
     const raw = axes.reduce((s, a) => s + a.score, 0);
     expect(r!.totalScore).toBe(Math.max(0, raw - 2));
   });
 
   it('applies no penalty for active slots', () => {
-    const candidates: PromptCandidate[] = [{ promptId: 'active', text: SYCOPHANTIC_PROMPT }];
+    const candidates: PromptCandidate[] = [{ promptId: 'active', text: LAZY_PROMPT }];
     const [r] = rankByLobotomyPotential(candidates);
     expect(r!.inactivePenalty).toBe(0);
   });
@@ -122,9 +127,8 @@ describe('rankByLobotomyPotential', () => {
   });
 
   it('sets clearsBar=true when totalScore >= 2', () => {
-    const candidates: PromptCandidate[] = [{ promptId: 'high', text: SYCOPHANTIC_PROMPT }];
+    const candidates: PromptCandidate[] = [{ promptId: 'high', text: LAZY_PROMPT }];
     const [r] = rankByLobotomyPotential(candidates);
-    // SYCOPHANTIC_PROMPT should score >= 2 on the sycophancy axis alone
     if (r!.totalScore >= 2) {
       expect(r!.clearsBar).toBe(true);
     }
@@ -160,11 +164,10 @@ describe('anyClears', () => {
   it('returns true when at least one ranking clears the bar', () => {
     const rankings = rankByLobotomyPotential([
       { promptId: 'clean', text: CLEAN_PROMPT },
-      { promptId: 'heavy', text: SYCOPHANTIC_PROMPT },
+      { promptId: 'lazy', text: LAZY_PROMPT },
     ]);
-    // At least one should clear if the sycophantic prompt scores >= 2
-    const heavyRanking = rankings.find((r) => r.promptId === 'heavy')!;
-    if (heavyRanking.clearsBar) {
+    const lazyRanking = rankings.find((r) => r.promptId === 'lazy')!;
+    if (lazyRanking.clearsBar) {
       expect(anyClears(rankings)).toBe(true);
     } else {
       expect(anyClears(rankings)).toBe(false);

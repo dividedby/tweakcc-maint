@@ -1,7 +1,7 @@
 /**
  * RealCorrectnessJudge — the prod adapter behind the {@link CorrectnessJudgePort} seam
  * (#138). It answers the one boolean the {@link CorrectnessChecker} asks for an OPEN-ENDED
- * Behavior-bait fixture (e.g. the anti-sycophancy fixture, whose premise correction has no
+ * Behavior-bait fixture (e.g. an open-ended fixture whose correctness check has no
  * deterministic string check): "did this output get the ground truth right?" — via a bench
  * `createModelJudgeBackend` grade call against the fixture's ground truth.
  *

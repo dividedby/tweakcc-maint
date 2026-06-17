@@ -31,7 +31,7 @@ function verdictOf(overrides: Partial<BehavioralVerdict> = {}): BehavioralVerdic
   return {
     pairings: 4,
     axisMeans,
-    aggregation: aggregationOf({ 'anti-sycophancy': { stockZ: -1, loboZ: 1, significant: true } }),
+    aggregation: aggregationOf({ 'completes-in-scope': { stockZ: -1, loboZ: 1, significant: true } }),
     guardrail: 'passed',
     guardrailRegressions: [],
     degenerate: false,
@@ -94,7 +94,7 @@ describe('renderLeafPrEvidence', () => {
     expect(md).toContain('auditMisbinds');
     // prove-value half — reuses renderProveValueResult.
     expect(md).toContain('prove-value');
-    expect(md).toContain('anti-sycophancy');
+    expect(md).toContain('completes-in-scope');
     // pristine provenance half.
     expect(md.toLowerCase()).toContain('pristine');
     expect(md).toContain('npm-pack');

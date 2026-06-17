@@ -45,15 +45,15 @@ describe('buildProveValueResult', () => {
 
   it('emits a per-axis lobotomized−stock delta and significance for every behavioral axis', () => {
     const aggregation = aggregationOf({
-      'anti-sycophancy': { stockZ: -0.8, loboZ: 0.9, significant: true },
-      'anti-hedging': { stockZ: 0.1, loboZ: 0.2, significant: false },
+      'completes-in-scope': { stockZ: -0.8, loboZ: 0.9, significant: true },
+      'no-stub-or-mvp': { stockZ: 0.1, loboZ: 0.2, significant: false },
     });
     const result = buildProveValueResult('2.1.172', verdictOf({ aggregation }), '2026-06-11T00:00:00.000Z');
     expect(new Set(result.axes.map((a) => a.axis))).toEqual(new Set(BEHAVIORAL_AXES));
-    const syco = result.axes.find((a) => a.axis === 'anti-sycophancy')!;
+    const syco = result.axes.find((a) => a.axis === 'completes-in-scope')!;
     expect(syco.delta).toBeCloseTo(1.7, 5);
     expect(syco.significant).toBe(true);
-    const hedge = result.axes.find((a) => a.axis === 'anti-hedging')!;
+    const hedge = result.axes.find((a) => a.axis === 'no-stub-or-mvp')!;
     expect(hedge.significant).toBe(false);
   });
 
@@ -70,7 +70,7 @@ describe('buildProveValueResult', () => {
   it('counts a result as proving value only when at least one axis is a significant lobotomized win and the guardrail passed', () => {
     const winning = buildProveValueResult(
       '2.1.172',
-      verdictOf({ aggregation: aggregationOf({ 'terse-directness': { stockZ: -1, loboZ: 1, significant: true } }) }),
+      verdictOf({ aggregation: aggregationOf({ 'no-deferral': { stockZ: -1, loboZ: 1, significant: true } }) }),
       'd',
     );
     expect(winning.provesValue).toBe(true);
@@ -84,7 +84,7 @@ describe('buildProveValueResult', () => {
       verdictOf({
         guardrail: 'failed',
         guardrailRegressions: ['fx'],
-        aggregation: aggregationOf({ 'terse-directness': { stockZ: -1, loboZ: 1, significant: true } }),
+        aggregation: aggregationOf({ 'no-deferral': { stockZ: -1, loboZ: 1, significant: true } }),
       }),
       'd',
     );
@@ -94,7 +94,7 @@ describe('buildProveValueResult', () => {
   it('flags a degenerate run (both arms identical) as not proving value regardless of scores', () => {
     const result = buildProveValueResult(
       '2.1.172',
-      verdictOf({ degenerate: true, aggregation: aggregationOf({ 'terse-directness': { stockZ: -1, loboZ: 1, significant: true } }) }),
+      verdictOf({ degenerate: true, aggregation: aggregationOf({ 'no-deferral': { stockZ: -1, loboZ: 1, significant: true } }) }),
       'd',
     );
     expect(result.degenerate).toBe(true);
@@ -113,12 +113,12 @@ describe('renderProveValueResult', () => {
   it('renders a leaf-PR-ready evidence block naming the version, verdict, and each significant axis', () => {
     const result = buildProveValueResult(
       '2.1.172',
-      verdictOf({ aggregation: aggregationOf({ 'anti-sycophancy': { stockZ: -1, loboZ: 1, significant: true } }) }),
+      verdictOf({ aggregation: aggregationOf({ 'completes-in-scope': { stockZ: -1, loboZ: 1, significant: true } }) }),
       '2026-06-11T00:00:00.000Z',
     );
     const md = renderProveValueResult(result);
     expect(md).toContain('2.1.172');
-    expect(md).toContain('anti-sycophancy');
+    expect(md).toContain('completes-in-scope');
     // Names the evidence track, not a gate verdict.
     expect(md.toLowerCase()).toContain('prove');
   });
