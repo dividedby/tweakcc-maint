@@ -52,6 +52,11 @@ on:
         required: false
         default: "5"
         type: string
+      fixtures:
+        description: "Comma-separated fixture ids to run (default: all)"
+        required: false
+        default: ""
+        type: string
 
 permissions:
   contents: read
@@ -76,6 +81,7 @@ jobs:
       BEHAVIORAL_AB_EFFORT: ${{ inputs.effort }}
       BEHAVIORAL_AB_CC_VERSION: ${{ inputs.cc_version }}
       BEHAVIORAL_AB_TRIALS: ${{ inputs.trials }}
+      BEHAVIORAL_AB_FIXTURE: ${{ inputs.fixtures }}
     steps:
       - name: Guard — require a license secret
         run: |

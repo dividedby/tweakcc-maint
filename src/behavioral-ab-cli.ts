@@ -33,11 +33,39 @@ import { RealJudgePanel } from './real-judge-panel.js';
 import { RealCorrectnessJudge } from './real-correctness-judge.js';
 import { detectCredentials, credentialMessage } from './credentials-preflight.js';
 import { isEntryPoint } from './cli-entrypoint.js';
+import { BEHAVIORAL_FIXTURES } from './behavioral-fixtures.js';
+import type { BehavioralFixture } from './behavioral-fixtures.js';
 import type { ProvisionedVariants } from './provision-variants.js';
 import type { JudgePanelPort } from './judge-panel-port.js';
 import type { CorrectnessJudgePort } from './correctness-judge-port.js';
 import type { CliInvocation, CliResult } from '@dividedby/bench-core';
 import type { AdoptionRecord } from './integration-gate.js';
+
+/**
+ * Filter the canonical {@link BEHAVIORAL_FIXTURES} to the given ids.
+ *
+ * Throws if any requested id is not found — a typo silently running the full metered bench
+ * is the failure mode to prevent. Pass `undefined` / empty string to get all fixtures.
+ */
+export function filterFixtures(
+  ids: string | undefined,
+  allFixtures: readonly BehavioralFixture[] = BEHAVIORAL_FIXTURES,
+): readonly BehavioralFixture[] | undefined {
+  if (!ids || ids.trim() === '') return undefined;
+  const requested = ids
+    .split(',')
+    .map((s) => s.trim())
+    .filter((s) => s !== '');
+  if (requested.length === 0) return undefined;
+  const valid = new Set(allFixtures.map((f) => f.id));
+  const bad = requested.filter((id) => !valid.has(id));
+  if (bad.length > 0) {
+    throw new Error(
+      `BEHAVIORAL_AB_FIXTURE: unknown fixture id(s): ${bad.join(', ')}. Valid ids: ${[...valid].join(', ')}`,
+    );
+  }
+  return allFixtures.filter((f) => requested.includes(f.id));
+}
 
 export interface BehavioralABCliDeps {
   /** Provision the two `cli.js` arms; defaults to the real {@link provisionVariants}. Injected
@@ -72,6 +100,12 @@ export interface BehavioralABCliDeps {
    * Read from `BEHAVIORAL_AB_TRIALS` in prod; injected so the test never reads process.env.
    */
   trials?: number;
+  /**
+   * Fixture subset to run. When set: only these fixtures are passed to {@link runBehavioralAB}.
+   * When absent: all canonical {@link BEHAVIORAL_FIXTURES}. Read from `BEHAVIORAL_AB_FIXTURE`
+   * (comma-separated ids) in prod; injected so the test drives it without reading process.env.
+   */
+  fixtures?: readonly BehavioralFixture[];
 }
 
 /** A minimal Adoption record to carry the verdict — this slice proves wiring, not a real adoption. */
@@ -105,6 +139,7 @@ export async function runBehavioralABCli(deps: BehavioralABCliDeps): Promise<voi
         panel: deps.panel,
         correctnessJudge: deps.correctnessJudge,
         trials: deps.trials,
+        fixtures: deps.fixtures,
       });
 
       deps.log(JSON.stringify(record, null, 2));
@@ -138,6 +173,8 @@ async function main(): Promise<void> {
 
   const trials = Math.max(1, Number(process.env.BEHAVIORAL_AB_TRIALS ?? 1) || 1);
 
+  const fixtures = filterFixtures(process.env.BEHAVIORAL_AB_FIXTURE);
+
   await runBehavioralABCli({
     provision: () => provisionVariants({ model }),
     panel: new RealJudgePanel(),
@@ -152,6 +189,7 @@ async function main(): Promise<void> {
     ccVersion: process.env.BEHAVIORAL_AB_CC_VERSION,
     artifactDir: process.env.BEHAVIORAL_AB_ARTIFACT_DIR ?? 'fallow-baselines',
     trials,
+    fixtures,
   });
 }
 
