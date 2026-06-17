@@ -57,6 +57,11 @@ Dispatch `integration-gate.yml` for the new CC version and watch CI. The gate is
 validation → **Four-zeros bar** across the **Support matrix**, bracketed by the **Restore
 drill**. It emits the **Adoption record**.
 
+The gate **wraps skrabe's Showtime Driver** (`driver.mjs check`/`report`) when present
+in the leaf checkout, keying on its exit codes — never re-parsing his prose (ADR 0007;
+`src/driver-verification.ts`, #80). We verify via his canonical seam; we never re-run his
+Showtime version-bump pipeline.
+
 The gate confirms skrabe's shipped state is correct against our bar. It does not author
 a PR. A non-zero exit or `pass: false` is a **blocking failure** — diagnose and report
 before proceeding.

@@ -141,7 +141,10 @@ one thing skrabe never needs from us (he ships versions same-day). Overhaul it t
 the v2 framework:
 
 - **Verify** the gate/four-zeros as our *own* trust instrument; on a version he
-  already shipped, the gate confirms his state — it does not author a PR.
+  already shipped, the gate confirms his state — it does not author a PR. The gate
+  **wraps his Showtime Driver** (`driver.mjs check`/`report`, keyed on exit codes —
+  ADR 0007, #80), not a parallel pipeline; we consume his canonical seam and never
+  re-run his version-bump pipeline.
 - **Measure** what he can't: the **leanness report (#328)** + the **anti-laziness
   delta (#331)**, with the Behavioral A/B as the non-regression guardrail.
 - **Prepare only what he merges** (cockpit draft PR + intent ping + re-preflight):

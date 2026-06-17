@@ -39,7 +39,11 @@ surfaced as evidence only when a re-run with higher power produces `provesValue:
 
 **Integration gate (existing)** — the correctness verification seam. Shells to the
 gate CLI (`integration-gate.yml` via `gh workflow run`). The gate is our own trust
-instrument, not a PR-producing step.
+instrument, not a PR-producing step. It **wraps skrabe's Showtime Driver**
+(`driver.mjs check`/`report`) as the canonical signal source when present in the leaf
+checkout, keying on exit codes (`src/driver-verification.ts`, #80; ADR 0005/0007);
+driver-absent falls back to the hand-rolled path. We never re-run his Showtime
+version-bump pipeline — verify only.
 
 ### Invariants (ADR 0010)
 - `supportMatrixStatus()` persists nothing; skrabe state is injected, never cached.
