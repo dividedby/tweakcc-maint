@@ -164,16 +164,17 @@ the v2 framework:
 - **No version-adoption PR is worth preparing.** Both leaves track CC 2.1.179
   (tweakcc-fixed CLI 2.0.8); the catch-up race is one we already lost twice
   (`tf#10`/`tf#11`).
-- **LC1 — leanness artifact for an `lcc` override set** *(retargeted; #315).* A
-  deterministic stock-vs-lobo **always-on prompt-size delta** (per model:
-  per-prompt + per-category token/char reduction, the always-on subset matching
-  the README's six categories — harness, communication, doing-tasks,
-  executing-actions, memory, core tools), reported as a structured artifact that
-  substantiates skrabe's ~30% claim. Compose with the **anti-laziness delta (A7,
-  #331)** — the behavioral half that maps to his current focus — and the
-  **non-regression guardrail** (powered Behavioral A/B: the leaner prompt regresses
-  no correctness). Re-run the preflight at proposal time; surface as a **draft PR
-  with an intent ping** (cockpit: prepare, don't impose). *Needs A6 + A7.*
+- **LC1 — leanness artifact for an `lcc` override set** *(executed 2026-06-17;
+  closed #315, no PR).* The deterministic always-on leanness artifact is clean —
+  **29.2%** always-on reduction at lcc `76c552c` (CC 2.1.179), reproducing the
+  README ~30% within tolerance (the figure moved 27.2%→29.2% as skrabe slimmed
+  more below-floor captures). But the **non-regression guardrail did not clear**:
+  the powered Behavioral A/B failed on `no-hedge-on-in-scope` at n=5 and n=20
+  (delta −0.074, non-significant, no causal mechanism). Neither a publishable
+  non-regression nor a defensible surgical finding → **no leaf PR** (cockpit:
+  don't impose mixed evidence). A brevity-tradeoff hypothesis was recorded on #315
+  but not confirmed (skrabe's deliberate leanness design). Byproduct: #341
+  fixture-filter (merged); related #340 (SHA-pin gap).
 - **LC2 — a version-independent helper unit.** Still held: his toolkit covers the
   obvious ones (`auditMisbinds`, Showtime, Driver — ADR 0007). Only propose if a
   genuine, uncovered gap surfaces. Flagged, not committed.
@@ -192,7 +193,7 @@ the v2 framework:
 
 1. **A6 (#328) leanness tool** ✅ + **A7 (#331) anti-laziness fixtures** ✅ — the two measurement artifacts both landed. A6 is the objective primary artifact (27.2% always-on leaner); A7's metered verdict came back null at n=5, so the anti-laziness delta is **not** surfaced. → **Epic E landed; LC1 is now the next priority.**
 2. **Epic E (#330) `/adopt` overhaul** ✅ — verify-and-measure reframe landed; command/skill duplication collapsed (skill is the single home + `references/adopt-flow.md`; `/adopt` a thin invoker; ADR 0010 amended in place).
-3. **LC1 (#315)** — compose the leanness artifact + the non-regression guardrail into the first draft leaf-PR. (Anti-laziness is null at n=5, so it is recorded but NOT presented as a value-prop; revisit only if a higher-power re-run is commissioned.)
+3. **LC1 (#315)** ✅ *executed, no PR (2026-06-17)* — leanness artifact clean (29.2% always-on) but the non-regression guardrail did not clear (`no-hedge-on-in-scope`, non-significant at n=20); per the cockpit posture, nothing surfaced to skrabe. **→ B2 (#307) is now the next priority.**
 4. **B2** (#307) config-dir resolution — Restore-drill correctness bug.
 5. **A3** (#306) provisioning preflight — diagnostic so a setup miss ≠ a bad verdict.
 6. **C2** (#310) seam tests — guard release-detection + preflight.
