@@ -1,50 +1,58 @@
 # Design Plan — `/adopt` slash command
 
-status: active · parent: #241 · ADR: 0010
+status: active · parent: #241 · ADR: 0010 · Epic E: #330
 
-Short-lived implementation scaffolding for the `/adopt` backlog (#242–#245).
-The issue tracker is authoritative for behavior; this records the module/seam
-shape and testing strategy. CONTEXT.md + ADR 0010 are authoritative for
-vocabulary and the persistence decision.
+The `/adopt` command is a thin invoker for the **release-adoption** skill
+(`.claude/skills/release-adoption/SKILL.md`), which is the single home for all
+verify-and-measure logic. CONTEXT.md + ADR 0010 are authoritative for vocabulary
+and the persistence decision.
 
-## Finding: single-module extension, not a multi-module design
+## Architecture: the skill is the single home
 
-The bulk of `/adopt` is a slash-command **orchestration prompt**
-(`.claude/commands/adopt.md`) that delegates to gearbox tiers and shells to
-existing scripts (`skills/showtime/driver.mjs`, `versionBumpReport.js`,
-`integration-gate.yml` dispatch) — not vitest-testable code. The only genuinely
-new code is a small extension of the existing alignment-snapshot module.
+`/adopt` itself is ~10 lines — it delegates entirely to the skill. All
+orchestration logic, phase-by-phase instructions, and PR templates live in the
+skill and its reference (`references/adopt-flow.md`). This collapses the earlier
+dual-home duplication (the 743-line `adopt.md` + 143-line `SKILL.md` each encoding
+the same procedure independently).
 
 ## Modules & seams
 
-**`alignment-snapshot` (existing, extended)** — owns the read-only gather of
-skrabe's current state and the matrix posture.
-- Already provides the seams `LeafStateSource`, `NpmReleaseSource`, the
-  `GatherSources` injection bundle, `aheadOfEvery` (matrix comparison), and
-  `ScreenedCandidate`/`headCovers` (redundancy suppression — the stale-premise
-  guard, lcc#9/tf#8, which *is* Path B's gap-diff logic).
-- **New injected seam — `AdoptionRecordSource`**: reads
-  `docs/records/adoption-record-*.json` → per-version pass. Feeds
-  `ourFlowComplete`.
-- **New pure composition — `supportMatrixStatus()`**: composes the
-  version × `skrabeAdopted` × `ourFlowComplete` report over (matrix versions,
-  `AdoptionRecordSource`, gathered skrabe state).
+**`alignment-snapshot` (existing)** — owns the read-only gather of skrabe's current
+state and the matrix posture.
+- `LeafStateSource`, `NpmReleaseSource`, `GatherSources` injection bundle,
+  `aheadOfEvery` (matrix comparison), `ScreenedCandidate`/`headCovers`
+  (redundancy suppression — stale-premise guard).
+- `AdoptionRecordSource`: reads `docs/records/adoption-record-*.json` → per-version
+  pass. Feeds `ourFlowComplete`.
+- `supportMatrixStatus()`: composes the version × `skrabeAdopted` × `ourFlowComplete`
+  report on demand without persisting state.
+
+**Leanness source (#328 / A6)** — the primary prove-value measurement seam. The
+always-on prompt-size delta (stock CC vs lobotomized-CC, per-prompt + per-category).
+Objective and deterministic; maps directly onto lcc's stated ~30% claim. ADR 0012
+records this as the headline artifact; the Behavioral A/B is the backstop.
+
+**Anti-laziness harness (#331 / A7)** — the Behavioral A/B with anti-laziness
+**behavior-bait fixtures**. Used as a non-regression guardrail on every version;
+surfaced as evidence only when a re-run with higher power produces `provesValue: true`
+(the first metered run at n=5 returned null — ADR 0012).
+
+**Integration gate (existing)** — the correctness verification seam. Shells to the
+gate CLI (`integration-gate.yml` via `gh workflow run`). The gate is our own trust
+instrument, not a PR-producing step.
 
 ### Invariants (ADR 0010)
 - `supportMatrixStatus()` persists nothing; skrabe state is injected, never cached.
-- `ourFlowComplete(version)` ≡ a passing `adoption-record-<version>.json` exists
-  (no second stored boolean).
-- `skrabeAdopted` is live at composition time; it drives the two-path fork on
-  fresh state only.
+- `ourFlowComplete(version)` ≡ a passing `adoption-record-<version>.json` exists.
+- `skrabeAdopted` is live at Phase 1; it is never persisted for a routing decision.
 
 ### Must not depend on
 - The command transport / prompt layer; real npm/git/gh inside the pure core
   (those live behind the existing seams).
 
 ## Non-code slices
-- **#243 / #244** — `adopt.md` orchestration (Full adoption / Verify-and-improve
-  paths). Gearbox-tier delegation + script shelling. Path B redundancy reuses
-  `ScreenedCandidate`/`headCovers`.
+- **Epic E (#330)** — the overhaul that pivoted `/adopt` from version-adoption to
+  verify-and-measure; landed the skill + reference rewrite + thin invoker.
 - **#245** — ops: delete `release-detector.yml` + `proposal-chain.yml`.
 
 ## Testing strategy
@@ -54,7 +62,6 @@ skrabe's current state and the matrix posture.
 - Reuse the existing `GatherSources` real/fake adapter split.
 
 ## Issue index
+- #241 — parent: `/adopt` command
 - #242 — matrix state model + Phase 1 preflight + routing floor (the code slice)
-- #243 — Full adoption path (Path A) — orchestration
-- #244 — Verify-and-improve path (Path B) — orchestration
-- #245 — deprecate detector + proposal-chain workflows — ops
+- #330 — Epic E: verify-and-measure overhaul (this reframe)
