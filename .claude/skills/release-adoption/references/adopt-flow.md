@@ -89,7 +89,7 @@ same-day). Enter Phase 2 — Gate.
 contribution. It confirms that his shipped state satisfies our **Four-zeros bar**.
 
 The gate is not a parallel pipeline — it **wraps skrabe's Showtime Driver**
-([CONTEXT.md](../../../CONTEXT.md) "Driver"; [ADR 0007](../../../docs/adr/0007-defer-to-skrabes-canonical-verification-pieces.md)).
+([CONTEXT.md](../../../../CONTEXT.md) "Driver"; [ADR 0007](../../../../docs/adr/0007-defer-to-skrabes-canonical-verification-pieces.md)).
 When his `skills/showtime/driver.mjs` is present in the configured leaf checkout, the
 gate sources its apply / orphan / mis-bind signals from `driver check` + `driver report`
 and keys on their **exit codes**, never re-parsing his prose (`src/driver-verification.ts`,
