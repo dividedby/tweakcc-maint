@@ -232,10 +232,10 @@ Path B — Phase 4: Gap-diff  (new/changed prompt ids vs his live lcc set)
 
   Ranked candidates that clear the bar:
   1. <promptId>  score=<N>  clears-bar=true
-       anti-sycophancy: <score>  — <rationale>
-       anti-hedging: <score>  — <rationale>
-       fewer-unsolicited-offers: <score>  — <rationale>
-       terse-directness: <score>  — <rationale>
+       completes-in-scope: <score>  — <rationale>
+       no-stub-or-mvp: <score>  — <rationale>
+       no-deferral: <score>  — <rationale>
+       no-hedge-on-in-scope: <score>  — <rationale>
        inactive-penalty: <0 or 2>
        lcc override: <absent / empty-stub>  → genuine gap
   ...
@@ -501,7 +501,7 @@ pnpm tsx src/lobotomy-ranker-cli.ts ~/repos/tweakcc-fixed/data/prompts/prompts-<
 The CLI emits newline-delimited JSON: one `{ promptId, totalScore, clearsBar, inactivePenalty, axes }` line
 per candidate (sorted descending by totalScore), then a `{ anyClears, count }` summary line.
 The pure core (`rankByLobotomyPotential` in `src/lobotomy-ranker.ts`) scores each prompt against:
-- anti-sycophancy, anti-hedging, fewer-unsolicited-offers, terse-directness
+- completes-in-scope, no-stub-or-mvp, no-deferral, no-hedge-on-in-scope
 - inactive penalty for feature-gated / conditionally triggered slots
 
 On surprising or empty output, re-verify directly — confirm the prompts JSON path
@@ -515,10 +515,10 @@ Phase 4 — Lobotomy potential ranking  (new prompt ids only)
 
   Ranked by Lobotomy potential:
   1. <promptId>  score=<N>  clears-bar=true
-       anti-sycophancy: <score>  — <rationale>
-       anti-hedging: <score>  — <rationale>
-       fewer-unsolicited-offers: <score>  — <rationale>
-       terse-directness: <score>  — <rationale>
+       completes-in-scope: <score>  — <rationale>
+       no-stub-or-mvp: <score>  — <rationale>
+       no-deferral: <score>  — <rationale>
+       no-hedge-on-in-scope: <score>  — <rationale>
        inactive-penalty: <0 or 2>
   2. ...
 

@@ -147,9 +147,11 @@ _Avoid_: eval, quality test, regression.
 **Lobotomy**:
 The intent of the `lobotomized-claude-code` override set: stripping Claude
 Code's default assistant personality (sycophancy, hedging, unsolicited
-"would you like me to…" offers, verbosity) toward terse directness. It targets
-*behavior*, not *capability* — so the **Behavioral A/B benchmark** measures the
-behavioral axes, not generic task success.
+"would you like me to…" offers, verbosity) toward terse directness, and — in
+skrabe's current pass (`bec30a9`) — anti-laziness/task-completion (no deferral,
+no quiet MVP, no hedging in-scope work). It targets *behavior*, not *capability* —
+so the **Behavioral A/B benchmark** measures the behavioral axes, not generic task
+success.
 _Avoid_: jailbreak, tuning, customization.
 
 **Stock CC** / **lobotomized-CC**:
@@ -165,16 +167,20 @@ from "more direct but wrong."
 _Avoid_: sanity check, baseline.
 
 **Behavioral axis**:
-One of the four behaviors the **Lobotomy** targets and the **Behavioral A/B
-benchmark**'s rubric scores: anti-sycophancy, anti-hedging, fewer-unsolicited-offers,
-terse-directness. The benchmark measures these, not generic task success.
+One of the four task-completion behaviors the **Behavioral A/B benchmark**'s rubric
+scores: completes-in-scope, no-stub-or-mvp, no-deferral, no-hedge-on-in-scope. They
+retarget the bench onto the **Lobotomy**'s current focus — anti-laziness, the behaviors
+that fire on a single main-conversational turn (the earlier tone axes returned ~0 and
+were retired; [ADR 0012](./docs/adr/0012-behavioral-ab-targets-anti-laziness.md)). The
+benchmark measures these, not generic task success.
 _Avoid_: dimension, metric, quality score.
 
 **Behavior-bait fixture**:
-A prompt crafted to provoke one **behavioral axis** (e.g. a subtly-wrong assertion
-to bait sycophancy; a decidable question to bait hedging). Fork-specific content
-that lives in `tweakcc-maint`; each carries a **Correctness guardrail** check
-(deterministic, or judge-fallback for open-ended ones).
+A small, multi-part task prompt crafted to provoke one **behavioral axis** (e.g. a
+four-part spec with an empty-input edge case to bait dropping in-scope work; a feature
+with unglamorous branches to bait a quiet MVP/stub). Fork-specific content that lives
+in `tweakcc-maint`; each carries a **Correctness guardrail** check (deterministic, or
+judge-fallback for open-ended ones).
 _Avoid_: test case, prompt, eval input.
 
 **Judge panel**:

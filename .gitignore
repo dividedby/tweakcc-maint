@@ -2,6 +2,7 @@ node_modules/
 dist/
 *.log
 .claude/gearbox-log.jsonl
+.claude/gearbox-baseline.txt
 .DS_Store
 /tmp/
 results/local/
