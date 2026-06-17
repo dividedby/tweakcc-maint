@@ -88,6 +88,16 @@ same-day). Enter Phase 2 — Gate.
 **The gate is our own trust instrument**, not a step that produces a PR or a leaf
 contribution. It confirms that his shipped state satisfies our **Four-zeros bar**.
 
+The gate is not a parallel pipeline — it **wraps skrabe's Showtime Driver**
+([CONTEXT.md](../../../CONTEXT.md) "Driver"; [ADR 0007](../../../docs/adr/0007-defer-to-skrabes-canonical-verification-pieces.md)).
+When his `skills/showtime/driver.mjs` is present in the configured leaf checkout, the
+gate sources its apply / orphan / mis-bind signals from `driver check` + `driver report`
+and keys on their **exit codes**, never re-parsing his prose (`src/driver-verification.ts`,
+#80). Running `node skills/showtime/driver.mjs check` locally is the same **Four-zeros**
+trust instrument the gate rides on. We **verify** his shipped state via his canonical
+Driver; we never re-run his Showtime version-bump pipeline — those steps are his, run
+same-day.
+
 Dispatch the `integration-gate.yml` workflow for `<newVersion>`:
 
 ```bash
