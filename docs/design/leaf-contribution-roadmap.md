@@ -72,6 +72,16 @@ the `opus-4-8` set @ CC 2.1.178. Findings (durable):
    immune to the firing mismatch, and a structured comparative form of skrabe's own
    ~30% claim that he does not publish.
 
+## What skrabe actually values (his recent commits, 2026-06-16) — the contribution filter
+
+Mined from ~40 recent commits on each leaf `origin/main`. Use this to decide what to *prepare*, not just what's green:
+
+- **`tweakcc-fixed` — correctness, proven, not speed.** His bar is the **four-zeros** (`CNF=0`, `K9 mis-bind=0`, `parse-fail=0`), **apply round-trip safety** (the 2.0.4 headline, `d613ae7`), **byte-diff patched-vs-pristine** silent-corruption catches, and `auditMisbinds`. He ships version support **same-day** (`5183f6b` 2.0.4/2.1.179 today; 2.1.178 one day after release) — **racing him is pointless.** Merged dividedby PRs: **test coverage of a corruption class** (`test/broaden-leaf-coverage`) and **surgical correctness fixes** (`fix/skip-unresolved-placeholder-prompts`).
+- **`lcc` — leanness + anti-laziness, curated solo.** Realigns and the **anti-laziness pass** (`bec30a9`) are his design call; he reworks rather than accept full-set copies. Merged dividedby PRs: **surgical mis-bind/vocab fixes only** (`fix/realign-agent-usage-croncreate-26`, `fix/realign-overrides-26`).
+- **What helps (vs races):** for `tweakcc-fixed` — a **test catching a silent-corruption class** or a **surgical correctness fix** the gate surfaced; for `lcc` — a **surgical mis-bind/vocab fix** or a **measurement he can't generate** (leanness #328, anti-laziness #331). **Never** a version-adoption PR or a full-set realign.
+
+This is why `/adopt` is being overhauled (Epic E): the command was built to *author version bumps* — the one thing he never needs from us.
+
 ---
 
 ## Epic A — Prove-value produces attachable, reproducible evidence
@@ -87,6 +97,7 @@ is to make **leanness** the primary artifact and keep the bench as a guardrail.
 | **A4** | **Bench powered** — multi-trial + SE-based significance | ✅ done (#315d) | `BEHAVIORAL_AB_TRIALS`; significance = noise-floor AND ≥2·SE |
 | **A5** | **Metered dispatch** — `behavioral-ab.yml` + bench-core `0.3.0` cost sink + ledger onboarding | ✅ done (#315b/c) | runs the bench on a credentialed runner; cost in the agent-research ledger |
 | **A6** | **Leanness report tool** — always-on prompt-size delta (stock vs lobo) per model | **NEW — primary (#328)** | the deciding artifact; see #328 and "Leaf-PR candidates" |
+| **A7** | **Anti-laziness fixtures** — retarget the bench to task-completion (no-defer / no-stub / no-hedge-on-in-scope) | **NEW (#331)** | the one behavioral axis that maps to skrabe's *current* lcc focus (his `bec30a9` anti-laziness pass) and fires on the main prompt; complements A6 |
 
 **Leaf-bar mapping:** A6's leanness artifact is the contribution that maps onto
 `lcc`'s *own* stated value without redundancy — skrabe asserts ~30% leaner but
@@ -121,6 +132,27 @@ ADR 0005), **#314** (Piebald/upstream mentions). Add to D's sweep: this reframe 
 purge "Behavioral A/B is the deciding prove-value evidence" wording wherever it
 reads as current (it's now the guardrail, not the headline).
 
+## Epic E — `/adopt` overhaul (verify-and-measure, not version-adopt)
+
+Tracker: **#330**. The `/adopt` command + `release-adoption` skill encode a
+**version-adoption** pipeline (extract → realign → "Prompts for <ver>" PR) — the
+one thing skrabe never needs from us (he ships versions same-day). Overhaul it to
+the v2 framework:
+
+- **Verify** the gate/four-zeros as our *own* trust instrument; on a version he
+  already shipped, the gate confirms his state — it does not author a PR.
+- **Measure** what he can't: the **leanness report (#328)** + the **anti-laziness
+  delta (#331)**, with the Behavioral A/B as the non-regression guardrail.
+- **Prepare only what he merges** (cockpit draft PR + intent ping + re-preflight):
+  for `tweakcc-fixed`, a corruption-class **test** or a **surgical correctness
+  fix**; for `lcc`, a **surgical mis-bind/vocab fix** or a **measurement artifact**.
+  Never a version-adoption or full-set-realign PR.
+- **Collapse the duplication:** `.claude/commands/adopt.md` (743 lines) and
+  `.claude/skills/release-adoption/SKILL.md` (143 lines) are two independent homes
+  for one procedure (they will drift). Consolidate to one — the skill as the single
+  source (SKILL.md + REFERENCE.md), `/adopt` a thin invoker; reconcile
+  `docs/design/adopt-command.md` + ADR 0010.
+
 ---
 
 ## Concrete leaf-PR candidates (honest, alignment-gated)
@@ -132,10 +164,11 @@ reads as current (it's now the guardrail, not the headline).
   per-prompt + per-category token/char reduction, the always-on subset matching
   the README's six categories — harness, communication, doing-tasks,
   executing-actions, memory, core tools), reported as a structured artifact that
-  substantiates skrabe's ~30% claim. Pair with the **non-regression guardrail**
-  (powered Behavioral A/B: the leaner prompt regresses no correctness). Re-run the
-  preflight at proposal time; surface as a **draft PR with an intent ping**
-  (cockpit: prepare, don't impose). *Needs A6 (the leanness tool).*
+  substantiates skrabe's ~30% claim. Compose with the **anti-laziness delta (A7,
+  #331)** — the behavioral half that maps to his current focus — and the
+  **non-regression guardrail** (powered Behavioral A/B: the leaner prompt regresses
+  no correctness). Re-run the preflight at proposal time; surface as a **draft PR
+  with an intent ping** (cockpit: prepare, don't impose). *Needs A6 + A7.*
 - **LC2 — a version-independent helper unit.** Still held: his toolkit covers the
   obvious ones (`auditMisbinds`, Showtime, Driver — ADR 0007). Only propose if a
   genuine, uncovered gap surfaces. Flagged, not committed.
@@ -152,12 +185,14 @@ reads as current (it's now the guardrail, not the headline).
 
 ## Sequenced priority
 
-1. **A6 — leanness tool** (the new deciding artifact) → **LC1** leanness draft PR.
-2. **B2** (#307) config-dir resolution — Restore-drill correctness bug.
-3. **A3** (#306) provisioning preflight — diagnostic so a setup miss ≠ a bad verdict.
-4. **C2** (#310) seam tests — guard release-detection + preflight.
-5. **C3** (#311), **B3** (#308) — hardening + transport.
-6. **D1–D3** (#312–#314) — docs reconciliation (incl. the v2 wording sweep).
+1. **A6 (#328) leanness tool** + **A7 (#331) anti-laziness fixtures** — the two measurement artifacts.
+2. **Epic E (#330) `/adopt` overhaul** — realign the command to verify-and-measure + collapse the command/skill duplication.
+3. **LC1 (#315)** — compose leanness + anti-laziness + the non-regression guardrail into the first draft leaf-PR *(needs 1)*.
+4. **B2** (#307) config-dir resolution — Restore-drill correctness bug.
+5. **A3** (#306) provisioning preflight — diagnostic so a setup miss ≠ a bad verdict.
+6. **C2** (#310) seam tests — guard release-detection + preflight.
+7. **C3** (#311), **B3** (#308) — hardening + transport.
+8. **D1–D3** (#312–#314) — docs reconciliation (incl. the v2 wording sweep).
 
 ## Known unknowns
 
