@@ -18,7 +18,7 @@ Alignment preflight (verified directly against leaf `origin/main`):
 
 | | leaf HEAD | our state |
 |---|---|---|
-| `tweakcc-fixed` | `5183f6b` — CLI **2.0.4**, CC **2.1.179** deep support | gate runs any dispatched `cc_version` |
+| `tweakcc-fixed` | `a8fb67b` — CLI **2.0.6** (the npm placeholder-guard release, our `tf#15`), CC **2.1.179** deep support | gate runs any dispatched `cc_version` |
 | `lobotomized-claude-code` | `bec30a9` — opus-4-8 anti-laziness pass, **2.1.179** | behavioral infra validated @ 2.1.178 |
 
 skrabe ships version-adoption faster than we can, solo, and owns the repos. A
@@ -76,7 +76,8 @@ the `opus-4-8` set @ CC 2.1.178. Findings (durable):
 
 Mined from ~40 recent commits on each leaf `origin/main`. Use this to decide what to *prepare*, not just what's green:
 
-- **`tweakcc-fixed` — correctness, proven, not speed.** His bar is the **four-zeros** (`CNF=0`, `K9 mis-bind=0`, `parse-fail=0`), **apply round-trip safety** (the 2.0.4 headline, `d613ae7`), **byte-diff patched-vs-pristine** silent-corruption catches, and `auditMisbinds`. He ships version support **same-day** (`5183f6b` 2.0.4/2.1.179 today; 2.1.178 one day after release) — **racing him is pointless.** Merged dividedby PRs: **test coverage of a corruption class** (`test/broaden-leaf-coverage`) and **surgical correctness fixes** (`fix/skip-unresolved-placeholder-prompts`).
+- **`tweakcc-fixed` — correctness, proven, not speed.** His bar is the **four-zeros** (`CNF=0`, `K9 mis-bind=0`, `parse-fail=0`), **apply round-trip safety** (the 2.0.4 headline, `d613ae7`), **byte-diff patched-vs-pristine** silent-corruption catches, and `auditMisbinds`. He ships version support **same-day** (`5183f6b` 2.0.4/2.1.179 today; 2.1.178 one day after release) — **racing him is pointless.** Merged dividedby PRs: **test coverage of a corruption class** (`test/broaden-leaf-coverage`), **surgical correctness fixes** (`fix/skip-unresolved-placeholder-prompts`), and the **npm placeholder-guard backstop** (`tf#15`, the **2.0.6** release headline).
+  - **Altitude lesson (`tf#15`, merged 2026-06-17): pitch the structural / version-independent backstop, not the specific symptom.** He'd *already* fixed the specific `${ANGLE_REUSE}` leak at the data layer in **2.0.5** (named the moved code-review angle slots in source order so the name resolves), yet merged our npm guard anyway because it backstops *any* future unresolved name on npm, not just that one — and he shipped it as the 2.0.6 headline. He also **verified it against his own code first** before merging. Takeaway: before citing a specific symptom as motivation, confirm it isn't already data-layer-fixed in his latest release; frame the contribution as the class-level backstop that *survives* his point fix.
 - **`lcc` — leanness + anti-laziness, curated solo.** Realigns and the **anti-laziness pass** (`bec30a9`) are his design call; he reworks rather than accept full-set copies. Merged dividedby PRs: **surgical mis-bind/vocab fixes only** (`fix/realign-agent-usage-croncreate-26`, `fix/realign-overrides-26`).
 - **What helps (vs races):** for `tweakcc-fixed` — a **test catching a silent-corruption class** or a **surgical correctness fix** the gate surfaced; for `lcc` — a **surgical mis-bind/vocab fix** or a **measurement he can't generate** (leanness #328, anti-laziness #331). **Never** a version-adoption PR or a full-set realign.
 
