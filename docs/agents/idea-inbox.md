@@ -32,10 +32,9 @@ The unchecked items under `## Ideas` in #99 are raw, un-actioned ideas. When ask
    work is filed in `dividedby/bench`; everything else in `dividedby/tweakcc-maint`.
    Then register it as a census row, qualifying a bench filing as `bench#NN` (a bare
    integer means tweakcc-maint).
-5. **Labels** — when filing issues, apply labels from `docs/agents/labels.md`: state
+5. **Labels** — when filing issues, apply labels from `docs/agents/triage-labels.md`: state
    (`needs-triage` to start), category (`bug` / `enhancement` / `chore` / `epic`),
-   and a size estimate (`size:S` / `size:M` / `size:L` / `size:XL`). The compact
-   vocabulary reference is `docs/agents/triage-labels.md`.
+   and a size estimate (`size:S` / `size:M` / `size:L` / `size:XL`).
 6. **Refine** — rewrite the resulting issue(s) with `/software-design`.
 7. **Maintain** — keep `## Ideas` sorted (un-actioned at the top); once an idea
    becomes an issue/PR, move it under **✅ Actioned**, check it, and append `→ #<num>`

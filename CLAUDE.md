@@ -81,7 +81,7 @@ Each ships a framework-free self-test — run it directly after editing the guar
 `.github/workflows/integration-gate.yml` runs the gate on the fork via
 `workflow_dispatch(cc_version)` — that input *is* the Support matrix. See `docs/adr/0006`.
 
-## Agent skills
+## Conventions
 
 ### Issue tracker
 
