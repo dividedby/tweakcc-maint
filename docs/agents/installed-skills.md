@@ -63,7 +63,6 @@ local `skills/` and the agent-meta files alongside it (`issue-tracker.md`,
 - **fewer-permission-prompts** — scan transcripts and add a read-only allowlist to project settings.
 - **handoff** — compact the conversation into a handoff document.
 - **init** — initialize a CLAUDE.md with codebase documentation.
-- **gearbox:doctor** — self-check the Gearbox install (PASS/WARN/FAIL).
 
 ## Writing
 - **writing-fragments** — mine the user for heterogeneous writing fragments into one doc.
