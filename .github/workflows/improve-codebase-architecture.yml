@@ -73,6 +73,13 @@ jobs:
           test -f ~/.claude/skills/improve-codebase-architecture/SKILL.md
           echo "Installed skill from mattpocock/skills@$(git -C "$RUNNER_TEMP/mattpocock-skills" rev-parse --short HEAD)"
 
+      - name: Fetch depth rubric
+        run: |
+          set -euo pipefail
+          # skills ADR 0020(c): hard-fail on any fetch error. The mattpocock/skills
+          # URLs live once in harness/cli.py fetch-rubric (dividedby/skills).
+          python3 "$HARNESS/cli.py" fetch-rubric --out-dir "$RUNNER_TEMP"
+
       - name: Ensure provenance label exists
         run: |
           gh label create "$LABEL" \
@@ -91,6 +98,8 @@ jobs:
           # load-bearing — a scope-free skeleton reviews blindly — so a missing
           # include HARD-FAILS the run here, like the test -f on the skill above.
           test -f .github/arch-review-context.md
+          test -f "$RUNNER_TEMP/depth-LANGUAGE.md"
+          test -f "$RUNNER_TEMP/depth-DEEPENING.md"
           # The agent is read-only: it explores, decides, and emits a single
           # <output> JSON block plus a raw <body> block. It does NOT file the issue
           # — the Publish step does, via the harness, which enforces the
@@ -109,7 +118,15 @@ jobs:
             --max-budget-usd 3.00 \
             --permission-mode acceptEdits \
             --allowedTools "Bash(gh issue list:*) Bash(gh issue view:*) Bash(gh search:*) Bash(gh api:*) Bash(git:*) Read Grep Glob WebSearch WebFetch" \
-            --append-system-prompt "$(cat "$HARNESS/prompts/improve-codebase-architecture.md"; printf '\n\n'; cat .github/arch-review-context.md)" \
+            --append-system-prompt "$(
+              cat "$HARNESS/prompts/improve-codebase-architecture.md"
+              printf '\n\n---\n\n## Depth rubric (fetched from mattpocock/skills)\n\n'
+              cat "$RUNNER_TEMP/depth-LANGUAGE.md"
+              printf '\n\n'
+              cat "$RUNNER_TEMP/depth-DEEPENING.md"
+              printf '\n\n---\n\n'
+              cat .github/arch-review-context.md
+            )" \
             "Run the scheduled architecture-review pass. Follow the instructions in the system prompt." \
             | tee "$RUNNER_TEMP/agent.jsonl"
 
