@@ -103,7 +103,7 @@ jobs:
           # The agent is read-only: it explores, decides, and emits a single
           # <output> JSON block plus a raw <body> block. It does NOT file the issue
           # — the Publish step does, via the harness, which enforces the
-          # one-issue-per-run cap and the label in code. gh is scoped to read-only
+          # ≤2-issues-per-run cap and the label in code. gh is scoped to read-only
           # subcommands so the agent cannot create an issue itself.
           # --output-format stream-json --verbose: stream every event so a hung run
           # leaves a trace and the final result event (total_cost_usd) lands before
@@ -117,7 +117,7 @@ jobs:
             --model claude-sonnet-4-6 \
             --max-budget-usd 3.00 \
             --permission-mode acceptEdits \
-            --allowedTools "Bash(gh issue list:*) Bash(gh issue view:*) Bash(gh search:*) Bash(gh api:*) Bash(git:*) Read Grep Glob WebSearch WebFetch" \
+            --allowedTools "Bash(gh issue list:*) Bash(gh issue view:*) Bash(gh search:*) Bash(git:*) Read Grep Glob" \
             --append-system-prompt "$(
               cat "$HARNESS/prompts/improve-codebase-architecture.md"
               printf '\n\n---\n\n## Depth rubric (fetched from mattpocock/skills)\n\n'
@@ -146,7 +146,7 @@ jobs:
         id: publish
         run: |
           set -euo pipefail
-          # Parse <output>/<body>, file <=1 labeled issue, write the rich step
+          # Parse <output>/<body>, file <=2 labeled issues, write the rich step
           # summary, emit issue_url. Fails loudly (exit 1) on a missing/garbled
           # block — the failure() Summarise step below then surfaces the raw log.
           python3 "$HARNESS/cli.py" publish \
