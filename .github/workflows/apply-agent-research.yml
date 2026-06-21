@@ -2,20 +2,20 @@ name: Apply Agent Research
 
 on:
   schedule:
-    # 03:27 UTC Saturday = 22:27 CT Friday. Weekly, in the shared Friday-evening
-    # consumer window — slot = sha1("tweakcc-maint/apply-agent-research") within the
-    # Sat 00–04 UTC (= Fri 19–23 CT) band, so this loop self-staggers against every
-    # other Consumer with no schedule coordination (agent-research ADR 0022
-    # hash-stagger). The Saturday-UTC slot IS Friday evening CT: one `* * 6` mask
-    # avoids the UTC-midnight day-of-week straddle. Weekly under the agent-research
-    # cost rebalance (2026-06-08): the upstream corpus refreshes daily-capture /
-    # 2×-week-synthesis, so applying its mirror more often than weekly is wasted
-    # runs — under the $100 Agent SDK credit.
+    # 03:27 UTC Mon/Wed/Sat = 22:27 CT Sun/Tue/Fri. 3×/week (Mon/Wed/Sat), in
+    # the shared evening consumer window — slot = sha1("tweakcc-maint/apply-agent-research")
+    # within the 00–04 UTC band (= evening CT), so this loop self-staggers against
+    # every other Consumer with no schedule coordination (agent-research ADR 0022
+    # hash-stagger). The 00–04 UTC slots are evening CT: a `* * 1,3,6` mask covers
+    # Mon/Wed/Sat UTC without the UTC-midnight day-of-week straddle. 3×/week under
+    # the agent-research cost rebalance (2026-06-08): the upstream corpus refreshes
+    # daily-capture / 2×-week-synthesis, so applying its mirror on Mon/Wed/Sat tracks
+    # freshness without over-spend — within the $100 Agent SDK credit.
     # GitHub runs scheduled workflows from the DEFAULT branch only (`main` here), so
     # the cron ticks from `main`. The checkout below omits `ref:` to follow the
     # triggering branch (main on cron; the dispatched branch on workflow_dispatch),
     # so the loop analyzes the freshest integrated agent-meta.
-    - cron: "27 3 * * 6"
+    - cron: "27 3 * * 1,3,6"
   workflow_dispatch:
 
 # Thin **workflow envelope** (ADR 0014): cron, permissions, tokens, tool scoping,
