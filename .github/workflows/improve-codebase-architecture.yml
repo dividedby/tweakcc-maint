@@ -2,13 +2,13 @@ name: Improve Codebase Architecture
 
 on:
   schedule:
-    # 01:34 UTC Saturday = 20:34 CT Friday. Weekly, in the shared Friday-evening
-    # consumer window — slot = sha1("tweakcc-maint/improve-codebase-architecture")
-    # within the Sat 00–04 UTC (= Fri 19–23 CT) band, so this loop self-staggers
-    # against every other onboarded loop with no schedule coordination
-    # (agent-research ADR 0022 hash-stagger). The single `* * 6` mask avoids the
-    # UTC-midnight day-of-week straddle a literal Friday-evening window would hit.
-    - cron: "34 1 * * 6"
+    # 01:34 UTC Mon/Wed/Sat = 20:34 CT Sun/Tue/Fri. 3×/week (Mon/Wed/Sat), in
+    # the shared evening consumer window — slot = sha1("tweakcc-maint/improve-codebase-architecture")
+    # within the 00–04 UTC band (= evening CT), so this loop self-staggers against
+    # every other onboarded loop with no schedule coordination (agent-research ADR
+    # 0022 hash-stagger). The `* * 1,3,6` mask covers Mon/Wed/Sat UTC without the
+    # UTC-midnight day-of-week straddle.
+    - cron: "34 1 * * 1,3,6"
   workflow_dispatch:
 
 # Thin **workflow envelope** (ADR 0014): cron, permissions, tokens, tool scoping,
